@@ -98,6 +98,22 @@
     .sport-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
     .sport-row label { font-size:14px; font-weight:700; color:var(--teal-d); }
     .sport-row select { font-family:inherit; font-weight:500; padding:9px 13px; border:2px solid var(--teal); border-radius:12px; font-size:14px; background:#fff; color:var(--ink); cursor:pointer; }
+    #login-area { text-align:center; padding:30px 10px 10px; }
+    .login-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:18px; font-weight:700;
+      padding:16px 36px; border-radius:16px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 10px 24px rgba(6,182,164,.34); transition:transform .12s, box-shadow .2s;
+    }
+    .login-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(6,182,164,.44); }
+    .login-note { max-width:420px; margin:14px auto 0; text-align:center; }
+    .pick-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
+      margin-top:16px; padding:13px 30px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 8px 20px rgba(6,182,164,.30); transition:transform .12s, box-shadow .2s;
+    }
+    .pick-btn:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.4); }
     .subtitle-row { margin:12px 0 4px; }
     .subtitle-row select {
       font-family:'Zen Maru Gothic',sans-serif; font-weight:700;
@@ -116,6 +132,11 @@
     <p class="lead" id="lead">要項（PDF・画像）をドロップ → 内容を確認 → Googleカレンダーに登録</p>
   </header>
   <main>
+    <div id="login-area">
+      <button id="loginBtn" class="login-btn">Googleでログイン</button>
+      <p class="note login-note">大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
+    </div>
+    <div id="work" style="display:none">
     <div class="sport-row">
       <label for="sport">競技：</label>
       <select id="sport"></select>
@@ -139,11 +160,14 @@
       </div>
       <b>ここに要項ファイルをドラッグ&amp;ドロップ</b>
       <div class="sub">PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。</div>
+      <button id="pickBtn" class="pick-btn" type="button">ファイルを選ぶ</button>
+      <input id="file" type="file" accept="image/*,application/pdf" multiple style="display:none">
     </div>
-    <p class="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
+    <p class="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
     <ul id="list"></ul>
     <div id="bar" style="display:none"><button id="reg">Googleカレンダーに登録</button></div>
     <div id="msg"></div>
+    </div>
   </main>
 
   <script src="https://accounts.google.com/gsi/client" async></script>

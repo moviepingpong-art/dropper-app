@@ -24,6 +24,10 @@ var list = document.getElementById('list');
 var bar = document.getElementById('bar');
 var msg = document.getElementById('msg');
 var regBtn = document.getElementById('reg');
+var loginBtn = document.getElementById('loginBtn');
+var pickBtn = document.getElementById('pickBtn');
+var loginArea = document.getElementById('login-area');
+var workArea = document.getElementById('work');
 var sportSel = document.getElementById('sport');
 var typeSel = document.getElementById('dropperType');
 var leadEl = document.getElementById('lead');
@@ -87,6 +91,35 @@ function applyType(key) {
 drop.addEventListener('drop', function (e) { popAnim(); handleFiles(e.dataTransfer.files); });
 regBtn.addEventListener('click', onRegisterClick);
 
+// 最初に「Googleでログイン」ボタンをタップ → ポップアップが正しく開く（タップ直後のため）
+// ログイン成功で作業エリアを表示。以降はログイン済みなのでファイル選択でポップアップ問題は起きない。
+if (loginBtn) {
+  loginBtn.addEventListener('click', async function () {
+    loginBtn.disabled = true;
+    setMsg('Googleにログインしています…');
+    try {
+      await ensureToken();
+      setMsg('');
+      if (loginArea) loginArea.style.display = 'none';
+      if (workArea) workArea.style.display = '';
+    } catch (e) {
+      setMsg(e && e.message ? e.message : 'ログインに失敗しました');
+      loginBtn.disabled = false;
+    }
+  });
+}
+
+// ファイル選択ボタン（スマホの主動線）。ログイン済みなのでダイアログを開くだけ。
+if (pickBtn) {
+  pickBtn.addEventListener('click', function () {
+    fileInput.value = '';
+    fileInput.click();
+  });
+}
+if (fileInput) {
+  fileInput.addEventListener('change', function (e) { popAnim(); handleFiles(e.target.files); });
+}
+
 function setMsg(t) { msg.textContent = t || ''; }
 
 // ドロップ/選択した瞬間に、アニメ部分（カレンダー＋紙）だけを一回り拡大して戻す
@@ -135,7 +168,7 @@ function ensureToken() {
 async function handleFiles(fileList) {
   var files = Array.prototype.slice.call(fileList || []);
   if (!files.length) { unpopAnim(); return; }
-  setMsg('Googleにログインします…（初回のみ）');
+  setMsg('要項を読み込んでいます…');
   try { await ensureToken(); }
   catch (e) { setMsg(e && e.message ? e.message : 'ログインに失敗しました'); unpopAnim(); return; }
   setMsg('');
