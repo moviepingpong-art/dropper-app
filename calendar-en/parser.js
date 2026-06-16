@@ -1,0 +1,542 @@
+// parser.js — 要項テキストから項目を推定
+// window.Dropper = { parse(text), addDays(iso,n), isPast(dates) } を公開する。
+(function (global) {
+  'use strict';
+  var PAST_GRACE_DAYS = 10;
+
+  // ===== 競技プロファイル =====
+  // 競技ごとの語彙をここで定義する。UIの競技セレクタで選んだキーを使う。
+  //   key           : 内部キー（UIの選択値）
+  //   label         : 表示名
+  //   sportKeywords : この競技の名前キーワード（自動判定・除外の保護に使う）
+  //   formats       : 試合形式の抽出ルール配列。各ルール { re, label, skipIfAny, skipIfNone }
+  //       re         : この正規表現が本文にマッチしたら label を候補に追加
+  //       skipIfAny  : 既に追加済みのラベルのいずれかがこの正規表現に当たる場合は追加しない（排他用）
+  //       skipIfNone : 既に追加済みのラベルのどれかがこの正規表現に当たる「とき以外」は追加しない（フォールバック用）
+  // excludeSports は全競技共通リスト（ALL_SPORTS）を使い、「選択中の競技キーワードに該当しなければ弾く」方式。
+  // 汎用モード（competition:'auto'で競技未特定など）は弾かない。
+
+  // 全競技名の共通リスト（大会名に他競技が混入した場合に空にする判定用）
+  var ALL_SPORTS = /(卓\s*球|ラ\s*ー\s*ジ\s*ボ\s*ー\s*ル|ピ\s*ン\s*ポ\s*ン|バ\s*ド\s*ミ\s*ン\s*ト\s*ン|バ\s*レ\s*ー\s*ボ\s*ー\s*ル|バ\s*ス\s*ケ\s*ッ\s*ト\s*ボ\s*ー\s*ル|柔\s*道|空\s*手|剣\s*道|弓\s*道|サ\s*ッ\s*カ\s*ー|フ\s*ッ\s*ト\s*サ\s*ル|野\s*球|ソ\s*フ\s*ト\s*ボ\s*ー\s*ル|ホ\s*ッ\s*ケ\s*ー|水\s*泳|陸\s*上\s*競\s*技|体\s*操|ラ\s*グ\s*ビ\s*ー|テ\s*ニ\s*ス|カ\s*ヌ\s*ー)/;
+
+  var SPORT_PROFILES = {
+    tabletennis: {
+      label: '卓球・バドミントン',
+      sportKeywords: /卓\s*球|ラ\s*ー\s*ジ\s*ボ\s*ー\s*ル|ピ\s*ン\s*ポ\s*ン|バ\s*ド\s*ミ\s*ン\s*ト\s*ン/,
+      formats: [
+        { re: /団\s*体/, label: '団体戦' },
+        { re: /個\s*人\s*戦/, label: '個人戦' },
+        { re: /男\s*女\s*シングルス/, label: '男女シングルス' },
+        { re: /シングルス/, label: 'シングルス', skipIfAny: /シングルス/ },
+        { re: /混\s*合\s*ダブルス/, label: '混合ダブルス' },
+        { re: /男\s*女\s*ダブルス/, label: '男女ダブルス' },
+        { re: /男\s*子\s*ダブルス/, label: '男子ダブルス' },
+        { re: /女\s*子\s*ダブルス/, label: '女子ダブルス' },
+        { re: /ダブルス/, label: 'ダブルス', skipIfAny: /ダブルス/ }
+      ]
+    },
+    volleyball: {
+      label: 'バレーボール',
+      sportKeywords: /バ\s*レ\s*ー\s*ボ\s*ー\s*ル|バ\s*レ\s*ー/,
+      formats: [
+        { re: /6\s*人\s*制|６\s*人\s*制/, label: '6人制' },
+        { re: /9\s*人\s*制|９\s*人\s*制/, label: '9人制' },
+        { re: /ビ\s*ー\s*チ\s*バ\s*レ\s*ー/, label: 'ビーチ' },   // 連語限定（単独「ビーチ」誤検出対策）
+        { re: /混\s*合/, label: '混合' },
+        { re: /男\s*女/, label: '男女' }
+      ]
+    },
+    basketball: {
+      label: 'バスケットボール',
+      sportKeywords: /バ\s*ス\s*ケ\s*ッ\s*ト\s*ボ\s*ー\s*ル|バ\s*ス\s*ケ|ミ\s*ニ\s*バ\s*ス/,
+      formats: [
+        { re: /3\s*[xX×]\s*3|３\s*[xX×]\s*３/, label: '3x3' },
+        { re: /ミ\s*ニ\s*バ\s*ス/, label: 'ミニバス' },
+        { re: /ト\s*ー\s*ナ\s*メ\s*ン\s*ト/, label: 'トーナメント' },
+        { re: /リ\s*ー\s*グ\s*戦/, label: 'リーグ戦' },
+        { re: /男\s*女/, label: '男女' }
+      ]
+    },
+    budo: {
+      label: '柔道・空手',
+      sportKeywords: /柔\s*道|空\s*手|剣\s*道/,
+      formats: [
+        { re: /団\s*体/, label: '団体' },
+        { re: /個\s*人/, label: '個人' },
+        { re: /組\s*手/, label: '組手' },
+        // 「形」は文脈限定（「形式」「型番号」の誤検出対策）
+        { re: /(?:個人|団体|男子|女子|種目|部門)\s*[・、]?\s*形|形\s*[・、]?\s*(?:組手|の部|競技)|形\s*の\s*部/, label: '形' },
+        { re: /体\s*重\s*別|階\s*級\s*別/, label: '体重別' },
+        { re: /無\s*差\s*別/, label: '無差別' },
+        { re: /男\s*女/, label: '男女' }
+      ]
+    },
+    soccer: {
+      label: 'サッカー・フットサル',
+      sportKeywords: /サ\s*ッ\s*カ\s*ー|フ\s*ッ\s*ト\s*サ\s*ル/,
+      formats: [
+        { re: /フ\s*ッ\s*ト\s*サ\s*ル/, label: 'フットサル' },
+        { re: /予\s*選\s*リ\s*ー\s*グ/, label: '予選リーグ' },
+        { re: /決\s*勝\s*ト\s*ー\s*ナ\s*メ\s*ン\s*ト/, label: '決勝トーナメント' },
+        { re: /ト\s*ー\s*ナ\s*メ\s*ン\s*ト/, label: 'トーナメント', skipIfAny: /トーナメント/ },
+        { re: /リ\s*ー\s*グ\s*戦/, label: 'リーグ戦', skipIfAny: /リーグ/ },
+        { re: /男\s*女/, label: '男女' }
+      ]
+    },
+    baseball: {
+      label: '野球・ソフトボール',
+      sportKeywords: /野\s*球|ソ\s*フ\s*ト\s*ボ\s*ー\s*ル/,
+      formats: [
+        { re: /硬\s*式/, label: '硬式' },
+        { re: /軟\s*式/, label: '軟式' },
+        { re: /学\s*童|少\s*年/, label: '学童・少年' },
+        { re: /ト\s*ー\s*ナ\s*メ\s*ン\s*ト/, label: 'トーナメント' },
+        { re: /リ\s*ー\s*グ\s*戦/, label: 'リーグ戦' },
+        { re: /男\s*女/, label: '男女' }
+      ]
+    }
+  };
+
+  // 既定の競技キー
+  var DEFAULT_SPORT = 'tabletennis';
+
+
+  function toHalfWidthDigits(s) {
+    return String(s).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+  }
+  function iso(y, mo, d) { return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2); }
+
+  function collapseCjkSpaces(s) {
+    var C = '\\u3040-\\u30ff\\u3400-\\u9fff\\uff66-\\uff9f々〆〇';
+    var H = '[ \\t\\u3000]+';
+    var re1 = new RegExp('([' + C + '])' + H + '(?=[' + C + '])', 'g');
+    var re2 = new RegExp('([' + C + '])' + H + '(?=[0-9])', 'g');
+    var re3 = new RegExp('([0-9])' + H + '(?=[' + C + '])', 'g');
+    return String(s).replace(re1, '$1').replace(re1, '$1').replace(re2, '$1').replace(re3, '$1');
+  }
+
+  function extractDates(line) {
+    var out = [], baseYear = null, m;
+    var reW = /令\s*和\s*(\d+)\s*年\s*(\d+)\s*月\s*(\d+)\s*日/g;
+    while ((m = reW.exec(line)) !== null) { baseYear = 2018 + Number(m[1]); out.push(iso(baseYear, m[2], m[3])); }
+    var reG = /(\d{4})\s*年\s*(\d+)\s*月\s*(\d+)\s*日/g;
+    while ((m = reG.exec(line)) !== null) { baseYear = Number(m[1]); out.push(iso(baseYear, m[2], m[3])); }
+    if (baseYear) {
+      var reMD = /(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
+      while ((m = reMD.exec(line)) !== null) {
+        var v = iso(baseYear, m[1], m[2]);
+        if (out.indexOf(v) === -1) out.push(v);
+      }
+    }
+    return Array.from(new Set(out)).sort();
+  }
+
+  function extractDeadline(lines, labelRe, fallbackYear) {
+    for (var i = 0; i < lines.length; i++) {
+      if (!labelRe.test(lines[i])) continue;
+      for (var j = i; j <= i + 2 && j < lines.length; j++) {
+        var d = extractDates(lines[j]);
+        if (!d.length && fallbackYear) {
+          var md = [], m, reMD = /(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
+          while ((m = reMD.exec(lines[j])) !== null) md.push(iso(fallbackYear, m[1], m[2]));
+          d = Array.from(new Set(md)).sort();
+        }
+        if (d.length) return d.length >= 2 ? (d[0] + '～' + d[d.length - 1]) : d[0];
+      }
+    }
+    return '';
+  }
+
+  function pickValue(lines, labelRe, excludeRe) {
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (!labelRe.test(ln) || (excludeRe && excludeRe.test(ln))) continue;
+      var v = ln.replace(/^\s*\d+\s*/, '')
+        .replace(new RegExp('^.*?' + labelRe.source + '\\s*[:：]?\\s*'), '')
+        .trim();
+      if (v) return v;
+      return (i + 1 < lines.length) ? lines[i + 1].trim() : '';
+    }
+    return '';
+  }
+
+  // 大会名クリーニング
+  function cleanTaikaiMei(name, activeProfile, genericMode) {
+    // BOM除去
+    name = name.replace(/^[\uFEFF\u00EF\u00BB\u00BF]+/, '');
+    // 】までの前置きを除去（「大会情報】」「参加者募集】」等）
+    name = name.replace(/^[^】]*】\s*/, '');
+    // 先頭の記号・番号を除去（「・」「1.」「①」等）
+    name = name.replace(/^[\s　]*[・●▶►◆■▪\-－―]+[\s　]*/, '');
+    name = name.replace(/^[\s　]*\d+[\.．]\s*/, '');
+    // 末尾の不要語を除去
+    name = name.replace(/[\s　。．、,]*[（(][^）)]*[）)]\s*(実\s*施|要\s*項|開\s*催)[\s。．]*$/, '');
+    name = name.replace(/[\s　。．、,]*(実\s*施要\s*項|実\s*施|要\s*項|に\s*つ\s*い\s*て|の?\s*ご?\s*案\s*内|開\s*催\s*要\s*項|開\s*催)[\s。．]*$/, '');
+    // 末尾の事務的な語を除去（概要・規約・募集・受付係 等）
+    name = name.replace(/[\s　。．、,]*(開\s*催\s*概\s*要|概\s*要|試\s*合\s*規\s*約|大\s*会\s*規\s*定|参\s*加\s*選\s*手\s*募\s*集|選\s*手\s*募\s*集|募\s*集\s*要\s*綱|募\s*集|広\s*告\s*受\s*付\s*係?|受\s*付\s*係)[\s。．]*$/, '');
+    // 先頭の「大会名」「名称」ラベルを除去
+    name = name.replace(/^(?:大\s*会\s*名|名\s*称)\s*[:：]?\s*/, '');
+    // 日付・時刻の混入を除去
+    name = name.replace(/[\s　]*\d{4}年\d+月\d+日[^）]*$/, '');
+    name = name.replace(/[\s　]*[（(]\d{4}年[^）)]*[）)].*$/, '');
+    name = name.replace(/[\s　]*(午前|午後)\d+時.*$/, '');
+    // 先頭の「兼〜」を除去
+    name = name.replace(/^兼\s*/, '');
+    // 本文混入（参加資格・〜による等）は空にする
+    if (/(参\s*加\s*資\s*格|ほ\s*か\s*次\s*に\s*よ\s*る|\d+\s*項\s*に\s*よ\s*る|総\s*則\s*\d)/.test(name)) name = '';
+    // 余分な末尾語を除去（「等を」「掲載」「会場図」等）
+    name = name.replace(/[\s　]*(等\s*を|掲\s*載.*$|会\s*場\s*図.*$)/, '');
+    // 「要項掲載（日付）」を除去
+    name = name.replace(/[\s　]*要\s*項\s*掲\s*載[^）]*[）)]?.*$/, '');
+    // 記事的な文末を除去（「が6月」等）
+    name = name.replace(/[\s　]*(が|は|を|に|で|も)\d*[月日].*$/, '');
+    // 選択中の競技以外の競技名を含む場合は空にする（汎用モードはスキップ）
+    if (!genericMode && ALL_SPORTS.test(name) &&
+        !(activeProfile.sportKeywords && activeProfile.sportKeywords.test(name))) name = '';
+    // サイト名・更新情報を除去
+    name = name.replace(/[\s　]*[-–—―|｜][\s　]*.{2,20}$/, '');
+    name = name.replace(/[\s　]*[（(][^）)]*更新[^）)]*[）)].*$/, '');
+    // 括弧内の「令和N年度」を除去
+    name = name.replace(/[（(]\s*令和[^）)]*[）)]?.*$/, '');
+    // 先頭の日付プレフィックスを除去
+    name = name.replace(/^\d+\/\d+\s*[（(][月火水木金土日][）)]\s*/, '');
+    name = name.replace(/^\d+月\d+日[（(][月火水木金土日][）)]?\s*/, '');
+    // 先頭の番号・記号を除去
+    name = name.replace(/^(?:[①-⑳Ⅰ-Ⅻ]+|[（(]\d+[）)](?:\s*名\s*称)?)\s*/, '');
+    // 余分な末尾語を除去（「ランキング」「無条件出場」等）
+    name = name.replace(/[\s　]*(ラ\s*ン\s*キ\s*ン\s*グ|無\s*条\s*件\s*出\s*場.*)$/, '');
+    // 他競技は空にする（汎用モードはスキップ）
+    if (!genericMode && ALL_SPORTS.test(name) &&
+        !(activeProfile.sportKeywords && activeProfile.sportKeywords.test(name))) name = '';
+    // 議事録・通知文は空にする
+    if (/(理\s*事\s*会|報\s*告\s*事\s*項|宗\s*片|事\s*務\s*局|日\s*程\s*と\s*会\s*場\s*一\s*覧|宿\s*泊\s*要\s*項|優\s*先\s*出\s*場\s*対\s*象)/.test(name)) name = '';
+    // 先頭の「(兼〜)」を除去
+    name = name.replace(/^[（(]兼[^）)]*[）)]\s*/, '');
+    // 末尾の「要項（年度）」を除去
+    name = name.replace(/[\s　]*[（(]?(要\s*項)[\s　]*[（(][^）)]*[）)].*$/, '');
+    name = name.replace(/[\s　]*(実\s*施)?\s*要\s*項\s*[（(][^）)]*[）)].*$/, '');
+    // 目次混入（「・・・数字」）を除去
+    name = name.replace(/[\s　]*[・．]{3,}.*$/, '');
+    name = name.replace(/[\s　]*\d+$/, '');
+    // 先頭の会長名・役職名を除去
+    name = name.replace(/^(会\s*長|理\s*事\s*長|会\s*頭)[\s　]?[^第]{1,8}(?=第)/, '');
+    // 番号プレフィックスを除去
+    name = name.replace(/^\d{1,2}\s*本\s*大\s*会\s*[①-⑳]?\s*/, '');
+    name = name.replace(/^[⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳][（(][^）)]*[）)]\s*/, '');
+    // 末尾の「実施要項主催〜」を除去
+    name = name.replace(/[\s　]*(実\s*施)?\s*要\s*項\s*主\s*催.*$/, '');
+    // 末尾の「からの推薦〜」を除去
+    name = name.replace(/[\s　]*から\s*の\s*推\s*薦.*$/, '');
+    // 半角カナを全角に変換
+    name = name.replace(/[ｦ-ﾟ]+/g, function(s) {
+      var r = '';
+      for (var i = 0; i < s.length; i++) {
+        var c = s.charCodeAt(i);
+        r += (c >= 0xFF61 && c <= 0xFF9F) ? String.fromCharCode(c - 0xFF61 + 0x30A1) : s[i];
+      }
+      return r;
+    });
+    // 先頭の主催者情報を除去
+    name = name.replace(/^.{2,20}(主\s*催|指\s*定\s*管\s*理\s*者)[^第]*(?=第)/, '');
+    // 末尾の主催者・協会情報を除去
+    name = name.replace(/[\s　]*[\/／]\s*(ｵｰﾌﾟﾝ|オープン).*(主\s*催|協\s*議\s*会|連\s*盟).*$/, '');
+    name = name.replace(/[\s　]*(主\s*催|協\s*議\s*会|連\s*盟)\s*.{2,20}$/, '');
+    // 「要項(案)」「1主催」等は上記パターンで対応済み
+    // 末尾の「について」「御案内」を除去
+    name = name.replace(/[\s　]*(に\s*つ\s*い\s*て)?[（(]?御?\s*案\s*内[）)]?[\s。．]*$/, '');
+    // 不適切な大会名パターンを空にする
+    // 複数の大会名が「兼」で連結されている場合は最初の大会名のみ取得
+    var kanMatch = name.match(/^(.{5,35}?(?:大会|選手権|フェスティバル))(?:兼|／|\/).*/);
+    if (kanMatch) name = kanMatch[1].trim();
+    // 会場・日程情報が混入している場合を除去
+    name = name.replace(/[\s　]*[（(]\s*(一般|ジュニア|カデット|ホープス|小学生|中学生|高校生|硬式|軟式)[^）)]*[）)].*$/, function(m, p1) {
+      // 種別情報は保持（短い場合）
+      return m.length < 15 ? m : '';
+    });
+    // 50文字超は空にする
+    if (name.replace(/\s/g, '').length > 50) name = '';
+    // 前後の記号・空白を除去
+    name = name.replace(/^[【「\s　\uFEFF『]+/, '').replace(/[】」\s　』]+$/, '');
+    return name.trim();
+  }
+
+  // 会場名クリーニング
+  function cleanVenue(s) {
+    if (!s) return '';
+    // 先頭の括弧・記号を除去
+    s = s.replace(/^[【『「\[◆●▶►■♦\(（]+\s*/, '').replace(/[】』」\]\)）]+$/, '');
+    // 「地域名：」プレフィックスを除去
+    s = s.replace(/^[^\s　：:]{2,5}[：:]\s*/, '');
+    // 付記を除去（現・旧・控室・サブ等）
+    s = s.replace(/[（(](現|旧|控\s*室|サ\s*ブ|予\s*定)[^）)]*[）)]/g, '').trim();
+    // 未閉じ括弧を除去
+    s = s.replace(/[（(][^）)]*$/, '').trim();
+    // 先頭の「…」「・〜：」を除去
+    s = s.replace(/^[…・]+\s*[^：:]*[：:]?\s*/, '');
+    // 括弧内の住所を除去
+    s = s.replace(/[（(][^）)]*[市区町村]\d[^）)]*[）)]/g, '').trim();
+    s = s.replace(/^[（(]\d+[）)]\s*(総\s*合\s*開\s*会\s*式|競\s*技)?\s*/, '');
+    // 「日程・競技会場〜」プレフィックスを除去
+    s = s.replace(/^[・\s　]*[日程競技会場]+[\s　（(\d)）)]*[：:･・\s　]*/, '');
+    // 先頭の番号を除去
+    s = s.replace(/^[\s　]*(?:[\d１-９][\.．）)]|[①-⑳])\s*/, '');
+    // 日付が先頭に混入している場合除去
+    s = s.replace(/^\d+月\d+日[（(][月火水木金土日][）)]?\s*[、,：:･・\s　]*/, '');
+    s = s.replace(/^[^：:]*[：:]\s*/, '');
+    // 括弧内の電話番号を除去
+    s = s.replace(/[（(][\d\-－\s]{6,}[）)]/g, '');
+    // TEL・電話・郵便番号以降を除去
+    s = s.replace(/[\s　]*(ＴＥＬ|TEL|℡|Tel|電話|FAX|☎|〒).*$/i, '');
+    s = s.replace(/[\s　]*[（(][^）)]*tel[^）)]*[）)].*$/i, '');
+    s = s.replace(/[\s　]*\d{2,4}[-－]\d{3,4}[-－]\d{4}.*$/, '');
+    // 試合説明・注意事項
+    s = s.replace(/[\s　]*[①-⑳\d１-９]+[．.。]\s*(試合|競技|男|女|種目|一部|二部).*$/, '');
+    s = s.replace(/[\s　]*[※★☆]\s*.*$/, '');
+    // 日付混入
+    s = s.replace(/[\s　]*(令和|[12][09]\d\d年|\d+月\d+日).*$/, '');
+    // 「午前」「開始」等
+    s = s.replace(/[\s　]*(午前|午後|開始|開館|開場).*$/, '');
+    // サイト名の混入を除去
+    s = s.replace(/[\s　]*[-–—―]\s*.{2,15}$/, '');
+    s = s.trim();
+    // 括弧内の住所を除去
+    s = s.replace(/[（(][^）)]*[市町村]\d[^）)]*[）)]/g, '').trim();
+    // 施設名に直結した住所を除去
+    s = s.replace(/((?:体育館|アリーナ|ホール|センター|競技場|ドーム))[^、。\n]*[市町村]\S+$/, '$1').trim();
+    // 先頭・末尾の括弧を除去
+    s = s.replace(/^[「『【◆]/, '').replace(/[」』】]$/, '');
+    // 他競技施設は空にする
+    if (/(陸\s*上\s*競\s*技\s*場|競\s*泳|カ\s*ヌ\s*ー|ボ\s*ク\s*シ\s*ン\s*グ|レ\s*ス\s*リ\s*ン\s*グ)/.test(s) && !/(体\s*育|アリーナ|ホール|センター)/.test(s)) s = '';
+    // 大会名が混入した場合は空にする
+    if (/(大\s*会|選\s*手\s*権|選\s*抜)/.test(s) && !/(体\s*育|アリーナ|ホール|センター|競\s*技\s*場)/.test(s)) s = '';
+    // 25文字超なら施設名で切る（括弧内の別名は保持）
+    if (s.length > 25) {
+      var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|プラザ|記念館|野球場|球場|運動場)/i;
+      var m = s.match(suffixRe);
+      if (m) {
+        var end = m.index + m[0].length;
+        var rest = s.slice(end);
+        var closeP = rest.match(/^[^）)]*[）)]/);
+        if (closeP) end += closeP[0].length;
+        s = s.slice(0, end).trim();
+      }
+    }
+    if (s.length > 30 && /[はがをにでも]/.test(s)) s = '';
+    // 不適切な会場名パターンを空にする
+    // 「略称SC」「予定」のみの場合
+    if (/^(略称|予定|未定|調整中)$/.test(s.trim())) s = '';
+    // 住所のみ（施設名なし）の場合
+    if (/^[〒]/.test(s) || /^\d{3}-\d{4}/.test(s)) s = '';
+    return s;
+  }
+
+  function splitVenue(s) {
+    s = String(s).replace(/^\s*\d+\s*/, '').replace(/^.*?(会\s*場|場\s*所)\s*[:：]?\s*/, '').trim();
+    var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|広場|公園|プラザ|グラウンド|運動場|記念館|野球場|球場)/gi;
+    var last = null, m;
+    while ((m = suffixRe.exec(s)) !== null) last = m;
+    if (last) {
+      var end = last.index + last[0].length;
+      var venue = s.slice(0, end).trim();
+      var address = s.slice(end).replace(/^[\s　、,，：:･・]+/, '').trim();
+      var alias = address.match(/^[（(][^）)]*(館|アリーナ|ARENA|体育|総合|センター|ホール|広場|公園)[^）)]*[）)]/);
+      if (alias) { venue += ' ' + alias[0]; address = address.slice(alias[0].length).replace(/^[\s　、,，：:･・]+/, '').trim(); }
+      address = address.replace(/\s*(ＴＥＬ|TEL|℡|Tel|電話|FAX|☎).*$/i, '').trim();
+      if (!/(〒|市|町|村|区|\d)/.test(address)) address = '';
+      return { venue: venue, address: address };
+    }
+    var addrRe = /(〒|ＴＥＬ|TEL|℡|Tel|電話|FAX|☎|\d+\s*番地|\d+\s*丁目)/;
+    var am = s.match(addrRe);
+    if (!am) return { venue: s, address: '' };
+    var venue2 = s.slice(0, am.index).trim();
+    var address2 = s.slice(am.index).replace(/\s*(ＴＥＬ|TEL|℡|Tel|電話|FAX|☎).*$/i, '').trim();
+    return { venue: venue2, address: address2 };
+  }
+
+  // 競技プロファイルと自動判定を解決する
+  //   sport: 'auto'（自動判定）/ 競技キー / 未指定（=DEFAULT_SPORT）
+  // 戻り: { profile, generic } generic=true なら競技で大会名を弾かない（汎用フォールバック）
+  function resolveProfile(text, sport) {
+    if (sport === 'auto') {
+      // 本文から競技を推定：sportKeywordsのヒット数が最多の競技を選ぶ
+      var best = null, bestCount = 0;
+      Object.keys(SPORT_PROFILES).forEach(function (key) {
+        var m = text.match(new RegExp(SPORT_PROFILES[key].sportKeywords.source, 'g'));
+        var c = m ? m.length : 0;
+        if (c > bestCount) { bestCount = c; best = key; }
+      });
+      if (best) return { profile: SPORT_PROFILES[best], generic: false };
+      // どの競技も検出できない（複合大会など）→ 汎用フォールバック（弾かない）
+      return { profile: SPORT_PROFILES[DEFAULT_SPORT], generic: true };
+    }
+    var p = SPORT_PROFILES[sport] || SPORT_PROFILES[DEFAULT_SPORT];
+    return { profile: p, generic: false };
+  }
+
+  function parse(rawText, sport) {
+    var text = collapseCjkSpaces(toHalfWidthDigits(rawText));
+    var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+
+    var resolved = resolveProfile(text, sport || DEFAULT_SPORT);
+    var activeProfile = resolved.profile;
+    var genericMode = resolved.generic;
+
+    var r = { taikai_mei: '', kaisai_dates: [], kaikai_jikan: '', kaijo: '', kaijo_jusho: '', shimekiri: '', shiai_keishiki: '', note: '' };
+
+    // 大会名
+    var greetingRe = /(さて|平素|拝啓|この度|このたび|各位|を開催|することと|お待ち|申し上げ|ご参加|いたします|となりました|ください)/;
+    var formRe = /(申\s*込\s*書|代\s*表\s*者|フリガナ|登\s*録\s*番\s*号|選\s*考\s*基\s*準|解\s*説|掲\s*載\s*し)/;
+    var nameCands = lines.filter(function (ln) {
+      return /第\s*\d+\s*回/.test(ln)
+        && /(大会|選手権|フェスティバル)/.test(ln)
+        && !greetingRe.test(ln)
+        && !formRe.test(ln)
+        && ln.replace(/\s/g, '').length <= 70;
+    });
+    if (nameCands.length) {
+      var titled = nameCands.find(function (ln) { return /要\s*項/.test(ln); });
+      var picked = titled || nameCands.slice().sort(function (a, b) { return a.length - b.length; })[0];
+      r.taikai_mei = cleanTaikaiMei(picked, activeProfile, genericMode);
+    }
+    if (!r.taikai_mei) {
+      var titleKw = /(大会|選手権|オープン|カップ|杯|トーナメント|交流会|親善|フェスティバル)/;
+      var docSuffix = /(の?ご?案内|要\s*項|について|開催)/;
+      var cand = lines.find(function (ln) {
+        return titleKw.test(ln) && docSuffix.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
+          && !/(本\s*大\s*会|全\s*国\s*大\s*会|予\s*選\s*通\s*過|参加資格|日\s*程|解\s*説|掲\s*載)/.test(ln)
+          && ln.replace(/\s/g, '').length <= 45;
+      });
+      if (cand) r.taikai_mei = cleanTaikaiMei(cand, activeProfile, genericMode);
+    }
+
+    // 開催日
+    var scanText = text;
+    var honPos = scanText.search(/本\s*大\s*会\s*日\s*程/);
+    if (honPos !== -1) scanText = scanText.slice(0, honPos);
+
+    var dates = [];
+    // ラベル付き日付を優先
+    var labelDateRe = /(?:日\s*時|期\s*日|開\s*催\s*日|大\s*会\s*日)[^0-9令平]{0,8}((?:令\s*和\s*\d+|平\s*成\s*\d+|\d{4})\s*年\s*\d+\s*月\s*\d+\s*日)/;
+    var mdMatch = scanText.match(labelDateRe);
+    if (mdMatch) dates = extractDates(mdMatch[1]);
+
+    // 曜日付き日付パターン（令和）
+    if (!dates.length) {
+      var reWD = /(令\s*和\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
+      var dm;
+      while ((dm = reWD.exec(scanText)) !== null) {
+        extractDates(dm[1]).forEach(function(d) { if (dates.indexOf(d) === -1) dates.push(d); });
+      }
+      dates.sort();
+    }
+    // 曜日付き日付パターン（西暦）
+    if (!dates.length) {
+      var reGD = /(\d{4}\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
+      var dm2;
+      while ((dm2 = reGD.exec(scanText)) !== null) {
+        extractDates(dm2[1]).forEach(function(d) { if (dates.indexOf(d) === -1) dates.push(d); });
+      }
+      dates.sort();
+    }
+    // 「M/D（曜日）」形式の日付を取得
+    if (!dates.length) {
+      var yearM = scanText.match(/(?:令\s*和\s*(\d+)|(\d{4}))\s*年/);
+      if (yearM) {
+        var baseYr = yearM[1] ? (2018 + Number(yearM[1])) : Number(yearM[2]);
+        var reMDSlash = /(\d{1,2})\/(\d{1,2})\s*[（(][月火水木金土日][）)]/g;
+        var sm;
+        while ((sm = reMDSlash.exec(scanText)) !== null) {
+          var v = iso(baseYr, sm[1], sm[2]);
+          if (dates.indexOf(v) === -1) dates.push(v);
+        }
+        dates = Array.from(new Set(dates)).sort();
+      }
+    }
+    // 最終手段：全文スキャン（締切・更新行を除外、最初の日付のみ）
+    if (!dates.length) {
+      var lns = scanText.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      for (var k = 0; k < lns.length; k++) {
+        if (/(締切|申込|必着|更新|掲載|投稿|公開|登録)/.test(lns[k])) continue;
+        var d = extractDates(lns[k]);
+        if (d.length) { dates = d; break; }
+      }
+    }
+    // 日付が5件超の場合は一覧ページとみなし破棄
+    if (dates.length > 5) dates = [];
+    r.kaisai_dates = dates;
+
+    // 開会式の時刻
+    for (var a = 0; a < lines.length; a++) {
+      var mt = lines[a].match(/開\s*会\s*式[^0-9]*?(\d{1,2})\s*[:：時]\s*(\d{1,2})?/);
+      if (mt) { r.kaikai_jikan = ('0' + mt[1]).slice(-2) + ':' + ('0' + (mt[2] || '0')).slice(-2); break; }
+    }
+
+    // 会場・住所
+    var venueRe = /(体育館|アリーナ|ARENA|武道館|記念|会館|センター|ホール|競技場|ドーム|グラウンド|総合運動|プラザ)/i;
+    var venueNg = /(協会|連盟|主催|後援|協賛|主管|受付|支払|振込|問合|申込)/;
+    var kaijoLine = lines.find(function (ln) { return venueRe.test(ln) && !venueNg.test(ln); });
+    if (kaijoLine) {
+      var v = splitVenue(kaijoLine);
+      r.kaijo = cleanVenue(v.venue);
+      if (v.address) r.kaijo_jusho = v.address;
+    } else {
+      r.kaijo = cleanVenue(pickValue(lines, /(会\s*場|場\s*所)/, venueNg));
+    }
+    if (!r.kaijo_jusho) {
+      var jusho = lines.find(function (ln) {
+        return /(市|町|村)/.test(ln) && /\d/.test(ln) && /(番地|丁目|〒|TEL|-)/.test(ln)
+          && !/(申込|受付|問合|協会|連盟|郵送|宛|事務局|送付|部会)/.test(ln);
+      });
+      if (jusho) r.kaijo_jusho = jusho.trim();
+    }
+
+    // 申込締切
+    var lastEvent = (r.kaisai_dates && r.kaisai_dates.length) ? r.kaisai_dates[r.kaisai_dates.length - 1] : '';
+    var eventYear = lastEvent ? Number(lastEvent.split('-')[0]) : null;
+    var dlCands = [
+      extractDeadline(lines, /(締\s*切|必\s*着)/, eventYear),
+      extractDeadline(lines, /参\s*加\s*申\s*込/, eventYear),
+      extractDeadline(lines, /申\s*込/, eventYear)
+    ];
+    r.shimekiri = dlCands.find(function (c) { return c && (!lastEvent || c <= lastEvent); }) || '';
+
+    // 試合形式（プロファイルの formats ルールを順に適用）
+    var fmtZone = text, fmts = [];
+    (activeProfile.formats || []).forEach(function (rule) {
+      if (!rule.re.test(fmtZone)) return;
+      // skipIfAny: 既出ラベルのいずれかがこの正規表現に当たるならスキップ（排他）
+      if (rule.skipIfAny && fmts.some(function (f) { return rule.skipIfAny.test(f); })) return;
+      // skipIfNone: 既出ラベルのどれかがこの正規表現に当たる「とき以外」はスキップ
+      if (rule.skipIfNone && !fmts.some(function (f) { return rule.skipIfNone.test(f); })) return;
+      fmts.push(rule.label);
+    });
+    r.shiai_keishiki = fmts.join('、');
+
+    return r;
+  }
+
+  function addDays(isoStr, n) {
+    var p = isoStr.split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function isPast(dates) {
+    if (!dates || !dates.length) return false;
+    var latest = dates.slice().sort().pop();
+    var p = latest.split('-');
+    var limit = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    limit.setDate(limit.getDate() + PAST_GRACE_DAYS);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return limit < today;
+  }
+
+  // UIの競技セレクタ用：競技キーと表示名の一覧を返す
+  function sports() {
+    return Object.keys(SPORT_PROFILES).map(function (key) {
+      return { key: key, label: SPORT_PROFILES[key].label };
+    });
+  }
+
+  global.Dropper = { parse: parse, addDays: addDays, isPast: isPast, sports: sports, DEFAULT_SPORT: DEFAULT_SPORT };
+})(window);
