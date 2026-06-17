@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>カレンダードロッパー</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal:#06b6a4; --teal-d:#048b7f; --lime:#a3e635; --lime-d:#84cc16;
+      --yellow:#ffd23f; --ink:#0f3d3a; --sub:#4f7c78; --line:#cdeae6;
+      --paper:#ffffff; --accent:#06b6a4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;
+      font-weight:500; color:var(--ink); margin:0;
+      background:linear-gradient(135deg,#e6fbf7 0%,#f3ffe0 55%,#fffbe6 100%);
+      background-attachment:fixed; min-height:100vh; line-height:1.6;
+    }
+    header { padding:28px 22px 8px; max-width:760px; }
+    h1 {
+      font-family:'Mochiy Pop One',sans-serif; font-weight:400;
+      font-size:34px; margin:0; line-height:1.15; letter-spacing:.01em;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 55%,var(--yellow) 120%);
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+      filter:drop-shadow(0 2px 0 rgba(6,182,164,.12));
+    }
+    .lead { color:var(--sub); font-size:15px; font-weight:500; margin:10px 0 0; }
+    main { padding:8px 22px 48px; max-width:760px; }
+
+    #drop {
+      position:relative; border:3px dashed var(--teal); border-radius:24px;
+      padding:38px 18px; text-align:center; color:var(--teal-d);
+      background:rgba(255,255,255,.65); cursor:pointer; backdrop-filter:blur(2px);
+      transition:transform .15s, box-shadow .2s, background .2s, border-color .2s;
+      animation: dropGlow 2.6s ease-in-out infinite;
+    }
+    #drop:hover { background:rgba(255,255,255,.85); transform:translateY(-2px); }
+    #drop.over { transform:scale(1.03); background:#eafff8; border-color:var(--lime-d); box-shadow:0 18px 40px rgba(6,182,164,.28); }
+    #drop b { font-size:20px; font-weight:700; color:var(--teal-d); display:inline-block; margin-top:4px; }
+    .sub { color:var(--sub); font-size:13px; font-weight:500; margin-top:8px; }
+
+    .anim { position:relative; width:72px; height:72px; margin:0 auto 14px; color:var(--teal); transform-origin:50% 50%; transition:transform .5s ease, color .5s ease; }
+    .anim .cal, .anim .paper { position:absolute; left:50%; top:50%; }
+    .anim .cal { width:52px; height:52px; transform:translate(-50%,-50%); animation: calBump 2.6s ease-in-out infinite; }
+    .anim .paper { width:30px; height:36px; transform:translate(-50%,-160%); animation: suck 2.6s ease-in-out infinite; }
+    #drop.over .anim .paper { animation-duration:1.1s; }
+    #drop.over .anim .cal { animation-duration:1.1s; color:var(--lime-d); }
+    @keyframes suck {
+      0%   { transform: translate(-50%,-160%) scale(.95) rotate(-8deg); opacity:0; }
+      18%  { transform: translate(-50%,-120%) scale(.95) rotate(-4deg); opacity:1; }
+      55%  { transform: translate(-50%,-88%)  scale(.90) rotate(0deg);  opacity:1; }
+      100% { transform: translate(-50%,-50%)  scale(.12) rotate(12deg); opacity:0; }
+    }
+    @keyframes calBump { 0%,82%,100%{ transform:translate(-50%,-50%) scale(1); } 92%{ transform:translate(-50%,-50%) scale(1.12); } }
+    @keyframes dropGlow { 0%,100%{ box-shadow:0 0 0 0 rgba(6,182,164,.12); } 50%{ box-shadow:0 0 0 14px rgba(163,230,53,.10); } }
+    .anim.pop { animation: animPop 1.2s cubic-bezier(.2,.7,.2,1) forwards; }
+    @keyframes animPop {
+      0%   { transform:translateY(0)    scale(1);   color:var(--teal); }
+      35%  { transform:translateY(30px) scale(3.5); color:var(--lime-d); }
+      100% { transform:translateY(30px) scale(3.5); color:var(--yellow); }
+    }
+    @media (prefers-reduced-motion: reduce){ #drop, .anim, .anim .cal, .anim .paper { animation:none; } .anim .paper { transform:translate(-50%,-120%); opacity:1; } }
+
+    #list { margin:20px 0 0; padding:0; list-style:none; }
+    .card { border:2px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; background:var(--paper); box-shadow:0 6px 18px rgba(6,182,164,.07); }
+    .card .hd { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .card .chk { display:flex; align-items:center; gap:9px; font-weight:700; }
+    .card .chk input { width:18px; height:18px; accent-color:var(--teal); }
+    .card .fn { word-break:break-all; }
+    .st { font-size:12px; font-weight:700; white-space:nowrap; }
+    .ok { color:var(--teal-d); } .ng { color:#e0457b; } .wait { color:var(--sub); }
+    .fields { margin-top:12px; display:grid; gap:9px; }
+    .f { display:grid; grid-template-columns:170px 1fr; align-items:center; gap:10px; font-size:13px; }
+    .f span { color:var(--sub); font-weight:700; }
+    .f input { padding:9px 11px; border:2px solid var(--line); border-radius:10px; font-size:14px; width:100%; font-family:inherit; transition:border-color .15s; }
+    .f input:focus { outline:none; border-color:var(--teal); }
+    @media (max-width:520px){ .f { grid-template-columns:1fr; gap:3px; } }
+
+    #bar { margin-top:18px; display:flex; gap:8px; align-items:center; }
+    button {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
+      padding:13px 26px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 8px 20px rgba(6,182,164,.32); transition:transform .12s, box-shadow .2s;
+    }
+    button:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.42); }
+    button:active:not(:disabled) { transform:translateY(0); }
+    button:disabled { opacity:.45; cursor:default; box-shadow:none; }
+    #msg { margin-top:14px; color:var(--sub); font-size:14px; font-weight:500; min-height:1.2em; }
+    #msg a { color:var(--teal-d); font-weight:700; }
+    .edit-hint { font-size:12.5px; color:var(--teal-d); font-weight:500; margin:0 0 10px; padding:9px 13px; background:linear-gradient(100deg,#e6fbf7,#f3ffe0); border-left:4px solid var(--teal); border-radius:10px; }
+    .note { color:var(--sub); font-size:12.5px; font-weight:500; margin-top:12px; line-height:1.7; }
+
+    .sport-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+    .sport-row label { font-size:14px; font-weight:700; color:var(--teal-d); }
+    .sport-row select { font-family:inherit; font-weight:500; padding:9px 13px; border:2px solid var(--teal); border-radius:12px; font-size:14px; background:#fff; color:var(--ink); cursor:pointer; }
+    #login-area { text-align:center; padding:30px 10px 10px; }
+    .login-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:18px; font-weight:700;
+      padding:16px 36px; border-radius:16px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 10px 24px rgba(6,182,164,.34); transition:transform .12s, box-shadow .2s;
+    }
+    .login-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(6,182,164,.44); }
+    .login-note { max-width:420px; margin:14px auto 0; text-align:center; }
+    .pick-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
+      margin-top:16px; padding:13px 30px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 8px 20px rgba(6,182,164,.30); transition:transform .12s, box-shadow .2s;
+    }
+    .pick-btn:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.4); }
+    .subtitle-row { margin:12px 0 4px; }
+    .subtitle-row select {
+      font-family:'Zen Maru Gothic',sans-serif; font-weight:700;
+      padding:9px 16px; border:none; border-radius:14px; font-size:17px;
+      background:linear-gradient(100deg,var(--yellow),var(--lime)); color:var(--ink);
+      cursor:pointer; box-shadow:0 6px 16px rgba(163,230,53,.3);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 data-i18n="appName">カレンダードロッパー</h1>
+    <div class="subtitle-row">
+      <select id="dropperType"></select>
+    </div>
+    <p class="lead" id="lead">要項（PDF・画像）をドロップ → 内容を確認 → Googleカレンダーに登録</p>
+  </header>
+  <main>
+    <div id="login-area">
+      <button id="loginBtn" class="login-btn" data-i18n="loginBtn">Googleでログイン</button>
+      <p class="note login-note" data-i18n="loginNote">大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
+    </div>
+    <div id="work" style="display:none">
+    <div class="sport-row">
+      <label for="sport" data-i18n="sportLabel">競技：</label>
+      <select id="sport"></select>
+    </div>
+    <div id="drop">
+      <div class="anim">
+        <svg class="cal" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <path d="M16 4 V10 M32 4 V10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <rect x="7" y="8" width="34" height="33" rx="5" stroke="currentColor" stroke-width="3"/>
+          <path d="M7 18 H41" stroke="currentColor" stroke-width="3"/>
+          <circle cx="16" cy="27" r="2" fill="currentColor"/>
+          <circle cx="24" cy="27" r="2" fill="currentColor"/>
+          <circle cx="32" cy="27" r="2" fill="currentColor"/>
+          <circle cx="16" cy="35" r="2" fill="currentColor"/>
+          <circle cx="24" cy="35" r="2" fill="currentColor"/>
+        </svg>
+        <svg class="paper" viewBox="0 0 32 40" fill="none" aria-hidden="true">
+          <rect x="3" y="2" width="26" height="36" rx="3" fill="#ffffff" stroke="currentColor" stroke-width="2.5"/>
+          <path d="M8 12 H24 M8 18 H24 M8 24 H20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <b data-i18n="dropTitle">ここに要項ファイルをドラッグ&amp;ドロップ</b>
+      <div class="sub" data-i18n="dropSub">PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。</div>
+      <button id="pickBtn" class="pick-btn" type="button" data-i18n="pickBtn">ファイルを選ぶ</button>
+      <input id="file" type="file" accept="image/*,application/pdf" multiple style="display:none">
+    </div>
+    <p class="note" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
+    <ul id="list"></ul>
+    <div id="bar" style="display:none"><button id="reg" data-i18n="registerBtn">Googleカレンダーに登録</button></div>
+    <div id="msg"></div>
+    </div>
+  </main>
+
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script>window.LANG = 'in';</script>
+  <script src="i18n.js"></script>
+  <script src="parser.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
