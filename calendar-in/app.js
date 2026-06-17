@@ -7,7 +7,7 @@ var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googl
 var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events';
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
-var OCR_LANG = 'ja';         // GoogleドライブOCRの言語（日本語）
+var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
 var DROPPER_FOLDER_NAME = 'DropperFiles';   // 要項を保存するアプリ専用フォルダ（自動作成）
 
 /* ===== 状態 ===== */

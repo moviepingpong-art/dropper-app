@@ -100,6 +100,323 @@
   // 既定の競技キー
   var DEFAULT_SPORT = 'tabletennis';
 
+  // =====================================================================
+  // 英語要項用ロジック（dropper_parser_en.py を移植）
+  // window.LANG が 'en' / 'in' のとき parseEn() を使う。
+  // 戻り値は日本語版と同じ8キー（taikai_mei, kaisai_dates, kaikai_jikan,
+  // kaijo, kaijo_jusho, shimekiri, shiai_keishiki, note）で互換。
+  // =====================================================================
+
+  // 英語競技プロファイル（7競技）。試合形式語彙は875件の実データ分析に基づく。
+  var SPORT_PROFILES_EN = {
+    soccer: {
+      label: 'Soccer / Futsal',
+      sportKeywords: /\b(soccer|football|futsal)\b/i,
+      formats: [
+        { re: /\bfutsal\b/i, label: 'Futsal' },
+        { re: /\bcup\b/i, label: 'Cup' },
+        { re: /\bknockout\b/i, label: 'Knockout' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /\b(women|girls)\b/i, label: 'Women/Girls' },
+        { re: /\b(men|boys)\b/i, label: 'Men/Boys' }
+      ]
+    },
+    tennis: {
+      label: 'Tennis',
+      sportKeywords: /\btennis\b/i,
+      formats: [
+        { re: /\bmixed\s+doubles\b/i, label: 'Mixed Doubles' },
+        { re: /\b(women|ladies)(?:'s)?\s+doubles\b/i, label: "Women's Doubles" },
+        { re: /\b(men|gentlemen)(?:'s)?\s+doubles\b/i, label: "Men's Doubles" },
+        { re: /\bdoubles\b/i, label: 'Doubles', skipIfAny: /Doubles/ },
+        { re: /\bsingles\b/i, label: 'Singles' }
+      ]
+    },
+    basketball: {
+      label: 'Basketball',
+      sportKeywords: /\bbasketball\b/i,
+      formats: [
+        { re: /\b3\s*[xX×]\s*3\b/, label: '3x3' },
+        { re: /\bknockout\b/i, label: 'Knockout' },
+        { re: /\bround\s+robin\b/i, label: 'Round Robin' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /\b(women|girls)\b/i, label: 'Women/Girls' },
+        { re: /\b(men|boys)\b/i, label: 'Men/Boys' }
+      ]
+    },
+    netball: {
+      label: 'Netball',
+      sportKeywords: /\bnetball\b/i,
+      formats: [
+        { re: /\b(graded|division|grade)\b/i, label: 'Graded/Division' },
+        { re: /\bmixed\b/i, label: 'Mixed' },
+        { re: /\bround\s+robin\b/i, label: 'Round Robin' },
+        { re: /\bknockout\b/i, label: 'Knockout' },
+        { re: /\bleague\b/i, label: 'League' }
+      ]
+    },
+    cricket: {
+      label: 'Cricket',
+      sportKeywords: /\bcricket\b/i,
+      formats: [
+        { re: /\bt20\b/i, label: 'T20' },
+        { re: /\bone\s*day\b/i, label: 'One Day' },
+        { re: /\bknockout\b/i, label: 'Knockout' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /\b(women|girls)\b/i, label: 'Women/Girls' },
+        { re: /\b(men|boys)\b/i, label: 'Men/Boys' }
+      ]
+    },
+    swimming: {
+      label: 'Swimming',
+      sportKeywords: /\bswimming\b/i,
+      formats: [
+        { re: /\bfreestyle\b/i, label: 'Freestyle' },
+        { re: /\b(individual\s+medley|IM)\b/, label: 'IM' },
+        { re: /\brelay\b/i, label: 'Relay' },
+        { re: /\bbackstroke\b/i, label: 'Backstroke' },
+        { re: /\bbreaststroke\b/i, label: 'Breaststroke' },
+        { re: /\bbutterfly\b/i, label: 'Butterfly' }
+      ]
+    },
+    golf: {
+      label: 'Golf',
+      sportKeywords: /\bgolf\b/i,
+      formats: [
+        { re: /\bhandicap\b/i, label: 'Handicap' },
+        { re: /\bstroke\s+play\b/i, label: 'Stroke Play' },
+        { re: /\bstableford\b/i, label: 'Stableford' },
+        { re: /\bmatch\s+play\b/i, label: 'Match Play' },
+        { re: /\bfoursome\b/i, label: 'Foursome' },
+        { re: /\bscratch\b/i, label: 'Scratch' }
+      ]
+    }
+  };
+  var DEFAULT_SPORT_EN = 'soccer';
+
+  // 月名→月番号
+  var EN_MONTHS = {
+    january:1,february:2,march:3,april:4,may:5,june:6,july:7,
+    august:8,september:9,october:10,november:11,december:12,
+    jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12
+  };
+  var EN_MONTH = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec';
+
+  function enIso(y, mo, d) {
+    return ('000' + y).slice(-4) + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2);
+  }
+  function enMonthNum(name) {
+    return EN_MONTHS[String(name).toLowerCase().replace(/\.$/, '')] || null;
+  }
+
+  // 英語の各種日付表記をISO(YYYY-MM-DD)へ正規化。locale: 'uk'/'us'/'auto'
+  function enExtractDates(text, locale) {
+    locale = locale || 'uk';   // 収集データは英連邦圏中心 → 既定UK式(DD/MM)
+    var out = [], m;
+    // "May 4, 2026" / "May 4 2026"
+    var re1 = new RegExp('\\b(' + EN_MONTH + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b', 'ig');
+    while ((m = re1.exec(text)) !== null) { var mo = enMonthNum(m[1]); if (mo) out.push(enIso(m[3], mo, m[2])); }
+    // "4 May 2026" / "4th May, 2026"
+    var re2 = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + EN_MONTH + ')\\.?,?\\s+(\\d{4})\\b', 'ig');
+    while ((m = re2.exec(text)) !== null) { var mo2 = enMonthNum(m[2]); if (mo2) out.push(enIso(m[3], mo2, m[1])); }
+    // "4 May to 30 August 2026"（月またぎ範囲・年は末尾）
+    var re3 = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + EN_MONTH + ')\\.?\\s*(?:to|[-\\u2013\\u2014])\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + EN_MONTH + ')\\.?,?\\s+(\\d{4})\\b', 'ig');
+    while ((m = re3.exec(text)) !== null) {
+      var y = m[5], a = enMonthNum(m[2]), b = enMonthNum(m[4]);
+      if (a) out.push(enIso(y, a, m[1]));
+      if (b) out.push(enIso(y, b, m[3]));
+    }
+    // "May 4-5, 2026"（同月内範囲）
+    var re4 = new RegExp('\\b(' + EN_MONTH + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*[-\\u2013\\u2014]\\s*(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b', 'ig');
+    while ((m = re4.exec(text)) !== null) {
+      var mo4 = enMonthNum(m[1]);
+      if (mo4) { out.push(enIso(m[4], mo4, m[2])); out.push(enIso(m[4], mo4, m[3])); }
+    }
+    // ISO "2026-05-04"
+    var re5 = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g;
+    while ((m = re5.exec(text)) !== null) out.push(enIso(m[1], m[2], m[3]));
+    // "4/5/2026" / "4.5.2026"（曖昧時は locale で判定）
+    var re6 = /\b(\d{1,2})[/.](\d{1,2})[/.](\d{4})\b/g;
+    while ((m = re6.exec(text)) !== null) {
+      var p = Number(m[1]), q = Number(m[2]), yy = m[3];
+      if (p > 12 && q <= 12) out.push(enIso(yy, q, p));
+      else if (q > 12 && p <= 12) out.push(enIso(yy, p, q));
+      else if (p <= 12 && q <= 12) {
+        if (locale === 'us') out.push(enIso(yy, p, q));
+        else out.push(enIso(yy, q, p));   // uk / auto は DD/MM
+      }
+    }
+    return Array.from(new Set(out)).sort();
+  }
+
+  // 開会時刻 "9:00 AM" / "09:00" / "9 a.m." / "9am" / "9.00am"
+  function enExtractTime(text) {
+    var m = text.match(/\b(\d{1,2})[:.](\d{2})\s*(a\.?m\.?|p\.?m\.?)?/i);
+    if (m) {
+      var h = Number(m[1]), mm = m[2], ap = (m[3] || '').toLowerCase().replace(/\./g, '');
+      if (ap === 'pm' && h < 12) h += 12;
+      if (ap === 'am' && h === 12) h = 0;
+      return ('0' + h).slice(-2) + ':' + mm;
+    }
+    m = text.match(/\b(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)/i);
+    if (m) {
+      var h2 = Number(m[1]), ap2 = m[2].toLowerCase().replace(/\./g, '');
+      if (ap2 === 'pm' && h2 < 12) h2 += 12;
+      if (ap2 === 'am' && h2 === 12) h2 = 0;
+      return ('0' + h2).slice(-2) + ':00';
+    }
+    return '';
+  }
+
+  // 大会名パターン・除外パターン
+  var EN_TITLE_SUFFIX = /(Championships?|Tournament|Open|Cup|Classic|Invitational|Games|League|Series|Festival|Meet|Trophy|Challenge)/i;
+  var EN_GREETING = /\b(dear|we are pleased|welcome|on behalf|thank you|please find|hereby|invite)\b/i;
+  // 大会要項でない文書（議事録・規則集・告知など）を弾く
+  var EN_NONEVENT = /\b(meeting|committee|minutes|agenda|handbook|policy|policies|newsletter|disciplinary|booth|memorandum|circular|press release|annual report|financial|rules and regulations|code of conduct|constitution|by-?laws)\b/i;
+  var EN_FORM = /\b(entry form|application form|registration form|name of|signature|please print|full name)\b/i;
+  // 全競技共通：明らかに別競技の語（profileのsportKeywordsに該当しなければ弾く）
+  var EN_OTHER_SPORTS = /\b(hockey|softball|handball|baseball|rugby|lacrosse|squash)\b/i;
+
+  function enCleanTitle(s, profile) {
+    s = String(s).replace(/^[\uFEFF\u200B]+/, '').trim().replace(/^["\u201C\u201D\u2018\u2019]+|["\u201C\u201D\u2018\u2019]+$/g, '').trim();
+    // 先頭の番号・記号
+    s = s.replace(/^\s*(?:no\.?\s*\d+|\d+[.)]\s*)/i, '');
+    // 末尾の事務語
+    s = s.replace(/\s*[-\u2013\u2014:]\s*(entry form|application|guidelines?|regulations?|prospectus|information|details?)\s*$/i, '');
+    s = s.replace(/\s*\((?:draft|tentative|revised|final)\)\s*$/i, '');
+    var sk = profile.sportKeywords;
+    // 他競技語（自競技キーワードに該当しなければ弾く）
+    if (s && EN_OTHER_SPORTS.test(s) && !(sk && sk.test(s))) s = '';
+    // あいさつ・非大会文書は除外
+    if (EN_GREETING.test(s)) s = '';
+    if (EN_NONEVENT.test(s)) s = '';
+    if (/\.$/.test(s) && s.split(/\s+/).length > 12) s = '';
+    return s.trim();
+  }
+
+  // 住所判定（英・豪・米）
+  var EN_POSTCODE_UK = /[A-Z]{1,2}[0-9][A-Z0-9]?\s*[0-9][A-Z]{2}/;
+  var EN_ZIP_US = /\b[0-9]{5}(?:-[0-9]{4})?\b/;
+  var EN_STREET_KW = /\b(?:Street|St|Road|Rd|Avenue|Ave|Lane|Drive|Way|Close|Court|Crescent|Terrace|Boulevard|Highway)\b/i;
+
+  // 会場文字列から住所部分を分離。戻り { venue, address }
+  function enSplitVenueAddress(s) {
+    if (!s) return { venue: s, address: '' };
+    var pc = EN_POSTCODE_UK.exec(s) || EN_ZIP_US.exec(s);
+    var cut = null;
+    if (pc) {
+      var comma = s.lastIndexOf(',', pc.index);
+      cut = comma >= 0 ? comma + 1 : pc.index;
+    } else {
+      var sm = /,\s*[0-9]+[A-Za-z]?\s/.exec(s);
+      if (sm && EN_STREET_KW.test(s.slice(sm.index))) cut = sm.index + 1;
+    }
+    if (cut !== null) {
+      var venue = s.slice(0, cut).replace(/[\s,.]+$/, '');
+      var addr = s.slice(cut).replace(/^[\s,.]+|[\s,.]+$/g, '');
+      if (venue) return { venue: venue, address: addr };
+    }
+    return { venue: s.replace(/^[\s,.]+|[\s,.]+$/g, ''), address: '' };
+  }
+
+  function enCleanVenue(s) {
+    s = String(s).trim().replace(/^["\u201C\u201D]+|["\u201C\u201D]+$/g, '').trim();
+    s = s.replace(/^\s*(venue|location|place|site|held at|ground|grounds|course|pool|address)\s*[:\-]\s*/i, '');
+    s = s.replace(/\s*(tel|phone|fax)[:.]?\s*[\d\-()\s]+$/i, '');
+    s = s.replace(/\s*\d{1,2}:\d{2}\s*(a\.?m\.?|p\.?m\.?)?\s*$/i, '');
+    return s.replace(/^[\s.,:\-]+|[\s.,:\-]+$/g, '');
+  }
+
+  var EN_VENUE_RE = /\b(Arena|Stadium|Gymnasium|Gym|Centre|Center|Hall|Complex|Court|Field|Park|Dome|Pavilion|University|College|School|Club|Course|Ground|Grounds|Racket|Racquet|Aquatics|Pool|Links|Oval|Recreation|Academy)\b/i;
+  var EN_VENUE_NG = /\b(federation|association|committee|organi[sz]er|sponsor|contact|email|website)\b/i;
+
+  // 英語版：競技プロファイルと自動判定を解決
+  function enResolveProfile(text, sport) {
+    if (sport === 'auto') {
+      var best = null, bestCount = 0;
+      Object.keys(SPORT_PROFILES_EN).forEach(function (key) {
+        var mm = text.match(new RegExp(SPORT_PROFILES_EN[key].sportKeywords.source, 'gi'));
+        var c = mm ? mm.length : 0;
+        if (c > bestCount) { bestCount = c; best = key; }
+      });
+      if (best) return SPORT_PROFILES_EN[best];
+      return SPORT_PROFILES_EN[DEFAULT_SPORT_EN];
+    }
+    return SPORT_PROFILES_EN[sport] || SPORT_PROFILES_EN[DEFAULT_SPORT_EN];
+  }
+
+  // 英語要項の解析本体（dropper_parser_en.py の parse_text 相当）
+  function parseEn(rawText, sport) {
+    var text = String(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
+    var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    var profile = enResolveProfile(text, sport || 'auto');
+
+    var r = { taikai_mei: '', kaisai_dates: [], kaikai_jikan: '', kaijo: '', kaijo_jusho: '', shimekiri: '', shiai_keishiki: '', note: '' };
+
+    // --- 大会名：種別語を含む行から、あいさつ・フォーム・非大会文書行を除外 ---
+    var titleCands = lines.filter(function (l) {
+      return EN_TITLE_SUFFIX.test(l) && !EN_GREETING.test(l) && !EN_FORM.test(l) && !EN_NONEVENT.test(l) && l.length <= 90;
+    });
+    if (titleCands.length) {
+      var titled = null;
+      for (var i = 0; i < titleCands.length; i++) {
+        if (/\b(19|20)\d{2}\b|\b\d+(?:st|nd|rd|th)\b/.test(titleCands[i])) { titled = titleCands[i]; break; }
+      }
+      var picked = titled || titleCands.slice().sort(function (a, b) { return a.length - b.length; })[0];
+      r.taikai_mei = enCleanTitle(picked, profile);
+    }
+
+    // --- 日付："Date:" 行を優先、なければ全文 ---
+    var dateLine = null;
+    for (var j = 0; j < lines.length; j++) {
+      if (/\b(date|dates|when|schedule)\b\s*[:\-]/i.test(lines[j])) { dateLine = lines[j]; break; }
+    }
+    var dates = dateLine ? enExtractDates(dateLine) : [];
+    if (!dates.length) dates = enExtractDates(text);
+    if (dates.length > 6) dates = [];   // 多すぎ＝年間日程表の誤取得
+    r.kaisai_dates = dates;
+
+    // --- 開会時刻 ---
+    var tline = null;
+    for (var k = 0; k < lines.length; k++) {
+      if (/\b(start|starts?|commenc\w+|begins?|kick\s*-?\s*off|tip\s*-?\s*off|first\s+match|first\s+race|warm\s*-?\s*up|opening|play\s+starts?)\b/i.test(lines[k])) { tline = lines[k]; break; }
+    }
+    r.kaikai_jikan = tline ? enExtractTime(tline) : '';
+
+    // --- 会場 ---
+    for (var v = 0; v < lines.length; v++) {
+      if (EN_VENUE_RE.test(lines[v]) && !EN_VENUE_NG.test(lines[v])) {
+        var lab = /\b(venue|location|held at|ground|grounds|course|pool|address)\b\s*[:\-]\s*(.+)$/i.exec(lines[v]);
+        var cleaned = enCleanVenue(lab ? lab[2] : lines[v]);
+        var split = enSplitVenueAddress(cleaned);
+        r.kaijo = split.venue;
+        r.kaijo_jusho = split.address;
+        break;
+      }
+    }
+
+    // --- 申込締切 ---
+    for (var d = 0; d < lines.length; d++) {
+      if (/\b(entry deadline|deadline for entries|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i.test(lines[d])) {
+        var dl = enExtractDates(lines[d]);
+        if (!dl.length && d + 1 < lines.length) dl = enExtractDates(lines[d + 1]);
+        if (dl.length) { r.shimekiri = dl[0]; break; }
+      }
+    }
+
+    // --- 試合形式（profile.formats を順に適用）---
+    var fmts = [];
+    (profile.formats || []).forEach(function (rule) {
+      if (!rule.re.test(text)) return;
+      if (rule.skipIfAny && fmts.some(function (f) { return rule.skipIfAny.test(f); })) return;
+      if (rule.skipIfNone && !fmts.some(function (f) { return rule.skipIfNone.test(f); })) return;
+      fmts.push(rule.label);
+    });
+    r.shiai_keishiki = fmts.join(', ');
+
+    return r;
+  }
+
 
   function toHalfWidthDigits(s) {
     return String(s).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
@@ -373,7 +690,16 @@
     return { profile: p, generic: false };
   }
 
+  // 現在の言語が英語系（en / in）なら英語ロジックを使う
+  function isEnglishLang() {
+    var lang = global.LANG || 'ja';
+    return lang === 'en' || lang === 'in';
+  }
+
   function parse(rawText, sport) {
+    // 英語系の言語では英語parserへ委譲
+    if (isEnglishLang()) return parseEn(rawText, sport);
+
     var text = collapseCjkSpaces(toHalfWidthDigits(rawText));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
 
@@ -531,12 +857,21 @@
     return limit < today;
   }
 
-  // UIの競技セレクタ用：競技キーと表示名の一覧を返す
+  // UIの競技セレクタ用：競技キーと表示名の一覧を返す（言語に応じて競技構成が変わる）
   function sports() {
-    return Object.keys(SPORT_PROFILES).map(function (key) {
-      return { key: key, label: SPORT_PROFILES[key].label };
+    var profiles = isEnglishLang() ? SPORT_PROFILES_EN : SPORT_PROFILES;
+    return Object.keys(profiles).map(function (key) {
+      return { key: key, label: profiles[key].label };
     });
   }
 
-  global.Dropper = { parse: parse, addDays: addDays, isPast: isPast, sports: sports, DEFAULT_SPORT: DEFAULT_SPORT };
+  // 既定の競技キー（言語に応じて切替）
+  function defaultSport() {
+    return isEnglishLang() ? DEFAULT_SPORT_EN : DEFAULT_SPORT;
+  }
+
+  global.Dropper = {
+    parse: parse, addDays: addDays, isPast: isPast, sports: sports,
+    get DEFAULT_SPORT() { return defaultSport(); }
+  };
 })(window);
