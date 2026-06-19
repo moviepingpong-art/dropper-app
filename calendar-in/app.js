@@ -335,6 +335,10 @@ function addCard(name) {
   list.appendChild(li);
   var stEl = li.querySelector('.st');
 
+  // 開催日が入力されたら警告を消す
+  var dateInput = li.querySelector('[data-k="kaisai_dates"]');
+  if (dateInput) dateInput.addEventListener('input', function () { markDateWarn_(li, !dateInput.value.trim()); });
+
   return {
     el: li,
     setStatus: function (t, cls) { stEl.textContent = t; stEl.className = 'st ' + (cls || 'wait'); },
@@ -349,6 +353,7 @@ function addCard(name) {
       setVal(li, 'shiai_keishiki', fields.shiai_keishiki);
       setVal(li, 'shimekiri', fields.shimekiri);
       setVal(li, 'note', fields.note);
+      markDateWarn_(li, !(fields.kaisai_dates && fields.kaisai_dates.length));   // 開催日が空なら強調
     },
     isChecked: function () { return li.querySelector('.chk input').checked; },
     read: function () {
@@ -362,11 +367,36 @@ function addCard(name) {
         shimekiri: getVal(li, 'shimekiri'),
         note: getVal(li, 'note')
       };
+    },
+    markDateEmpty: function () { markDateWarn_(li, true); },
+    focusDate: function () {
+      var f = li.querySelector('[data-k="kaisai_dates"]');
+      if (f) { li.scrollIntoView({ behavior: 'smooth', block: 'center' }); f.focus(); }
     }
   };
 }
 function fieldHtml(label, key) {
   return '<label class="f"><span>' + label + '</span><input data-k="' + key + '" type="text"></label>';
+}
+// 開催日フィールドの警告（赤枠＋注意文）を on/off する
+function markDateWarn_(li, on) {
+  var f = li.querySelector('[data-k="kaisai_dates"]');
+  if (!f) return;
+  var label = f.closest('.f');
+  if (!label) return;
+  var warnEl = label.querySelector('.date-warn');
+  if (on) {
+    label.classList.add('warn');
+    if (!warnEl) {
+      warnEl = document.createElement('span');
+      warnEl.className = 'date-warn';
+      warnEl.textContent = I18N.t('dateWarn');
+      label.appendChild(warnEl);
+    }
+  } else {
+    label.classList.remove('warn');
+    if (warnEl && warnEl.parentNode) warnEl.parentNode.removeChild(warnEl);
+  }
 }
 function setVal(li, k, v) { var el = li.querySelector('[data-k="' + k + '"]'); if (el) el.value = v || ''; }
 function getVal(li, k) { var el = li.querySelector('[data-k="' + k + '"]'); return el ? el.value : ''; }
@@ -380,6 +410,17 @@ async function doRegister() {
   await ensureToken();
   var targets = items.filter(function (it) { return it.card.isChecked() && !it.registered; });
   if (!targets.length) { setMsg(I18N.t('msgNoItems')); regBtn.disabled = false; return; }
+
+  // ② 登録前チェック：チェック済みで開催日が空のカードがあれば警告して中断
+  var emptyCards = targets.filter(function (it) { return !it.card.read().kaisai_dates.length; });
+  if (emptyCards.length) {
+    emptyCards.forEach(function (it) { it.card.markDateEmpty(); });
+    setMsg(I18N.t('msgDateEmptyA') + emptyCards.length + I18N.t('msgDateEmptyB'));
+    emptyCards[0].card.focusDate();
+    regBtn.disabled = false;
+    return;
+  }
+
   var ok = 0, ng = 0;
   for (var i = 0; i < targets.length; i++) {
     var f = targets[i].card.read();
