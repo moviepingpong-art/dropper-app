@@ -194,6 +194,105 @@
   };
   var DEFAULT_SPORT_EN = 'soccer';
 
+  // インド競技プロファイル（7競技・英語版と顔ぶれが違う）。dropper_parser_in.py 由来。
+  var SPORT_PROFILES_IN = {
+    football: {
+      label: 'Football',
+      sportKeywords: /football|soccer|futsal/i,
+      excludeSports: /badminton|table tennis|kabaddi|carrom|cricket|athletics|hockey|american football/i,
+      formats: [
+        { re: /futsal/i, label: 'Futsal' },
+        { re: /knock\s*-?\s*out|knockout/i, label: 'Knockout' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /group\s+stage/i, label: 'Group Stage' },
+        { re: /\bmen'?s|\bboys'?/i, label: 'Men/Boys' },
+        { re: /women'?s|girls'?/i, label: 'Women/Girls' }
+      ]
+    },
+    cricket: {
+      label: 'Cricket',
+      sportKeywords: /cricket/i,
+      excludeSports: /badminton|table tennis|kabaddi|carrom|football|soccer|athletics|hockey/i,
+      formats: [
+        { re: /\bT\s*20\b|twenty\s*20/i, label: 'T20' },
+        { re: /one\s*day|\bODI\b|50\s*over/i, label: 'One Day' },
+        { re: /test\s+match/i, label: 'Test' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /knock\s*-?\s*out|knockout/i, label: 'Knockout' },
+        { re: /\bmen'?s|\bboys'?/i, label: 'Men/Boys' },
+        { re: /women'?s|girls'?/i, label: 'Women/Girls' }
+      ]
+    },
+    tabletennis: {
+      label: 'Table Tennis',
+      sportKeywords: /table tennis|\bTT\b|ping[- ]?pong/i,
+      excludeSports: /badminton|cricket|kabaddi|carrom|football|soccer|athletics|hockey|lawn tennis/i,
+      formats: [
+        { re: /\bmen'?s\s+singles|boys'?\s+singles/i, label: "Men's Singles" },
+        { re: /women'?s\s+singles|girls'?\s+singles/i, label: "Women's Singles" },
+        { re: /mixed\s+doubles/i, label: 'Mixed Doubles' },
+        { re: /doubles/i, label: 'Doubles', skipIfAny: /Doubles/i },
+        { re: /singles/i, label: 'Singles', skipIfAny: /Singles/i },
+        { re: /\bteam\b/i, label: 'Team' }
+      ]
+    },
+    badminton: {
+      label: 'Badminton',
+      sportKeywords: /badminton|shuttle/i,
+      excludeSports: /table tennis|cricket|kabaddi|carrom|football|soccer|athletics|hockey|volleyball|tennis(?! )/i,
+      formats: [
+        { re: /\bmen'?s\s+singles|boys'?\s+singles/i, label: "Men's Singles" },
+        { re: /women'?s\s+singles|girls'?\s+singles/i, label: "Women's Singles" },
+        { re: /mixed\s+doubles/i, label: 'Mixed Doubles' },
+        { re: /\bmen'?s\s+doubles/i, label: "Men's Doubles" },
+        { re: /women'?s\s+doubles/i, label: "Women's Doubles" },
+        { re: /doubles/i, label: 'Doubles', skipIfAny: /Doubles/i },
+        { re: /singles/i, label: 'Singles', skipIfAny: /Singles/i },
+        { re: /\bteam\s+event\b/i, label: 'Team' }
+      ]
+    },
+    kabaddi: {
+      label: 'Kabaddi',
+      sportKeywords: /kabaddi/i,
+      excludeSports: /badminton|table tennis|cricket|carrom|football|soccer|athletics|hockey/i,
+      formats: [
+        { re: /knock\s*-?\s*out|knockout/i, label: 'Knockout' },
+        { re: /\bleague\b/i, label: 'League' },
+        { re: /round\s*robin/i, label: 'Round Robin' },
+        { re: /\bmen'?s|\bboys'?/i, label: 'Men/Boys' },
+        { re: /women'?s|girls'?/i, label: 'Women/Girls' }
+      ]
+    },
+    carrom: {
+      label: 'Carrom',
+      sportKeywords: /carrom|carom/i,
+      excludeSports: /badminton|table tennis|cricket|kabaddi|football|soccer|athletics|hockey/i,
+      formats: [
+        { re: /singles/i, label: 'Singles', skipIfAny: /Singles/i },
+        { re: /doubles/i, label: 'Doubles', skipIfAny: /Doubles/i },
+        { re: /\bteam\b/i, label: 'Team' },
+        { re: /\bmen'?s|\bboys'?/i, label: 'Men/Boys' },
+        { re: /women'?s|girls'?/i, label: 'Women/Girls' }
+      ]
+    },
+    athletics: {
+      label: 'Athletics',
+      sportKeywords: /athletics|track and field|track\s*&\s*field/i,
+      excludeSports: /badminton|table tennis|kabaddi|carrom|football|soccer|cricket|hockey/i,
+      formats: [
+        { re: /100\s*m\b|200\s*m\b|400\s*m\b|sprint/i, label: 'Sprint' },
+        { re: /800\s*m\b|1500\s*m\b|5000\s*m\b|long distance|marathon/i, label: 'Distance' },
+        { re: /relay/i, label: 'Relay' },
+        { re: /long jump|high jump|triple jump/i, label: 'Jump' },
+        { re: /shot put|javelin|discus|hammer/i, label: 'Throw' },
+        { re: /hurdles/i, label: 'Hurdles' },
+        { re: /\bmen'?s|\bboys'?/i, label: 'Men/Boys' },
+        { re: /women'?s|girls'?/i, label: 'Women/Girls' }
+      ]
+    }
+  };
+  var DEFAULT_SPORT_IN = 'cricket';
+
   // 月名→月番号
   var EN_MONTHS = {
     january:1,february:2,march:3,april:4,may:5,june:6,july:7,
@@ -273,11 +372,13 @@
   var EN_GREETING = /\b(dear|we are pleased|welcome|on behalf|thank you|please find|hereby|invite)\b/i;
   // 大会要項でない文書（議事録・規則集・告知など）を弾く
   var EN_NONEVENT = /\b(meeting|committee|minutes|agenda|handbook|policy|policies|newsletter|disciplinary|booth|memorandum|circular|press release|annual report|financial|rules and regulations|code of conduct|constitution|by-?laws)\b/i;
+  // インド版：教育/採用/判例ドメインのノイズを大幅に拡張
+  var EN_NONEVENT_IN = /\b(meeting|committee|minutes|agenda|handbook|policy|policies|newsletter|disciplinary|booth|memorandum|circular|press release|annual report|financial|rules and regulations|code of conduct|constitution|by-?laws|prospectus|admission|brochure|enrolment|enrollment|recruitment|judgment|judgement|high court|supreme court|achievements?|performance analysis|fan guide|sports calendar|college calendar|sr\.?\s*sec\.?\s*school|autonomous\)|naac|cgpa|affiliated to|founded in|owned by|employment notice|vacancy|sports quota|direct entry|opening date|bid\/offer|budget|manifesto|webinar|expo|eligible list|probable players|selection trial|scholarship|change of venue|willingness)\b/i;
   var EN_FORM = /\b(entry form|application form|registration form|name of|signature|please print|full name)\b/i;
   // 全競技共通：明らかに別競技の語（profileのsportKeywordsに該当しなければ弾く）
   var EN_OTHER_SPORTS = /\b(hockey|softball|handball|baseball|rugby|lacrosse|squash)\b/i;
 
-  function enCleanTitle(s, profile) {
+  function enCleanTitle(s, profile, region) {
     s = String(s).replace(/^[\uFEFF\u200B]+/, '').trim().replace(/^["\u201C\u201D\u2018\u2019]+|["\u201C\u201D\u2018\u2019]+$/g, '').trim();
     // 先頭の番号・記号
     s = s.replace(/^\s*(?:no\.?\s*\d+|\d+[.)]\s*)/i, '');
@@ -287,9 +388,11 @@
     var sk = profile.sportKeywords;
     // 他競技語（自競技キーワードに該当しなければ弾く）
     if (s && EN_OTHER_SPORTS.test(s) && !(sk && sk.test(s))) s = '';
-    // あいさつ・非大会文書は除外
+    // インド：判例（A v. B 形式）を弾く
+    if (region === 'in' && s && /\b[Vv]\.\s+[A-Z]|\bvs\.?\s+[A-Z]/.test(s) && /court|state|union|ltd|private limited/i.test(s)) s = '';
+    // あいさつ・非大会文書は除外（インドは拡張リスト）
     if (EN_GREETING.test(s)) s = '';
-    if (EN_NONEVENT.test(s)) s = '';
+    if ((region === 'in' ? EN_NONEVENT_IN : EN_NONEVENT).test(s)) s = '';
     if (/\.$/.test(s) && s.split(/\s+/).length > 12) s = '';
     return s.trim();
   }
@@ -319,43 +422,54 @@
     return { venue: s.replace(/^[\s,.]+|[\s,.]+$/g, ''), address: '' };
   }
 
-  function enCleanVenue(s) {
+  function enCleanVenue(s, region) {
     s = String(s).trim().replace(/^["\u201C\u201D]+|["\u201C\u201D]+$/g, '').trim();
     s = s.replace(/^\s*(venue|location|place|site|held at|ground|grounds|course|pool|address)\s*[:\-]\s*/i, '');
     s = s.replace(/\s*(tel|phone|fax)[:.]?\s*[\d\-()\s]+$/i, '');
     s = s.replace(/\s*\d{1,2}:\d{2}\s*(a\.?m\.?|p\.?m\.?)?\s*$/i, '');
+    // インド：参加費(₹/Rs./INR)・電話(+91)を除去
+    if (region === 'in') {
+      s = s.replace(/\s*(?:₹|Rs\.?|INR)\s*[\d,]+\/?-?/ig, '');
+      s = s.replace(/\s*\+?91[\d\s\-]{8,}/g, '');
+    }
     return s.replace(/^[\s.,:\-]+|[\s.,:\-]+$/g, '');
   }
 
   var EN_VENUE_RE = /\b(Arena|Stadium|Gymnasium|Gym|Centre|Center|Hall|Complex|Court|Field|Park|Dome|Pavilion|University|College|School|Club|Course|Ground|Grounds|Racket|Racquet|Aquatics|Pool|Links|Oval|Recreation|Academy)\b/i;
   var EN_VENUE_NG = /\b(federation|association|committee|organi[sz]er|sponsor|contact|email|website)\b/i;
 
-  // 英語版：競技プロファイルと自動判定を解決
-  function enResolveProfile(text, sport) {
-    if (sport === 'auto') {
+  // 英語/インド版：競技プロファイルと自動判定を解決
+  function enResolveProfile(text, sport, region) {
+    var profiles = (region === 'in') ? SPORT_PROFILES_IN : SPORT_PROFILES_EN;
+    var fallback = (region === 'in') ? DEFAULT_SPORT_IN : DEFAULT_SPORT_EN;
+    if (sport === 'auto' || !sport) {
       var best = null, bestCount = 0;
-      Object.keys(SPORT_PROFILES_EN).forEach(function (key) {
-        var mm = text.match(new RegExp(SPORT_PROFILES_EN[key].sportKeywords.source, 'gi'));
+      Object.keys(profiles).forEach(function (key) {
+        var mm = text.match(new RegExp(profiles[key].sportKeywords.source, 'gi'));
         var c = mm ? mm.length : 0;
         if (c > bestCount) { bestCount = c; best = key; }
       });
-      if (best) return SPORT_PROFILES_EN[best];
-      return SPORT_PROFILES_EN[DEFAULT_SPORT_EN];
+      if (best) return profiles[best];
+      return profiles[fallback];
     }
-    return SPORT_PROFILES_EN[sport] || SPORT_PROFILES_EN[DEFAULT_SPORT_EN];
+    return profiles[sport] || profiles[fallback];
   }
 
-  // 英語要項の解析本体（dropper_parser_en.py の parse_text 相当）
-  function parseEn(rawText, sport) {
+  // 英語/インド要項の解析本体（dropper_parser_en.py / _in.py の parse_text 相当）
+  // region: 'en'（英語圏）/ 'in'（インド）
+  function parseEn(rawText, sport, region) {
+    region = region || 'en';
     var text = String(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
     var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-    var profile = enResolveProfile(text, sport || 'auto');
+    var profile = enResolveProfile(text, sport || 'auto', region);
+    var locale = (region === 'in') ? 'uk' : (profile.locale || 'uk');
+    var nonevent = (region === 'in') ? EN_NONEVENT_IN : EN_NONEVENT;
 
     var r = { taikai_mei: '', kaisai_dates: [], kaikai_jikan: '', kaijo: '', kaijo_jusho: '', shimekiri: '', shiai_keishiki: '', note: '' };
 
     // --- 大会名：種別語を含む行から、あいさつ・フォーム・非大会文書行を除外 ---
     var titleCands = lines.filter(function (l) {
-      return EN_TITLE_SUFFIX.test(l) && !EN_GREETING.test(l) && !EN_FORM.test(l) && !EN_NONEVENT.test(l) && l.length <= 90;
+      return EN_TITLE_SUFFIX.test(l) && !EN_GREETING.test(l) && !EN_FORM.test(l) && !nonevent.test(l) && l.length <= 90;
     });
     if (titleCands.length) {
       var titled = null;
@@ -363,17 +477,35 @@
         if (/\b(19|20)\d{2}\b|\b\d+(?:st|nd|rd|th)\b/.test(titleCands[i])) { titled = titleCands[i]; break; }
       }
       var picked = titled || titleCands.slice().sort(function (a, b) { return a.length - b.length; })[0];
-      r.taikai_mei = enCleanTitle(picked, profile);
+      r.taikai_mei = enCleanTitle(picked, profile, region);
     }
 
-    // --- 日付："Date:" 行を優先、なければ全文 ---
-    var dateLine = null;
+    // --- 開催日（3段階フォールバック）---
+    var dates = [];
+    // 段階1: 開催日を明示するラベル行を優先
+    var dateLabelRe = /\b(date of (?:event|tournament|competition|championship|meet)|dates?|when|schedule|held on|scheduled (?:on|for)|to be held|event date|tournament date|match date|fixture)\b\s*[:\-]?/i;
     for (var j = 0; j < lines.length; j++) {
-      if (/\b(date|dates|when|schedule)\b\s*[:\-]/i.test(lines[j])) { dateLine = lines[j]; break; }
+      if (dateLabelRe.test(lines[j])) {
+        var d1 = enExtractDates(lines[j], locale);
+        if (d1.length) { dates = d1; break; }
+      }
     }
-    var dates = dateLine ? enExtractDates(dateLine) : [];
-    if (!dates.length) dates = enExtractDates(text);
-    if (dates.length > 6) dates = [];   // 多すぎ＝年間日程表の誤取得
+    // 段階2: ラベルが無ければ、表組みのセル内日付を拾う
+    if (!dates.length) {
+      var cell = [];
+      for (var c = 0; c < lines.length; c++) {
+        var l = lines[c];
+        // 行が短く（80字以内）、年度範囲(2025-26)や電話でなく、日付を含む
+        if (l.length <= 80 && !/\b(19|20)\d{2}\s*[-/]\s*\d{2}\b/.test(l) && !/\+?\d{2,4}[\s-]\d{4,}/.test(l)) {
+          var dc = enExtractDates(l, locale);
+          if (dc.length) cell = cell.concat(dc);
+        }
+      }
+      cell = Array.from(new Set(cell)).sort();
+      if (cell.length) dates = cell;
+    }
+    // 段階3: それでも無ければ全文から
+    if (!dates.length) dates = enExtractDates(text, locale);
     r.kaisai_dates = dates;
 
     // --- 開会時刻 ---
@@ -387,7 +519,7 @@
     for (var v = 0; v < lines.length; v++) {
       if (EN_VENUE_RE.test(lines[v]) && !EN_VENUE_NG.test(lines[v])) {
         var lab = /\b(venue|location|held at|ground|grounds|course|pool|address)\b\s*[:\-]\s*(.+)$/i.exec(lines[v]);
-        var cleaned = enCleanVenue(lab ? lab[2] : lines[v]);
+        var cleaned = enCleanVenue(lab ? lab[2] : lines[v], region);
         var split = enSplitVenueAddress(cleaned);
         r.kaijo = split.venue;
         r.kaijo_jusho = split.address;
@@ -395,11 +527,14 @@
       }
     }
 
-    // --- 申込締切 ---
+    // --- 申込締切（インドは表現を拡張）---
+    var dlRe = (region === 'in')
+      ? /\b(entry deadline|deadline for entries|last date(?:\s+for\s+(?:entry|entries|registration|submission))?|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|receipt of entries|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i
+      : /\b(entry deadline|deadline for entries|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i;
     for (var d = 0; d < lines.length; d++) {
-      if (/\b(entry deadline|deadline for entries|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i.test(lines[d])) {
-        var dl = enExtractDates(lines[d]);
-        if (!dl.length && d + 1 < lines.length) dl = enExtractDates(lines[d + 1]);
+      if (dlRe.test(lines[d])) {
+        var dl = enExtractDates(lines[d], locale);
+        if (!dl.length && d + 1 < lines.length) dl = enExtractDates(lines[d + 1], locale);
         if (dl.length) { r.shimekiri = dl[0]; break; }
       }
     }
@@ -697,8 +832,10 @@
   }
 
   function parse(rawText, sport) {
-    // 英語系の言語では英語parserへ委譲
-    if (isEnglishLang()) return parseEn(rawText, sport);
+    var lang = global.LANG || 'ja';
+    // 英語系の言語では英語/インドparserへ委譲
+    if (lang === 'in') return parseEn(rawText, sport, 'in');
+    if (lang === 'en') return parseEn(rawText, sport, 'en');
 
     var text = collapseCjkSpaces(toHalfWidthDigits(rawText));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -857,9 +994,17 @@
     return limit < today;
   }
 
+  // 言語に応じた競技プロファイル群を返す
+  function profilesForLang() {
+    var lang = global.LANG || 'ja';
+    if (lang === 'in') return SPORT_PROFILES_IN;
+    if (lang === 'en') return SPORT_PROFILES_EN;
+    return SPORT_PROFILES;
+  }
+
   // UIの競技セレクタ用：競技キーと表示名の一覧を返す（言語に応じて競技構成が変わる）
   function sports() {
-    var profiles = isEnglishLang() ? SPORT_PROFILES_EN : SPORT_PROFILES;
+    var profiles = profilesForLang();
     return Object.keys(profiles).map(function (key) {
       return { key: key, label: profiles[key].label };
     });
@@ -867,7 +1012,10 @@
 
   // 既定の競技キー（言語に応じて切替）
   function defaultSport() {
-    return isEnglishLang() ? DEFAULT_SPORT_EN : DEFAULT_SPORT;
+    var lang = global.LANG || 'ja';
+    if (lang === 'in') return DEFAULT_SPORT_IN;
+    if (lang === 'en') return DEFAULT_SPORT_EN;
+    return DEFAULT_SPORT;
   }
 
   global.Dropper = {
