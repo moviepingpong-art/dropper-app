@@ -782,6 +782,18 @@
     return s;
   }
 
+  // 住所文字列からラベル(N 会場/場所/住所)・電話を除去して整える
+  function cleanAddress_(s) {
+    s = String(s).trim();
+    // 先頭のラベル（…会場/場所/住所/所在地）までを除去
+    s = s.replace(/^.*?(会\s*場|場\s*所|住\s*所|所\s*在\s*地)\s*[:：]?\s*/, '');
+    // 電話・FAX・☎ 以降を除去
+    s = s.replace(/[\s　]*(ＴＥＬ|TEL|℡|Tel|電話|FAX|☎).*$/i, '');
+    // 末尾の括弧電話番号を除去
+    s = s.replace(/[（(][\d\-－\s]{6,}[）)]\s*$/, '');
+    return s.trim();
+  }
+
   function splitVenue(s) {
     s = String(s).replace(/^\s*\d+\s*/, '').replace(/^.*?(会\s*場|場\s*所)\s*[:：]?\s*/, '').trim();
     var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|広場|公園|プラザ|グラウンド|運動場|記念館|野球場|球場)/gi;
@@ -878,40 +890,50 @@
     if (honPos !== -1) scanText = scanText.slice(0, honPos);
 
     var dates = [];
-    // ラベル付き日付を優先
+    var dateLns = scanText.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    // 申込・締切などの文脈行は開催日として拾わない（開催日は要項前半の日時欄に書かれるのが通例）
+    var applyCtx = /(申込|締切|必着|受付|応募|エントリー)/;
+
+    // ラベル付き日付を最優先（日時・期日・開催日・大会日の直後の日付）
     var labelDateRe = /(?:日\s*時|期\s*日|開\s*催\s*日|大\s*会\s*日)[^0-9令平]{0,8}((?:令\s*和\s*\d+|平\s*成\s*\d+|\d{4})\s*年\s*\d+\s*月\s*\d+\s*日)/;
     var mdMatch = scanText.match(labelDateRe);
     if (mdMatch) dates = extractDates(mdMatch[1]);
 
-    // 曜日付き日付パターン（令和）
+    // 曜日付き日付パターン（令和）— 申込・締切系の行は除外
     if (!dates.length) {
-      var reWD = /(令\s*和\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
-      var dm;
-      while ((dm = reWD.exec(scanText)) !== null) {
-        extractDates(dm[1]).forEach(function(d) { if (dates.indexOf(d) === -1) dates.push(d); });
-      }
+      dateLns.forEach(function (ln) {
+        if (applyCtx.test(ln)) return;
+        var dm, reWD = /(令\s*和\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
+        while ((dm = reWD.exec(ln)) !== null) {
+          extractDates(dm[1]).forEach(function (d) { if (dates.indexOf(d) === -1) dates.push(d); });
+        }
+      });
       dates.sort();
     }
-    // 曜日付き日付パターン（西暦）
+    // 曜日付き日付パターン（西暦）— 申込・締切系の行は除外
     if (!dates.length) {
-      var reGD = /(\d{4}\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
-      var dm2;
-      while ((dm2 = reGD.exec(scanText)) !== null) {
-        extractDates(dm2[1]).forEach(function(d) { if (dates.indexOf(d) === -1) dates.push(d); });
-      }
+      dateLns.forEach(function (ln) {
+        if (applyCtx.test(ln)) return;
+        var dm2, reGD = /(\d{4}\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
+        while ((dm2 = reGD.exec(ln)) !== null) {
+          extractDates(dm2[1]).forEach(function (d) { if (dates.indexOf(d) === -1) dates.push(d); });
+        }
+      });
       dates.sort();
     }
-    // 「M/D（曜日）」形式の日付を取得
+    // 「M/D（曜日）」形式の日付を取得 — 申込・締切系の行は除外
     if (!dates.length) {
       var yearM = scanText.match(/(?:令\s*和\s*(\d+)|(\d{4}))\s*年/);
       if (yearM) {
         var baseYr = yearM[1] ? (2018 + Number(yearM[1])) : Number(yearM[2]);
-        var reMDSlash = /(\d{1,2})\/(\d{1,2})\s*[（(][月火水木金土日][）)]/g;
-        var sm;
-        while ((sm = reMDSlash.exec(scanText)) !== null) {
-          var v = iso(baseYr, sm[1], sm[2]);
-          if (dates.indexOf(v) === -1) dates.push(v);
-        }
+        dateLns.forEach(function (ln) {
+          if (applyCtx.test(ln)) return;
+          var sm, reMDSlash = /(\d{1,2})\/(\d{1,2})\s*[（(][月火水木金土日][）)]/g;
+          while ((sm = reMDSlash.exec(ln)) !== null) {
+            var v = iso(baseYr, sm[1], sm[2]);
+            if (dates.indexOf(v) === -1) dates.push(v);
+          }
+        });
         dates = Array.from(new Set(dates)).sort();
       }
     }
@@ -937,20 +959,34 @@
     // 会場・住所
     var venueRe = /(体育館|アリーナ|ARENA|武道館|記念|会館|センター|ホール|競技場|ドーム|グラウンド|総合運動|プラザ)/i;
     var venueNg = /(協会|連盟|主催|後援|協賛|主管|受付|支払|振込|問合|申込)/;
-    var kaijoLine = lines.find(function (ln) { return venueRe.test(ln) && !venueNg.test(ln); });
-    if (kaijoLine) {
-      var v = splitVenue(kaijoLine);
+    var addrNg = /(申込|受付|問合|協会|連盟|郵送|宛|事務局|送付|部会)/;
+    var kaijoIdx = -1;
+    for (var ki = 0; ki < lines.length; ki++) {
+      if (venueRe.test(lines[ki]) && !venueNg.test(lines[ki])) { kaijoIdx = ki; break; }
+    }
+    if (kaijoIdx >= 0) {
+      var v = splitVenue(lines[kaijoIdx]);
       r.kaijo = cleanVenue(v.venue);
-      if (v.address) r.kaijo_jusho = v.address;
+      if (v.address) r.kaijo_jusho = cleanAddress_(v.address);
+      // 住所が同じ行に無い（会場名が単独行）の場合、会場ラベル行や直後の行から住所を拾う
+      if (!r.kaijo_jusho) {
+        for (var ai = kaijoIdx; ai <= kaijoIdx + 2 && ai < lines.length; ai++) {
+          var cand = lines[ai];
+          var hasLabel = /(会\s*場|場\s*所|住\s*所)/.test(cand);
+          if ((ai > kaijoIdx || hasLabel) && /(市|町|村|区)/.test(cand) && /\d/.test(cand) && !addrNg.test(cand)) {
+            var ca = cleanAddress_(cand);
+            if (ca && ca !== r.kaijo) { r.kaijo_jusho = ca; break; }
+          }
+        }
+      }
     } else {
       r.kaijo = cleanVenue(pickValue(lines, /(会\s*場|場\s*所)/, venueNg));
     }
     if (!r.kaijo_jusho) {
       var jusho = lines.find(function (ln) {
-        return /(市|町|村)/.test(ln) && /\d/.test(ln) && /(番地|丁目|〒|TEL|-)/.test(ln)
-          && !/(申込|受付|問合|協会|連盟|郵送|宛|事務局|送付|部会)/.test(ln);
+        return /(市|町|村)/.test(ln) && /\d/.test(ln) && /(番地|丁目|〒|TEL|-)/.test(ln) && !addrNg.test(ln);
       });
-      if (jusho) r.kaijo_jusho = jusho.trim();
+      if (jusho) r.kaijo_jusho = cleanAddress_(jusho);
     }
 
     // 申込締切
