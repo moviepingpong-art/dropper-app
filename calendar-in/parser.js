@@ -402,6 +402,37 @@
   var EN_ZIP_US = /\b[0-9]{5}(?:-[0-9]{4})?\b/;
   var EN_STREET_KW = /\b(?:Street|St|Road|Rd|Avenue|Ave|Lane|Drive|Way|Close|Court|Crescent|Terrace|Boulevard|Highway)\b/i;
 
+  // 申込締切の文脈（開催日候補からの除外と締切抽出の両方で共通利用）
+  var EN_DEADLINE_RE = /\b(entry deadline|deadline for entries|last date(?:\s+for\s+(?:entry|entries|registration|submission))?|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|receipt of entries|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i;
+
+  // 会場名の前に連結された「日付ラベル＋日付」「開始/開会時刻」を行頭から繰り返し除去
+  var EN_DATE_PREFIX_RE = /^\s*(date|dates|when|schedule|held on|scheduled (?:on|for)|event date|tournament date|match date)\s*[:\-]?\s*/i;
+  var EN_START_PREFIX_RE = /^\s*(start|starts|starting|commences?|commencing|begins?|kick\s*-?\s*off|tip\s*-?\s*off|opening|warm\s*-?\s*up)\s*[:\-]?\s*/i;
+  var EN_LEADING_DATE_TOK = /^\s*(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s*)?(?:\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:\s+\d{4})?|[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})\s*/i;
+  var EN_LEADING_TIME_TOK = /^\s*\d{1,2}([:.]\d{2})?\s*(a\.?m\.?|p\.?m\.?)\s*/i;
+
+  function enStripLeadingDateTime(s) {
+    var prev = null;
+    while (s && s !== prev) {
+      prev = s;
+      s = s.replace(EN_DATE_PREFIX_RE, '');
+      s = s.replace(EN_START_PREFIX_RE, '');
+      s = s.replace(EN_LEADING_DATE_TOK, '');
+      s = s.replace(EN_LEADING_TIME_TOK, '');
+    }
+    return s.trim();
+  }
+
+  // 会場文字列内で住所が始まる位置を返す（無ければnull）
+  function enStreetCut(s) {
+    var sm = /,\s*[0-9]+[A-Za-z]?\s/.exec(s);
+    if (sm && EN_STREET_KW.test(s.slice(sm.index))) return sm.index + 1;
+    // カンマ無しで「施設名 番地 通り名」が連結（例: "... Centre 12 Park Road"）
+    var sm2 = /\s[0-9]+[A-Za-z]?\s+[A-Z][A-Za-z]*/.exec(s);
+    if (sm2 && EN_STREET_KW.test(s.slice(sm2.index))) return sm2.index;
+    return null;
+  }
+
   // 会場文字列から住所部分を分離。戻り { venue, address }
   function enSplitVenueAddress(s) {
     if (!s) return { venue: s, address: '' };
@@ -411,12 +442,17 @@
       var comma = s.lastIndexOf(',', pc.index);
       cut = comma >= 0 ? comma + 1 : pc.index;
     } else {
-      var sm = /,\s*[0-9]+[A-Za-z]?\s/.exec(s);
-      if (sm && EN_STREET_KW.test(s.slice(sm.index))) cut = sm.index + 1;
+      cut = enStreetCut(s);
     }
     if (cut !== null) {
       var venue = s.slice(0, cut).replace(/[\s,.]+$/, '');
       var addr = s.slice(cut).replace(/^[\s,.]+|[\s,.]+$/g, '');
+      // ポストコードで切っても会場側に番地が残る場合、さらに番地で切る
+      var v2 = enStreetCut(venue);
+      if (v2 !== null) {
+        addr = (venue.slice(v2).replace(/^[\s,.]+|[\s,.]+$/g, '') + ' ' + addr).trim();
+        venue = venue.slice(0, v2).replace(/[\s,.]+$/, '');
+      }
       if (venue) return { venue: venue, address: addr };
     }
     return { venue: s.replace(/^[\s,.]+|[\s,.]+$/g, ''), address: '' };
@@ -424,13 +460,19 @@
 
   function enCleanVenue(s, region) {
     s = String(s).trim().replace(/^["\u201C\u201D]+|["\u201C\u201D]+$/g, '').trim();
+    // 不具合1対策: 会場名の前に連結された日付・開始時刻を除去
+    s = enStripLeadingDateTime(s);
+    // ラベル除去後にもう一度（"Date: ... Venue: ..." の順序ゆれに対応）
     s = s.replace(/^\s*(venue|location|place|site|held at|ground|grounds|course|pool|address)\s*[:\-]\s*/i, '');
-    s = s.replace(/\s*(tel|phone|fax)[:.]?\s*[\d\-()\s]+$/i, '');
     s = s.replace(/\s*\d{1,2}:\d{2}\s*(a\.?m\.?|p\.?m\.?)?\s*$/i, '');
-    // インド：参加費(₹/Rs./INR)・電話(+91)を除去
     if (region === 'in') {
+      // インド：電話("Tel +91 ..." 等)・参加費(₹/Rs./INR)を除去
+      s = s.replace(/\s*(tel|phone|fax|mob(?:ile)?|contact)[:.]?\s*\+?[\d\s\-()]{6,}$/i, '');
+      s = s.replace(/\s*(tel|phone|fax|mob(?:ile)?|contact)[:.]?\s*$/i, '');
       s = s.replace(/\s*(?:₹|Rs\.?|INR)\s*[\d,]+\/?-?/ig, '');
       s = s.replace(/\s*\+?91[\d\s\-]{8,}/g, '');
+    } else {
+      s = s.replace(/\s*(tel|phone|fax)[:.]?\s*[\d\-()\s]+$/i, '');
     }
     return s.replace(/^[\s.,:\-]+|[\s.,:\-]+$/g, '');
   }
@@ -480,21 +522,23 @@
       r.taikai_mei = enCleanTitle(picked, profile, region);
     }
 
-    // --- 開催日（3段階フォールバック）---
+    // --- 開催日（3段階フォールバック・締切行は全段階で除外）---
     var dates = [];
-    // 段階1: 開催日を明示するラベル行を優先
+    // 段階1: 開催日を明示するラベル行を優先（締切行は除外）
     var dateLabelRe = /\b(date of (?:event|tournament|competition|championship|meet)|dates?|when|schedule|held on|scheduled (?:on|for)|to be held|event date|tournament date|match date|fixture)\b\s*[:\-]?/i;
     for (var j = 0; j < lines.length; j++) {
+      if (EN_DEADLINE_RE.test(lines[j])) continue;   // 不具合2: 締切行はラベル段階で除外
       if (dateLabelRe.test(lines[j])) {
         var d1 = enExtractDates(lines[j], locale);
         if (d1.length) { dates = d1; break; }
       }
     }
-    // 段階2: ラベルが無ければ、表組みのセル内日付を拾う
+    // 段階2: ラベルが無ければ、表組みのセル内日付を拾う（締切行は除外）
     if (!dates.length) {
       var cell = [];
       for (var c = 0; c < lines.length; c++) {
         var l = lines[c];
+        if (EN_DEADLINE_RE.test(l)) continue;   // 不具合2: 締切行は開催日候補から除外
         // 行が短く（80字以内）、年度範囲(2025-26)や電話でなく、日付を含む
         if (l.length <= 80 && !/\b(19|20)\d{2}\s*[-/]\s*\d{2}\b/.test(l) && !/\+?\d{2,4}[\s-]\d{4,}/.test(l)) {
           var dc = enExtractDates(l, locale);
@@ -504,8 +548,11 @@
       cell = Array.from(new Set(cell)).sort();
       if (cell.length) dates = cell;
     }
-    // 段階3: それでも無ければ全文から
-    if (!dates.length) dates = enExtractDates(text, locale);
+    // 段階3: それでも無ければ全文から（締切行は除外）
+    if (!dates.length) {
+      var nonDeadline = lines.filter(function (l) { return !EN_DEADLINE_RE.test(l); }).join('\n');
+      dates = enExtractDates(nonDeadline, locale);
+    }
     r.kaisai_dates = dates;
 
     // --- 開会時刻 ---
@@ -527,12 +574,9 @@
       }
     }
 
-    // --- 申込締切（インドは表現を拡張）---
-    var dlRe = (region === 'in')
-      ? /\b(entry deadline|deadline for entries|last date(?:\s+for\s+(?:entry|entries|registration|submission))?|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|receipt of entries|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i
-      : /\b(entry deadline|deadline for entries|registration closes?|registrations? close|closing date|closing:|deadline|entries close|entries must be received|register by|registration by|applications? close|apply by|rsvp by|due (?:date|by)|cut[- ]?off)\b/i;
+    // --- 申込締切（en/in共通のDEADLINE_RE）---
     for (var d = 0; d < lines.length; d++) {
-      if (dlRe.test(lines[d])) {
+      if (EN_DEADLINE_RE.test(lines[d])) {
         var dl = enExtractDates(lines[d], locale);
         if (!dl.length && d + 1 < lines.length) dl = enExtractDates(lines[d + 1], locale);
         if (dl.length) { r.shimekiri = dl[0]; break; }
@@ -796,6 +840,9 @@
 
   function splitVenue(s) {
     s = String(s).replace(/^\s*\d+\s*/, '').replace(/^.*?(会\s*場|場\s*所)\s*[:：]?\s*/, '').trim();
+    // OCRが日付・開会式・住所などの値を1行に連結するケース：先頭の日付/開会式/開始時刻を除去
+    s = s.replace(/^\s*(?:令\s*和\s*\d+\s*年|平\s*成\s*\d+\s*年|\d{4}\s*年)?\s*\d+\s*月\s*\d+\s*日\s*[（(]?[月火水木金土日]?[）)]?\s*/, '');
+    s = s.replace(/^(?:(?:開\s*会\s*式|開\s*始|受\s*付)[：:]?\s*午\s*[前後]\s*\d+\s*時(?:\s*\d+\s*分)?\s*)+/, '');
     var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|広場|公園|プラザ|グラウンド|運動場|記念館|野球場|球場)/gi;
     var last = null, m;
     while ((m = suffixRe.exec(s)) !== null) last = m;
