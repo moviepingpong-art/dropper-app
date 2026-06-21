@@ -185,6 +185,7 @@ async function processOne(file) {
   try {
     card.setStatus(I18N.t('stReading'), 'wait');
     var res = await ocrViaDrive(file);
+    console.log('===== OCRテキスト [' + (file.name || '') + '] ここから =====\n' + res.text + '\n===== OCRテキスト ここまで =====');
     var fields = window.Dropper.parse(res.text, sportSel ? sportSel.value : undefined);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
