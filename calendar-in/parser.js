@@ -325,11 +325,17 @@
       if (a) out.push(enIso(y, a, m[1]));
       if (b) out.push(enIso(y, b, m[3]));
     }
-    // "May 4-5, 2026"（同月内範囲）
+    // "May 4-5, 2026"（同月内範囲・月が先）
     var re4 = new RegExp('\\b(' + EN_MONTH + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*[-\\u2013\\u2014]\\s*(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b', 'ig');
     while ((m = re4.exec(text)) !== null) {
       var mo4 = enMonthNum(m[1]);
       if (mo4) { out.push(enIso(m[4], mo4, m[2])); out.push(enIso(m[4], mo4, m[3])); }
+    }
+    // "4-5 July 2026"（同月内範囲・日が先）
+    var re4b = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*[-\\u2013\\u2014]\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + EN_MONTH + ')\\.?,?\\s+(\\d{4})\\b', 'ig');
+    while ((m = re4b.exec(text)) !== null) {
+      var mo4b = enMonthNum(m[3]);
+      if (mo4b) { out.push(enIso(m[4], mo4b, m[1])); out.push(enIso(m[4], mo4b, m[2])); }
     }
     // ISO "2026-05-04"
     var re5 = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g;
@@ -535,12 +541,15 @@
     }
     // 段階2: ラベルが無ければ、表組みのセル内日付を拾う（締切行は除外）
     if (!dates.length) {
+      var schedKw = /\b(round|day|match|fixture|game|heat|final|semi|quarter|leg|session|will (?:take place|be held)|held on|scheduled)\b/i;
       var cell = [];
       for (var c = 0; c < lines.length; c++) {
         var l = lines[c];
         if (EN_DEADLINE_RE.test(l)) continue;   // 不具合2: 締切行は開催日候補から除外
-        // 行が短く（80字以内）、年度範囲(2025-26)や電話でなく、日付を含む
-        if (l.length <= 80 && !/\b(19|20)\d{2}\s*[-/]\s*\d{2}\b/.test(l) && !/\+?\d{2,4}[\s-]\d{4,}/.test(l)) {
+        // 年度範囲(2025-26)・電話を含む行は除外
+        if (/\b(19|20)\d{2}\s*[-/]\s*\d{2}\b/.test(l) || /\+?\d{2,4}[\s-]\d{4,}/.test(l)) continue;
+        // 短い行（80字以内）、またはスケジュール語を含む長い行なら日付を拾う
+        if (l.length <= 80 || schedKw.test(l)) {
           var dc = enExtractDates(l, locale);
           if (dc.length) cell = cell.concat(dc);
         }
@@ -552,6 +561,23 @@
     if (!dates.length) {
       var nonDeadline = lines.filter(function (l) { return !EN_DEADLINE_RE.test(l); }).join('\n');
       dates = enExtractDates(nonDeadline, locale);
+    }
+    // 段階4（最終手段）: 年なし日付の補完（文書内に年が1つだけのとき "3 March"/"August 1st" 等を補う）
+    if (!dates.length) {
+      var yrs = Array.from(new Set(text.match(/\b20\d{2}\b/g) || []));
+      if (yrs.length === 1) {
+        var yy = yrs[0], cand = [];
+        for (var q = 0; q < lines.length; q++) {
+          var ln = lines[q];
+          if (EN_DEADLINE_RE.test(ln)) continue;
+          var mm, reMD = new RegExp('\\b(' + EN_MONTH + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b', 'ig');
+          while ((mm = reMD.exec(ln)) !== null) { var moA = enMonthNum(mm[1]); if (moA) cand.push(enIso(yy, moA, mm[2])); }
+          var reDM = new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + EN_MONTH + ')\\.?\\b', 'ig');
+          while ((mm = reDM.exec(ln)) !== null) { var moB = enMonthNum(mm[2]); if (moB) cand.push(enIso(yy, moB, mm[1])); }
+        }
+        cand = Array.from(new Set(cand)).sort();
+        if (cand.length && cand.length <= 6) dates = cand;
+      }
     }
     r.kaisai_dates = dates;
 
