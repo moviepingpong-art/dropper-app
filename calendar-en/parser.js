@@ -579,6 +579,19 @@
         if (cand.length && cand.length <= 6) dates = cand;
       }
     }
+    // 段階5（最終救出）: 大会名/会場の上位行に紛れた日付を拾う（"@7.35pm Sun June 15th 2026 Final" 等）
+    if (!dates.length) {
+      var cand5 = [];
+      for (var p = 0; p < Math.min(6, lines.length); p++) {
+        var l5 = lines[p];
+        if (EN_DEADLINE_RE.test(l5)) continue;
+        if (/\b(19|20)\d{2}\s*[-/]\s*\d{2}\b/.test(l5) || /\+?\d{2,4}[\s-]\d{4,}/.test(l5)) continue;
+        var d5 = enExtractDates(l5, locale);
+        if (d5.length) cand5 = cand5.concat(d5);
+      }
+      cand5 = Array.from(new Set(cand5)).sort();
+      if (cand5.length && cand5.length <= 6) dates = cand5;
+    }
     r.kaisai_dates = dates;
 
     // --- 開会時刻 ---
@@ -1018,6 +1031,35 @@
         var d = extractDates(lns[k]);
         if (d.length) { dates = d; break; }
       }
+    }
+    // 段階5（最終救出）: 大会名/会場の上位行に紛れた日付を拾う（会場名末尾の "6/28" 等。年は文書内から補完）
+    if (!dates.length) {
+      var ym5 = text.match(/(?:令\s*和\s*(\d+)|(\d{4}))\s*年/);
+      var by5 = ym5 ? (ym5[1] ? (2018 + Number(ym5[1])) : Number(ym5[2])) : null;
+      var cand5j = [];
+      for (var p5 = 0; p5 < Math.min(6, lines.length); p5++) {
+        var l5j = lines[p5];
+        if (/(締切|申込|必着|受付|応募|エントリー)/.test(l5j)) continue;
+        // 完全な日付（令和/西暦 年月日）
+        extractDates(l5j).forEach(function (d) { if (cand5j.indexOf(d) === -1) cand5j.push(d); });
+        // 年なしの m/d を文書内の年で補完（前後が数字＝年や別数値の一部は除外）
+        if (by5) {
+          var sm5, reMD5 = /(\d{1,2})\s*\/\s*(\d{1,2})/g;
+          while ((sm5 = reMD5.exec(l5j)) !== null) {
+            var before = sm5.index > 0 ? l5j.charAt(sm5.index - 1) : '';
+            var afterIdx = sm5.index + sm5[0].length;
+            var after = afterIdx < l5j.length ? l5j.charAt(afterIdx) : '';
+            if (/\d/.test(before) || /\d/.test(after)) continue;
+            var mo5 = Number(sm5[1]), da5 = Number(sm5[2]);
+            if (mo5 >= 1 && mo5 <= 12 && da5 >= 1 && da5 <= 31) {
+              var v5 = iso(by5, mo5, da5);
+              if (v5 && cand5j.indexOf(v5) === -1) cand5j.push(v5);
+            }
+          }
+        }
+      }
+      cand5j = Array.from(new Set(cand5j)).sort();
+      if (cand5j.length && cand5j.length <= 5) dates = cand5j;
     }
     // 日付が5件超の場合は一覧ページとみなし破棄
     if (dates.length > 5) dates = [];
