@@ -632,6 +632,7 @@
     });
     r.shiai_keishiki = fmts.join(', ');
 
+    buildSchedule(r);
     return r;
   }
 
@@ -640,6 +641,15 @@
     return String(s).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
   }
   function iso(y, mo, d) { return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2); }
+
+  // 日ごとに種目を持てる器を作る（案イ：events は空。日ごとの割り当ては後段=正規表現の試作/AIに任せる）
+  // r.kaisai_dates と既存の r.shiai_keishiki はそのまま維持し、schedule と day_split を「追加」するだけ。
+  function buildSchedule(r) {
+    var dates = (r.kaisai_dates || []);
+    r.schedule = dates.map(function (d) { return { date: d, events: '' }; });
+    r.day_split = false;  // 日ごとに種目を割り当てられたか（現段階は常に false）
+    return r;
+  }
 
   function collapseCjkSpaces(s) {
     var C = '\\u3040-\\u30ff\\u3400-\\u9fff\\uff66-\\uff9f々〆〇';
@@ -1126,6 +1136,7 @@
     });
     r.shiai_keishiki = fmts.join('、');
 
+    buildSchedule(r);
     return r;
   }
 
