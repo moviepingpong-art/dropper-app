@@ -1149,6 +1149,13 @@
     ];
     r.shimekiri = dlCands.find(function (c) { return c && (!lastEvent || c <= lastEvent); }) || '';
 
+    // 締切として確定した日付は開催日から除外（締切日が開催日欄に紛れ込むケースの後処理）
+    // 範囲（"A～B"）なら両端を除外対象にする。
+    if (r.shimekiri && r.kaisai_dates && r.kaisai_dates.length) {
+      var dlSet = r.shimekiri.split(/[~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      r.kaisai_dates = r.kaisai_dates.filter(function (d) { return dlSet.indexOf(d) === -1; });
+    }
+
     // 試合形式（プロファイルの formats ルールを順に適用）
     var fmtZone = text, fmts = [];
     (activeProfile.formats || []).forEach(function (rule) {
