@@ -648,6 +648,41 @@
     var dates = (r.kaisai_dates || []);
     r.schedule = dates.map(function (d) { return { date: d, events: '' }; });
     r.day_split = false;  // 日ごとに種目を割り当てられたか（現段階は常に false）
+    computeWarnings(r);
+    return r;
+  }
+
+  // 採点係：正規表現の抽出結果を見て「怪しい所」に印(warnings)を立てる。値は変えず、印だけ付ける。
+  // 各 warning は { field, code }。表示文言は app.js 側で I18N により言語化（parserは言語非依存）。
+  // field は確認カードの data-k と対応（'' はカード全体の注意）。
+  function computeWarnings(r) {
+    var w = [];
+    var dates = r.kaisai_dates || [];
+    // 1) 複数日開催だが日ごとの種目が分かれていない（練習日・種目の振り分け要確認。論点1と連動）
+    if ((r.schedule || []).length >= 2 && !r.day_split) w.push({ field: 'shiai_keishiki', code: 'multi_day_events' });
+    // 2) 開催日が多め（締切日・練習日などの混入の可能性）
+    if (dates.length >= 4) w.push({ field: 'kaisai_dates', code: 'many_dates' });
+    // 3) 開催日が締切（期間）と重なる（締切日の混入の可能性）
+    if (r.shimekiri && dates.length) {
+      var ep = r.shimekiri.split(/[~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var lo = ep[0], hi = ep[ep.length - 1];
+      if (lo && hi && dates.some(function (d) { return d >= lo && d <= hi; })) {
+        w.push({ field: 'kaisai_dates', code: 'date_in_deadline' });
+      }
+    }
+    // 4) 締切が開催日より後（順序が逆＝要確認）
+    if (r.shimekiri && dates.length) {
+      var dlLo = r.shimekiri.split(/[~～]/)[0].trim();
+      var firstEvent = dates.slice().sort()[0];
+      if (dlLo && firstEvent && dlLo > firstEvent) w.push({ field: 'shimekiri', code: 'deadline_after_event' });
+    }
+    // 5) 会場名が極端に短い／数字・記号だけ（誤抽出の可能性）
+    if (r.kaijo && (r.kaijo.replace(/\s/g, '').length <= 2 || !/[^\d\s.,:\-]/.test(r.kaijo))) {
+      w.push({ field: 'kaijo', code: 'venue_suspect' });
+    }
+    // 6) 試合形式が空（取りこぼし）
+    if (!r.shiai_keishiki) w.push({ field: 'shiai_keishiki', code: 'format_empty' });
+    r.warnings = w;
     return r;
   }
 

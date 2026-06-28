@@ -186,6 +186,7 @@ async function processOne(file) {
     card.setStatus(I18N.t('stReading'), 'wait');
     var res = await ocrViaDrive(file);
     var fields = window.Dropper.parse(res.text, sportSel ? sportSel.value : undefined);
+    card.setText(res.text);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
   } catch (e) {
@@ -330,21 +331,34 @@ function addCard(name) {
     fieldHtml(I18N.t('fldFormat'), 'shiai_keishiki') +
     fieldHtml(I18N.t('fldDeadline'), 'shimekiri') +
     fieldHtml(I18N.t('fldNote'), 'note') +
+    '</div>' +
+    '<div class="card-foot" style="display:none;margin-top:6px">' +
+      '<p class="warn-notice" style="display:none;margin:0 0 6px;padding:6px 8px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;font-size:12px;color:#7a4f01"></p>' +
+      '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
+      '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
+      '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
     '</div>';
   li.querySelector('.fn').textContent = name;
   list.appendChild(li);
   var stEl = li.querySelector('.st');
+  var ocrText = '';   // この要項のOCR生テキスト（AI検算で使用）
 
   // 開催日が入力されたら警告を消す
   var dateInput = li.querySelector('[data-k="kaisai_dates"]');
   if (dateInput) dateInput.addEventListener('input', function () { markDateWarn_(li, !dateInput.value.trim()); });
 
-  return {
+  // AI検算ボタン（この大会の全項目をAIで取り直す。⚠の有無に関わらず実行できる）
+  var aiBtn = li.querySelector('.ai-recheck');
+  if (aiBtn) aiBtn.addEventListener('click', function () { runAiRecheck_(li, ocrText); });
+
+  var cardApi = {
     el: li,
+    setText: function (t) { ocrText = t || ''; },
     setStatus: function (t, cls) { stEl.textContent = t; stEl.className = 'st ' + (cls || 'wait'); },
     fill: function (fields) {
       stEl.textContent = I18N.t('stDone'); stEl.className = 'st ok';
       li.querySelector('.fields').style.display = 'block';
+      li.querySelector('.card-foot').style.display = 'block';
       setVal(li, 'taikai_mei', fields.taikai_mei);
       setVal(li, 'kaisai_dates', (fields.kaisai_dates || []).join(', '));
       setVal(li, 'kaijo', fields.kaijo);
@@ -354,6 +368,7 @@ function addCard(name) {
       setVal(li, 'shimekiri', fields.shimekiri);
       setVal(li, 'note', fields.note);
       markDateWarn_(li, !(fields.kaisai_dates && fields.kaisai_dates.length));   // 開催日が空なら強調
+      renderWarnings_(li, fields.warnings || []);   // 採点係：⚠を該当項目に表示
     },
     isChecked: function () { return li.querySelector('.chk input').checked; },
     read: function () {
@@ -374,6 +389,115 @@ function addCard(name) {
       if (f) { li.scrollIntoView({ behavior: 'smooth', block: 'center' }); f.focus(); }
     }
   };
+  return cardApi;
+}
+
+// 採点係の結果（warnings）を該当フィールドの下に⚠表示する。値は変えない（印だけ）。
+var WARN_CODE_KEY = {
+  multi_day_events: 'warnMultiDayEvents',
+  many_dates: 'warnManyDates',
+  date_in_deadline: 'warnDateInDeadline',
+  deadline_after_event: 'warnDeadlineAfterEvent',
+  venue_suspect: 'warnVenueSuspect',
+  format_empty: 'warnFormatEmpty'
+};
+function renderWarnings_(li, warnings) {
+  // 既存の⚠表示をクリア
+  li.querySelectorAll('.field-warn').forEach(function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
+  var notice = li.querySelector('.warn-notice');
+  (warnings || []).forEach(function (w) {
+    var input = li.querySelector('[data-k="' + w.field + '"]');
+    if (!input) return;
+    var label = input.closest('.f');
+    if (!label) return;
+    var span = document.createElement('span');
+    span.className = 'field-warn';
+    span.style.cssText = 'display:block;margin-top:3px;font-size:12px;color:#d4380d';
+    span.textContent = '⚠ ' + I18N.t(WARN_CODE_KEY[w.code] || w.code);
+    label.appendChild(span);
+  });
+  if (notice) {
+    if ((warnings || []).length) { notice.textContent = I18N.t('warnNotice'); notice.style.display = 'block'; }
+    else { notice.style.display = 'none'; }
+  }
+}
+
+/* ===== AI検算（BYOK：ユーザー自身のGeminiキーで実行） =====
+   ・キーはこの端末のみ（localStorage）に保持し、当方サーバーには送らない／保存しない。
+   ・⚠の有無に関わらず、この大会の全項目をAIで取り直す。結果は必ず人が確認する前提。
+   ・無料枠超過(429)時は「翌日まで利用不可」を表示する。 */
+var AI_MODEL = 'gemini-flash-latest';   // 必要に応じて 'gemini-2.0-flash' 等に変更可
+var AI_KEY_STORE = 'dropper_ai_key';
+
+function getAiKey_() {
+  var k = '';
+  try { k = localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) {}
+  if (!k) {
+    k = (window.prompt(I18N.t('aiKeyPrompt')) || '').trim();
+    if (k) { try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {} }
+  }
+  return k;
+}
+
+async function runAiRecheck_(li, ocrText) {
+  var statusEl = li.querySelector('.ai-status');
+  var setAi = function (t) { if (statusEl) statusEl.textContent = t || ''; };
+  if (!ocrText) { setAi(I18N.t('aiFail') + 'no text'); return; }
+  var key = getAiKey_();
+  if (!key) { setAi(I18N.t('aiNoKey')); return; }
+
+  setAi(I18N.t('aiRunning'));
+  var prompt =
+    'あなたはスポーツ大会の要項から情報を抽出するアシスタントです。' +
+    '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切を読み取り、' +
+    'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
+    '開催日は YYYY-MM-DD の配列。練習日・受付日・申込締切日は開催日に含めないこと。' +
+    '複数日開催なら schedule に日ごとの種目を入れる。値が不明な項目は空文字または空配列。\n' +
+    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}]}\n\n' +
+    '--- 要項テキスト ---\n' + ocrText;
+
+  try {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+    var resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+      })
+    });
+    if (resp.status === 429) { setAi(I18N.t('aiLimit')); return; }
+    if (!resp.ok) {
+      var et = await resp.text();
+      if (resp.status === 400 && /API key not valid|API_KEY_INVALID/i.test(et)) { try { localStorage.removeItem(AI_KEY_STORE); } catch (e) {} }
+      setAi(I18N.t('aiFail') + resp.status); return;
+    }
+    var data = await resp.json();
+    var txt = ((((data.candidates || [])[0] || {}).content || {}).parts || [])
+      .map(function (p) { return p.text || ''; }).join('').trim();
+    txt = txt.replace(/^```(?:json)?|```$/g, '').trim();
+    var obj = JSON.parse(txt);
+
+    // AI結果を入力欄へ反映（必ず人が確認する前提）
+    if ('taikai_mei' in obj) setVal(li, 'taikai_mei', obj.taikai_mei);
+    if ('kaisai_dates' in obj) setVal(li, 'kaisai_dates', (obj.kaisai_dates || []).join(', '));
+    if ('kaijo' in obj) setVal(li, 'kaijo', obj.kaijo);
+    if ('kaijo_jusho' in obj) setVal(li, 'kaijo_jusho', obj.kaijo_jusho);
+    if ('kaikai_jikan' in obj) setVal(li, 'kaikai_jikan', obj.kaikai_jikan);
+    if ('shiai_keishiki' in obj) setVal(li, 'shiai_keishiki', obj.shiai_keishiki);
+    if ('shimekiri' in obj) setVal(li, 'shimekiri', obj.shimekiri);
+    if (obj.schedule && obj.schedule.length) {
+      var note = li.querySelector('[data-k="note"]');
+      var sched = obj.schedule.filter(function (s) { return s && (s.date || s.events); })
+        .map(function (s) { return s.date + '：' + (s.events || ''); }).join(' / ');
+      if (note && sched) note.value = (note.value ? note.value + ' / ' : '') + sched;
+    }
+    markDateWarn_(li, !getVal(li, 'kaisai_dates').trim());
+    renderWarnings_(li, []);   // AI反映後は採点係の⚠を一旦消す（再確認はユーザー）
+    setAi(I18N.t('aiDone'));
+  } catch (e) {
+    setAi(I18N.t('aiFail') + (e && e.message ? e.message : e));
+  }
 }
 function fieldHtml(label, key) {
   return '<label class="f"><span>' + label + '</span><input data-k="' + key + '" type="text"></label>';
