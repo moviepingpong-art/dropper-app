@@ -679,7 +679,8 @@
   function extractDeadline(lines, labelRe, fallbackYear) {
     for (var i = 0; i < lines.length; i++) {
       if (!labelRe.test(lines[i])) continue;
-      for (var j = i; j <= i + 2 && j < lines.length; j++) {
+      // ラベル行の直前〜+2行を探索（「令和8年7月12日（日）」の次行に「締切」だけ来る要項に対応）
+      for (var j = Math.max(0, i - 1); j <= i + 2 && j < lines.length; j++) {
         var d = extractDates(lines[j]);
         if (!d.length && fallbackYear) {
           var md = [], m, reMD = /(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
@@ -989,16 +990,23 @@
     var dateLns = scanText.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     // 申込・締切などの文脈行は開催日として拾わない（開催日は要項前半の日時欄に書かれるのが通例）
     var applyCtx = /(申込|締切|必着|受付|応募|エントリー)/;
+    // 締切日が「日付だけの単独行」で、キーワードが直前/直後の別行にある要項があるため近傍行も見る
+    function nearDeadline(i) {
+      if (applyCtx.test(dateLns[i] || '')) return true;
+      if (i > 0 && applyCtx.test(dateLns[i - 1] || '')) return true;
+      if (i + 1 < dateLns.length && applyCtx.test(dateLns[i + 1] || '')) return true;
+      return false;
+    }
 
     // ラベル付き日付を最優先（日時・期日・開催日・大会日の直後の日付）
     var labelDateRe = /(?:日\s*時|期\s*日|開\s*催\s*日|大\s*会\s*日)[^0-9令平]{0,8}((?:令\s*和\s*\d+|平\s*成\s*\d+|\d{4})\s*年\s*\d+\s*月\s*\d+\s*日)/;
     var mdMatch = scanText.match(labelDateRe);
     if (mdMatch) dates = extractDates(mdMatch[1]);
 
-    // 曜日付き日付パターン（令和）— 申込・締切系の行は除外
+    // 曜日付き日付パターン（令和）— 申込・締切系の行（近傍含む）は除外
     if (!dates.length) {
-      dateLns.forEach(function (ln) {
-        if (applyCtx.test(ln)) return;
+      dateLns.forEach(function (ln, i) {
+        if (nearDeadline(i)) return;
         var dm, reWD = /(令\s*和\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
         while ((dm = reWD.exec(ln)) !== null) {
           extractDates(dm[1]).forEach(function (d) { if (dates.indexOf(d) === -1) dates.push(d); });
@@ -1006,10 +1014,10 @@
       });
       dates.sort();
     }
-    // 曜日付き日付パターン（西暦）— 申込・締切系の行は除外
+    // 曜日付き日付パターン（西暦）— 申込・締切系の行（近傍含む）は除外
     if (!dates.length) {
-      dateLns.forEach(function (ln) {
-        if (applyCtx.test(ln)) return;
+      dateLns.forEach(function (ln, i) {
+        if (nearDeadline(i)) return;
         var dm2, reGD = /(\d{4}\s*年\s*\d+\s*月\s*\d+\s*日)\s*[（(][月火水木金土日][）)]/g;
         while ((dm2 = reGD.exec(ln)) !== null) {
           extractDates(dm2[1]).forEach(function (d) { if (dates.indexOf(d) === -1) dates.push(d); });
@@ -1017,13 +1025,30 @@
       });
       dates.sort();
     }
-    // 「M/D（曜日）」形式の日付を取得 — 申込・締切系の行は除外
+    // 年なし「M月D日（曜）」の補完 — 既に年あり日付を拾えている場合、2日目以降が年省略でも同じ年で補う
+    // （例: 「令和8年8月22日(土)」＋「8月23日(日)」→ 8/23も拾う。締切近傍行は除外）
+    if (dates.length) {
+      var yBase = Number(dates[0].split('-')[0]);
+      dateLns.forEach(function (ln, i) {
+        if (nearDeadline(i)) return;
+        var ym, reMDw = /(?:令\s*和\s*\d+\s*年|\d{4}\s*年)?\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[（(][月火水木金土日][）)]/g;
+        while ((ym = reMDw.exec(ln)) !== null) {
+          var mo = Number(ym[1]), da = Number(ym[2]);
+          if (mo >= 1 && mo <= 12 && da >= 1 && da <= 31) {
+            var v = iso(yBase, mo, da);
+            if (dates.indexOf(v) === -1) dates.push(v);
+          }
+        }
+      });
+      dates = Array.from(new Set(dates)).sort();
+    }
+    // 「M/D（曜日）」形式の日付を取得 — 申込・締切系の行（近傍含む）は除外
     if (!dates.length) {
       var yearM = scanText.match(/(?:令\s*和\s*(\d+)|(\d{4}))\s*年/);
       if (yearM) {
         var baseYr = yearM[1] ? (2018 + Number(yearM[1])) : Number(yearM[2]);
-        dateLns.forEach(function (ln) {
-          if (applyCtx.test(ln)) return;
+        dateLns.forEach(function (ln, i) {
+          if (nearDeadline(i)) return;
           var sm, reMDSlash = /(\d{1,2})\/(\d{1,2})\s*[（(][月火水木金土日][）)]/g;
           while ((sm = reMDSlash.exec(ln)) !== null) {
             var v = iso(baseYr, sm[1], sm[2]);
