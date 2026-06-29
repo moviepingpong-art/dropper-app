@@ -50,6 +50,7 @@ var DROPPER_TYPES = {
 };
 var DEFAULT_TYPE = 'sports';
 var currentType = DEFAULT_TYPE;
+var aiMode = 'hybrid';   // 'hybrid'=正規表現＋必要時AI / 'ai'=最初から全項目AIで取り直す
 
 // 多言語：HTMLのdata-i18n要素に現在の言語の文言を流し込む
 if (window.I18N) { try { I18N.applyDom(); } catch (e) {} }
@@ -64,6 +65,34 @@ if (window.I18N) { try { I18N.applyDom(); } catch (e) {} }
   sportSel.innerHTML = opts;
   sportSel.value = window.Dropper.DEFAULT_SPORT || 'auto';
 })();
+
+// 処理モードセレクタ（②ハイブリッド / ③最初からAI）を動的に生成して挿入する
+(function buildAiModeSelector() {
+  if (!sportSel) return;
+  var anchorRow = sportRow || (sportSel.closest ? sportSel.closest('div') : null) || sportSel.parentNode;
+  if (!anchorRow || !anchorRow.parentNode) return;
+  var row = document.createElement('div');
+  row.className = 'aimode-row';
+  row.style.cssText = 'margin:6px 0';
+  var sel = document.createElement('select');
+  sel.id = 'aimode';
+  sel.style.cssText = 'padding:4px 8px';
+  sel.innerHTML =
+    '<option value="hybrid">' + I18N.t('modeHybrid') + '</option>' +
+    '<option value="ai">' + I18N.t('modeAi') + '</option>';
+  sel.value = aiMode;
+  var lab = document.createElement('label');
+  lab.style.cssText = 'font-size:13px;margin-right:6px';
+  lab.textContent = I18N.t('modeLabel');
+  row.appendChild(lab); row.appendChild(sel);
+  anchorRow.parentNode.insertBefore(row, anchorRow);
+  sel.addEventListener('change', function () {
+    aiMode = sel.value;
+    // ③を選んだ時点でキー未登録なら、最初に一度だけ入力を促す
+    if (aiMode === 'ai') { var k = getAiKey_(); if (!k) { aiMode = 'hybrid'; sel.value = 'hybrid'; } }
+  });
+})();
+
 
 // 種類セレクタを生成し、選択に応じて表示を切り替える
 (function buildTypeSelector() {
@@ -189,6 +218,8 @@ async function processOne(file) {
     card.setText(res.text);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
+    // ③「最初からAI」モード：正規表現の結果（フォールバック）を表示後、全項目をAIで取り直す
+    if (aiMode === 'ai') { await runAiRecheck_(card.el, res.text); }
   } catch (e) {
     card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
   }
@@ -392,7 +423,7 @@ function addCard(name) {
   return cardApi;
 }
 
-// 採点係の結果（warnings）を該当フィールドの下に⚠表示する。値は変えない（印だけ）。
+// 採点係の結果（warnings）を、該当項目の入力枠の「強調＋点滅」で示す（理由文は出さない）。値は変えない。
 var WARN_CODE_KEY = {
   multi_day_events: 'warnMultiDayEvents',
   many_dates: 'warnManyDates',
@@ -401,21 +432,27 @@ var WARN_CODE_KEY = {
   venue_suspect: 'warnVenueSuspect',
   format_empty: 'warnFormatEmpty'
 };
+// 点滅アニメ用のスタイルを一度だけ注入
+(function ensureWarnStyle_() {
+  if (document.getElementById('dropper-warn-style')) return;
+  var st = document.createElement('style');
+  st.id = 'dropper-warn-style';
+  st.textContent =
+    '@keyframes dropperBlink{0%,100%{box-shadow:0 0 0 0 rgba(212,56,13,.0);border-color:#d4380d}' +
+    '50%{box-shadow:0 0 0 3px rgba(212,56,13,.35);border-color:#ff4d4f}}' +
+    '.f.warn-blink input{border:2px solid #d4380d!important;background:#fff1f0;animation:dropperBlink 1s ease-in-out infinite}';
+  (document.head || document.documentElement).appendChild(st);
+})();
 function renderWarnings_(li, warnings) {
-  // 既存の⚠表示をクリア
-  li.querySelectorAll('.field-warn').forEach(function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
-  var notice = li.querySelector('.warn-notice');
+  // 既存の強調をクリア
+  li.querySelectorAll('.f.warn-blink').forEach(function (el) { el.classList.remove('warn-blink'); });
   (warnings || []).forEach(function (w) {
     var input = li.querySelector('[data-k="' + w.field + '"]');
     if (!input) return;
     var label = input.closest('.f');
-    if (!label) return;
-    var span = document.createElement('span');
-    span.className = 'field-warn';
-    span.style.cssText = 'display:block;margin-top:3px;font-size:12px;color:#d4380d';
-    span.textContent = '⚠ ' + I18N.t(WARN_CODE_KEY[w.code] || w.code);
-    label.appendChild(span);
+    if (label) label.classList.add('warn-blink');   // 入力枠を強調＋点滅
   });
+  var notice = li.querySelector('.warn-notice');
   if (notice) {
     if ((warnings || []).length) { notice.textContent = I18N.t('warnNotice'); notice.style.display = 'block'; }
     else { notice.style.display = 'none'; }
