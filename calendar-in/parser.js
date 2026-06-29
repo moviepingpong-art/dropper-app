@@ -658,8 +658,11 @@
   function computeWarnings(r) {
     var w = [];
     var dates = r.kaisai_dates || [];
-    // 1) 複数日開催だが日ごとの種目が分かれていない（練習日・種目の振り分け要確認。論点1と連動）
-    if ((r.schedule || []).length >= 2 && !r.day_split) w.push({ field: 'shiai_keishiki', code: 'multi_day_events' });
+    // 1) 複数日開催だが日ごとの種目が分かれていない（練習日混入・種目振り分けの確認。開催日と試合形式の両方を点滅）
+    if ((r.schedule || []).length >= 2 && !r.day_split) {
+      w.push({ field: 'kaisai_dates', code: 'multi_day_events' });
+      w.push({ field: 'shiai_keishiki', code: 'multi_day_events' });
+    }
     // 2) 開催日が多め（締切日・練習日などの混入の可能性）
     if (dates.length >= 4) w.push({ field: 'kaisai_dates', code: 'many_dates' });
     // 3) 開催日が締切（期間）と重なる（締切日の混入の可能性）
@@ -722,6 +725,7 @@
           while ((m = reMD.exec(lines[j])) !== null) md.push(iso(fallbackYear, m[1], m[2]));
           d = Array.from(new Set(md)).sort();
         }
+        // 締切は範囲（受付期間など複数日付）ならA～B、単一日付ならその日を返す
         if (d.length) return d.length >= 2 ? (d[0] + '～' + d[d.length - 1]) : d[0];
       }
     }
