@@ -123,6 +123,30 @@
       background:linear-gradient(100deg,var(--yellow),var(--lime)); color:var(--ink);
       cursor:pointer; box-shadow:0 6px 16px rgba(163,230,53,.3);
     }
+
+    /* ===== AI利用選択ポップアップ ===== */
+    #ai-modal { position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
+    #ai-modal.show { display:flex; }
+    .ai-modal-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
+      padding:26px 24px; box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
+    .ai-modal-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:22px; margin:0 0 6px; color:var(--teal-d); line-height:1.3; }
+    .ai-modal-card .ai-intro { color:var(--sub); font-size:14px; margin:0 0 18px; }
+    .ai-opt { border:2px solid var(--line); border-radius:16px; padding:15px 16px; margin-bottom:14px; }
+    .ai-opt h3 { margin:0 0 6px; font-size:16px; font-weight:700; color:var(--ink); }
+    .ai-opt p { margin:0; font-size:13px; color:var(--sub); line-height:1.7; }
+    .ai-opt ul { margin:8px 0 0; padding-left:2px; list-style:none; font-size:12.5px; color:var(--sub); line-height:1.9; }
+    .ai-opt li { padding-left:2px; }
+    .ai-opt.aiuse { border-color:var(--teal); background:linear-gradient(180deg,#f0fffb,#ffffff); }
+    .ai-opt a { color:var(--teal-d); font-weight:700; }
+    .ai-modal-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+    .ai-modal-btns button { flex:1 1 auto; font-size:15px; padding:13px 18px; }
+    .ai-btn-skip { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
+    .ai-modal-foot { margin:14px 0 0; font-size:11.5px; color:var(--sub); line-height:1.6; }
+    /* 設定（再選択）リンク */
+    .ai-settings-row { margin:10px 0 0; text-align:right; }
+    .ai-settings-link { background:none; border:none; box-shadow:none; color:var(--teal-d); font-size:13px; font-weight:700; padding:4px 8px; cursor:pointer; text-decoration:underline; }
+    .ai-settings-link:hover { transform:none; box-shadow:none; }
   </style>
 </head>
 <body>
@@ -169,8 +193,40 @@
     <ul id="list"></ul>
     <div id="bar" style="display:none"><button id="reg" data-i18n="registerBtn">Googleカレンダーに登録</button></div>
     <div id="msg"></div>
+    <div class="ai-settings-row">
+      <button type="button" id="aiSettingsLink" class="ai-settings-link" data-i18n="aiSettingsLink">AI設定を変更</button>
+    </div>
     </div>
   </main>
+
+  <!-- AI利用選択ポップアップ（ログイン直後に表示。選択は記憶し次回は出さない） -->
+  <div id="ai-modal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+    <div class="ai-modal-card">
+      <h2 id="aiModalTitle" data-i18n="aiModalTitle">🤖 AIで読み取り精度を上げますか？</h2>
+      <p class="ai-intro" data-i18n="aiModalIntro">要項の読み取りは、AIを使うとさらに正確になります。利用は任意です。</p>
+
+      <div class="ai-opt">
+        <h3 data-i18n="aiModalSkipTitle">AIを使わない（通常モード）</h3>
+        <p data-i18n="aiModalSkipDesc">追加設定なしで、いますぐ無料で使えます。読み取り結果はご自身で確認・修正できます。</p>
+      </div>
+
+      <div class="ai-opt aiuse">
+        <h3 data-i18n="aiModalUseTitle">AIを使う（AIモード）</h3>
+        <p data-i18n="aiModalUseDesc">ご自身の Google Gemini APIキー を使って、最初から全項目をAIで読み取ります。</p>
+        <ul>
+          <li data-i18n="aiModalUse1">🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。</li>
+          <li data-i18n="aiModalUse2">💰 Gemini APIには無料枠があり、1日およそ1,500件まで無料で使えます（個人利用なら十分）。</li>
+          <li><span data-i18n="aiModalUse3">🔑 キーの取得方法は</span> <a id="aiKeyGuideLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="aiModalGuideLink">こちら（取得ガイド）</a> <span data-i18n="aiModalUse3b">をご覧ください（Google AI Studio で数分・無料）。</span></li>
+        </ul>
+      </div>
+
+      <div class="ai-modal-btns">
+        <button type="button" id="aiSkipBtn" class="ai-btn-skip" data-i18n="aiModalSkipBtn">AIを使わない</button>
+        <button type="button" id="aiUseBtn" data-i18n="aiModalUseBtn">AIを使う（キーを入力）</button>
+      </div>
+      <p class="ai-modal-foot" data-i18n="aiModalFoot">※この選択は記憶され、次回からは表示されません。あとから「AI設定を変更」でいつでも変更できます。</p>
+    </div>
+  </div>
 
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>window.LANG = 'ja';</script>

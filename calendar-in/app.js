@@ -66,45 +66,52 @@ if (window.I18N) { try { I18N.applyDom(); } catch (e) {} }
   sportSel.value = window.Dropper.DEFAULT_SPORT || 'auto';
 })();
 
-// 処理モードセレクタ（②ハイブリッド / ③最初からAI）を動的に生成して挿入する
-(function buildAiModeSelector() {
-  if (!sportSel) return;
-  var anchorRow = sportRow || (sportSel.closest ? sportSel.closest('div') : null) || sportSel.parentNode;
-  if (!anchorRow || !anchorRow.parentNode) return;
-  var row = document.createElement('div');
-  row.className = 'aimode-row';
-  row.style.cssText = 'margin:6px 0';
-  var sel = document.createElement('select');
-  sel.id = 'aimode';
-  sel.style.cssText = 'padding:4px 8px';
-  var o1 = document.createElement('option'); o1.value = 'hybrid';
-  var o2 = document.createElement('option'); o2.value = 'ai';
-  sel.appendChild(o1); sel.appendChild(o2);
-  sel.value = aiMode;
-  var lab = document.createElement('label');
-  lab.className = 'aimode-label';
-  lab.style.cssText = 'font-size:13px;margin-right:6px';
-  row.appendChild(lab); row.appendChild(sel);
-  anchorRow.parentNode.insertBefore(row, anchorRow);
-  sel.addEventListener('change', function () {
-    aiMode = sel.value;
-    // AIモードを選んだ時点でキー未登録なら、最初に一度だけ入力を促す
-    if (aiMode === 'ai') { var k = getAiKey_(); if (!k) { aiMode = 'hybrid'; sel.value = 'hybrid'; } }
-  });
-  // 文言は I18N から都度入れ直す（生成タイミングや言語切替に左右されないようにする）
-  refreshAiModeLabels_();
-})();
+// AI利用の選択はログイン直後のポップアップで行う（画面内のモードセレクタは廃止）。
+// 選択は localStorage に記憶し、次回からは出さない。「AI設定を変更」で再表示できる。
+var AI_CHOICE_STORE = 'dropper_ai_choice';   // 'ai' | 'hybrid'
 
-// モードセレクタの表示文言を現在の言語で入れ直す（i18n読込後・言語切替後でも確実に反映）
-function refreshAiModeLabels_() {
-  var sel = document.getElementById('aimode');
-  if (!sel) return;
-  var lab = document.querySelector('.aimode-label');
-  if (lab) lab.textContent = I18N.t('modeLabel');
-  if (sel.options[0]) sel.options[0].textContent = I18N.t('modeHybrid');
-  if (sel.options[1]) sel.options[1].textContent = I18N.t('modeAi');
+// ポップアップを出すべきか（未選択のときだけ自動表示）
+function maybeShowAiModal_() {
+  var choice = '';
+  try { choice = localStorage.getItem(AI_CHOICE_STORE) || ''; } catch (e) {}
+  if (choice === 'ai') { aiMode = 'ai'; return; }
+  if (choice === 'hybrid') { aiMode = 'hybrid'; return; }
+  openAiModal_();
 }
 
+function openAiModal_() {
+  var m = document.getElementById('ai-modal');
+  if (m) m.classList.add('show');
+}
+function closeAiModal_() {
+  var m = document.getElementById('ai-modal');
+  if (m) m.classList.remove('show');
+}
+
+// 「AIを使わない」を選択
+function chooseHybrid_() {
+  aiMode = 'hybrid';
+  try { localStorage.setItem(AI_CHOICE_STORE, 'hybrid'); } catch (e) {}
+  closeAiModal_();
+}
+// 「AIを使う」を選択 → キー入力 → 入力できたらAIモードで記憶。未入力なら通常モードのまま。
+function chooseAi_() {
+  var key = getAiKey_();
+  if (!key) { return; }   // キー未入力ならポップアップは閉じず再選択を促す
+  aiMode = 'ai';
+  try { localStorage.setItem(AI_CHOICE_STORE, 'ai'); } catch (e) {}
+  closeAiModal_();
+}
+
+// ポップアップのボタン・設定リンクを配線
+(function wireAiModal_() {
+  var skip = document.getElementById('aiSkipBtn');
+  var use = document.getElementById('aiUseBtn');
+  var settings = document.getElementById('aiSettingsLink');
+  if (skip) skip.addEventListener('click', chooseHybrid_);
+  if (use) use.addEventListener('click', chooseAi_);
+  if (settings) settings.addEventListener('click', openAiModal_);   // 再選択（いつでも変更可）
+})();
 
 
 // 種類セレクタを生成し、選択に応じて表示を切り替える
@@ -147,6 +154,7 @@ if (loginBtn) {
       setMsg('');
       if (loginArea) loginArea.style.display = 'none';
       if (workArea) workArea.style.display = '';
+      maybeShowAiModal_();   // ログイン直後：未選択ならAI利用ポップアップを出す
     } catch (e) {
       setMsg(e && e.message ? e.message : I18N.t('msgLoginFailed'));
       loginBtn.disabled = false;
