@@ -110,6 +110,15 @@ function renderSportRow_() {
   }
 }
 
+// 現在選択中の競技プロファイルの「試合形式」欄ラベル（formatLabel）を返す。無ければ既定（fldFormat）。
+function currentSportFormatLabel_() {
+  var def = I18N.t('fldFormat');
+  if (!sportSel || !window.Dropper || !window.Dropper.sports) return def;
+  var cur = sportSel.value;
+  var found = (window.Dropper.sports() || []).filter(function (s) { return s.key === cur; })[0];
+  return (found && found.formatLabel) ? found.formatLabel : def;
+}
+
 function openAiModal_() {
   var m = document.getElementById('ai-modal');
   if (m) m.classList.add('show');
@@ -458,10 +467,13 @@ function addCard(name) {
     });
     markDateRowsWarn_();
   }
+  // この大会カードで使う「試合形式」欄のラベル。通常モードは競技プロファイルのformatLabel、
+  // AIモードはAIのformat_labelで上書きされる。未設定なら既定（fldFormat）。
+  var formatLabel_ = currentSportFormatLabel_();
   // 行を1行追加（date/formatの初期値を指定可）
   function addRow_(date, format) {
     var div = document.createElement('div');
-    div.innerHTML = dayRowHtml_(rowsEl.children.length + 1);
+    div.innerHTML = dayRowHtml_(rowsEl.children.length + 1, formatLabel_);
     var row = div.firstChild;
     rowsEl.appendChild(row);
     var dEl = row.querySelector('[data-k="day_date"]');
@@ -484,6 +496,12 @@ function addCard(name) {
     if (!dates || !dates.length) { addRow_('', ''); }
     else { dates.forEach(function (d) { addRow_(d, formatByDate[d] || ''); }); }
     renumberRows_();
+  }
+  // 「試合形式」欄のラベルを差し替え、全行のラベル表示を更新する（AIのformat_label反映用）
+  function setFormatLabel_(label) {
+    formatLabel_ = (label && label.trim()) ? label.trim() : I18N.t('fldFormat');
+    var spans = rowsEl.querySelectorAll('.day-row-format .format-label-text');
+    for (var i = 0; i < spans.length; i++) { spans[i].textContent = formatLabel_; }
   }
   // 「＋日を追加」ボタン
   var addBtn = li.querySelector('.day-add');
@@ -592,7 +610,9 @@ function addCard(name) {
       }
       box.textContent = I18N.t('aiFallbackNotice') + (reason ? '（' + reason + '）' : '');
       box.style.display = 'block';
-    }
+    },
+    // 「試合形式」欄のラベルを差し替える（AIのformat_label反映用）
+    setFormatLabel: function (label) { setFormatLabel_(label); }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
   return cardApi;
@@ -675,7 +695,8 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     'その日の種目が不明なら events は空文字でよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
     'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
     '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
-    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":""}\n\n' +
+    'format_label は、その競技で「試合形式」に相当する項目の自然な見出し名（例：卓球なら「試合形式」、陸上なら「実施種目」、駅伝なら「区間」、武道なら「部門・階級」）。判断できなければ空文字。\n' +
+    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":""}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
@@ -722,6 +743,10 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
         var sp = (typeof obj.sport === 'string') ? obj.sport.trim() : '';
         auto.textContent = sp ? (I18N.t('sportAutoLabel') + sp) : I18N.t('sportAutoUnknown');
       }
+      // AIが答えた format_label（競技に合った項目名）を「試合形式」欄ラベルに反映
+      if (li.__cardApi && li.__cardApi.setFormatLabel && typeof obj.format_label === 'string') {
+        li.__cardApi.setFormatLabel(obj.format_label);
+      }
     }
     if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算
     if (isAiMode && li.__cardApi && li.__cardApi.showFields) {
@@ -743,12 +768,13 @@ function fieldHtml(label, key) {
 function dayLabel_(n) { return I18N.t('dayLabel', { n: n }); }
 
 // 開催日＋試合形式のペア行を1行分のHTMLで返す（n=1始まりの行番号）
-function dayRowHtml_(n) {
+function dayRowHtml_(n, formatLabel) {
+  var fmtLbl = formatLabel || I18N.t('fldFormat');
   return '' +
     '<div class="day-row" data-day-row>' +
       '<span class="day-row-label">' + dayLabel_(n) + '</span>' +
       '<label class="f day-row-date"><span>' + I18N.t('fldDates') + '</span><input data-k="day_date" type="text"></label>' +
-      '<label class="f day-row-format"><span>' + I18N.t('fldFormat') + '</span><input data-k="day_format" type="text"></label>' +
+      '<label class="f day-row-format"><span class="format-label-text">' + fmtLbl + '</span><input data-k="day_format" type="text"></label>' +
       '<button type="button" class="day-row-remove" title="' + I18N.t('dayRemoveBtn') + '">' + I18N.t('dayRemoveBtn') + '</button>' +
     '</div>';
 }
