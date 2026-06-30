@@ -444,6 +444,10 @@ function addCard(name) {
     fieldHtml(I18N.t('fldOpening'), 'kaikai_jikan') +
     fieldHtml(I18N.t('fldDeadline'), 'shimekiri') +
     fieldHtml(I18N.t('fldNote'), 'note') +
+    '<div class="keyinfo-wrap" style="display:none">' +
+      '<p class="keyinfo-head">' + I18N.t('keyInfoHead') + '</p>' +
+      '<div class="keyinfo-rows"></div>' +
+    '</div>' +
     '</div>' +
     '<div class="card-foot" style="display:none;margin-top:6px">' +
       '<p class="warn-notice" style="display:none;margin:0 0 6px;padding:6px 8px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;font-size:12px;color:#7a4f01"></p>' +
@@ -456,8 +460,45 @@ function addCard(name) {
   var stEl = li.querySelector('.st');
   var ocrText = '';   // この要項のOCR生テキスト（AI検算で使用）
   var rowsEl = li.querySelector('.day-rows');
+  var keyInfoWrap = li.querySelector('.keyinfo-wrap');
+  var keyInfoRows = li.querySelector('.keyinfo-rows');
 
-  // ===== day-row（開催日＋試合形式のペア行）管理 =====
+  // ===== 重要情報欄（AIモードのみ。参加者にとって重要な情報を最大5項目、欄ごとに表示） =====
+  // items = [{label, text}] を受け取り、欄を作り直す。空なら欄ごと隠す。
+  function setKeyInfo_(items) {
+    if (!keyInfoRows || !keyInfoWrap) return;
+    keyInfoRows.innerHTML = '';
+    items = (items || []).slice(0, 5);   // 最大5項目
+    if (!items.length) { keyInfoWrap.style.display = 'none'; return; }
+    keyInfoWrap.style.display = 'block';
+    items.forEach(function (it) {
+      var row = document.createElement('div');
+      row.className = 'keyinfo-row';
+      row.setAttribute('data-keyinfo-row', '');
+      row.innerHTML =
+        '<input type="checkbox" class="keyinfo-chk" checked title="' + I18N.t('keyInfoInclude') + '">' +
+        '<input type="text" class="keyinfo-label" value="">' +
+        '<input type="text" class="keyinfo-text" value="">';
+      keyInfoRows.appendChild(row);
+      row.querySelector('.keyinfo-label').value = (it.label || '').trim();
+      row.querySelector('.keyinfo-text').value = (it.text || '').trim();
+    });
+  }
+  // チェックされた重要情報を [{label, text}] で返す（カレンダー登録の説明文用）
+  function readKeyInfo_() {
+    if (!keyInfoRows) return [];
+    var out = [];
+    keyInfoRows.querySelectorAll('[data-keyinfo-row]').forEach(function (row) {
+      var chk = row.querySelector('.keyinfo-chk');
+      if (!chk || !chk.checked) return;
+      var label = (row.querySelector('.keyinfo-label').value || '').trim();
+      var text = (row.querySelector('.keyinfo-text').value || '').trim();
+      if (label || text) out.push({ label: label, text: text });
+    });
+    return out;
+  }
+
+
   // 行番号ラベル（1日目／2日目…）を振り直す
   function renumberRows_() {
     var rows = rowsEl.querySelectorAll('[data-day-row]');
@@ -573,7 +614,8 @@ function addCard(name) {
         kaijo_jusho: getVal(li, 'kaijo_jusho'),
         kaikai_jikan: getVal(li, 'kaikai_jikan'),
         shimekiri: getVal(li, 'shimekiri'),
-        note: getVal(li, 'note')
+        note: getVal(li, 'note'),
+        key_info: readKeyInfo_()   // チェックされた重要情報 [{label,text}]（カレンダー説明文用）
       };
     },
     markDateEmpty: function () { markDateRowsWarn_(); },
@@ -612,7 +654,10 @@ function addCard(name) {
       box.style.display = 'block';
     },
     // 「試合形式」欄のラベルを差し替える（AIのformat_label反映用）
-    setFormatLabel: function (label) { setFormatLabel_(label); }
+    setFormatLabel: function (label) { setFormatLabel_(label); },
+    // 重要情報欄をセット（AIモードのみ）／チェックされた重要情報を読み取る
+    setKeyInfo: function (items) { setKeyInfo_(items); },
+    readKeyInfo: function () { return readKeyInfo_(); }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
   return cardApi;
@@ -697,10 +742,13 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
     '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
     'format_label は、その競技で「試合形式」に相当する項目の自然な見出し名（例：卓球なら「試合形式」、陸上なら「実施種目」、駅伝なら「区間」、武道なら「部門・階級」）。判断できなければ空文字。\n' +
-    'eligibility は参加資格・出場制限を、参加者が読んで分かるよう簡潔にまとめた文（年齢・性別・所属・段位・出場できない条件など。複数あれば「、」で区切る）。記載が無ければ空文字。\n' +
-    'fee は参加費・参加料を、金額と単位が分かるよう簡潔にまとめた文（例「1人8,000円（3名1チーム24,000円）」）。記載が無ければ空文字。\n' +
-    'payment_deadline は参加費の振込・支払期限。YYYY-MM-DD 形式、無ければ空文字。\n' +
-    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","eligibility":"","fee":"","payment_deadline":""}\n\n' +
+    'key_info は、この大会に参加するにあたって参加者が知っておくべき重要な情報を、要項から重要な順に最大5件抜き出した配列。' +
+    '各要素は {"label":"短い見出し","text":"内容"} の形。' +
+    'label は「参加資格」「参加費」「申込締切」「エントリー制限」「持ち物」「駐車場」「安全・注意」「表彰」など内容に合った簡潔な見出し。' +
+    'text はその具体的な内容を参加者が読んで分かるよう簡潔にまとめる。' +
+    '参加資格・出場制限・参加費・支払期限なども、要項に記載があり重要と判断すれば key_info に含めること。' +
+    '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。\n' +
+    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
@@ -754,8 +802,10 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
       if (li.__cardApi && li.__cardApi.setFormatLabel && typeof obj.format_label === 'string') {
         li.__cardApi.setFormatLabel(obj.format_label);
       }
-      // 参加するにあたって重要な情報（参加資格・参加費・振込期限）をメモ欄にカテゴリ見出し付きで追記
-      appendParticipationInfo_(li, obj);
+      // 参加するにあたって重要な情報（AIが要項ごとに最大5件判断）を重要情報欄に表示
+      if (li.__cardApi && li.__cardApi.setKeyInfo) {
+        li.__cardApi.setKeyInfo(Array.isArray(obj.key_info) ? obj.key_info : []);
+      }
     }
     if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算
     if (isAiMode && li.__cardApi && li.__cardApi.showFields) {
@@ -768,25 +818,6 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     setAi(I18N.t('aiFail') + (e && e.message ? e.message : e));
     fallback(e && e.message ? e.message : String(e));
   }
-}
-
-// 参加するにあたって重要な情報（参加資格・参加費・振込期限）を、カテゴリ見出し付きでメモ欄に追記する。
-// 既存のメモ内容は残し、その下に足す（重複追記は防ぐ）。値が無い項目は出さない。
-function appendParticipationInfo_(li, obj) {
-  var note = li.querySelector('[data-k="note"]');
-  if (!note) return;
-  var parts = [];
-  var elig = (typeof obj.eligibility === 'string') ? obj.eligibility.trim() : '';
-  var fee = (typeof obj.fee === 'string') ? obj.fee.trim() : '';
-  var pay = (typeof obj.payment_deadline === 'string') ? obj.payment_deadline.trim() : '';
-  if (elig) parts.push(I18N.t('noteEligibility') + elig);
-  if (fee) parts.push(I18N.t('noteFee') + fee);
-  if (pay) parts.push(I18N.t('notePayment') + pay);
-  if (!parts.length) return;
-  var block = parts.join('\n');
-  var cur = note.value || '';
-  if (cur.indexOf(block) !== -1) return;   // 同一内容が既にあれば追記しない
-  note.value = cur ? (cur + '\n' + block) : block;
 }
 
 function fieldHtml(label, key) {
@@ -895,10 +926,19 @@ async function createEvent(f, fileId, mimeType) {
     }
   }
 
+  // チェックされた重要情報を「【見出し】内容」改行区切りでまとめる
+  var keyInfoText = (f.key_info || []).map(function (it) {
+    var lbl = (it.label || '').trim();
+    var txt = (it.text || '').trim();
+    if (lbl && txt) return '【' + lbl + '】' + txt;
+    return lbl ? ('【' + lbl + '】') : txt;
+  }).filter(Boolean).join('\n');
+
   var description = [
     formatText ? I18N.t('descFormat') + formatText : '',
     f.shimekiri ? I18N.t('descDeadline') + f.shimekiri : '',
     f.kaikai_jikan ? I18N.t('descOpening') + f.kaikai_jikan : '',
+    keyInfoText ? keyInfoText : '',
     f.note ? I18N.t('descNote') + f.note : '',
     fileId ? I18N.t('descFlyer') + folderUrl + I18N.t('descFlyerTail') : ''
   ].filter(Boolean).join('\n');

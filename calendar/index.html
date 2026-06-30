@@ -120,6 +120,14 @@
     .day-add:hover:not(:disabled) { transform:translateY(-1px); box-shadow:none; background:#f0fffb; }
     .ai-fallback { display:none; margin:0 0 10px; padding:9px 12px; border-radius:10px;
       background:#fff7e6; border:2px solid #ffd591; font-size:12.5px; font-weight:700; color:#7a4f01; line-height:1.5; }
+    .keyinfo-wrap { margin:12px 0 0; padding:12px; border:2px solid var(--line); border-radius:14px; background:linear-gradient(180deg,#f7fffd,#ffffff); }
+    .keyinfo-head { margin:0 0 9px; font-size:12px; font-weight:700; color:var(--teal-d); line-height:1.4; }
+    .keyinfo-rows { display:grid; gap:8px; }
+    .keyinfo-row { display:grid; grid-template-columns:auto 1fr; grid-template-areas:'chk label' 'chk text'; gap:4px 8px; align-items:center; }
+    .keyinfo-chk { grid-area:chk; width:18px; height:18px; align-self:start; margin-top:4px; cursor:pointer; }
+    .keyinfo-label { grid-area:label; font-weight:700; font-size:13px; padding:6px 9px; border:2px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
+    .keyinfo-text { grid-area:text; font-size:13px; padding:6px 9px; border:2px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
+    .keyinfo-label:focus, .keyinfo-text:focus { outline:none; border-color:var(--teal); }
 
     #bar { margin-top:18px; display:flex; gap:8px; align-items:center; }
     button {
