@@ -665,9 +665,6 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
   if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
 
   setAi(I18N.t('aiRunning'));
-  // AIに種目も判定させる（案X）。有効な種目キーの一覧を渡し、その中から選ばせる。
-  var sportList = (window.Dropper && window.Dropper.sports) ? window.Dropper.sports() : [];
-  var sportKeysText = sportList.map(function (s) { return s.key + '（' + s.label + '）'; }).join('、');
   var prompt =
     'あなたはスポーツ大会の要項から情報を抽出するアシスタントです。' +
     '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切・競技種目を読み取り、' +
@@ -676,7 +673,8 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '複数日開催なら schedule に日ごとの種目（events）を入れる。' +
     'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は kaisai_dates と同じ YYYY-MM-DD 形式にすること。' +
     'その日の種目が不明なら events は空文字でよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
-    'sport は競技種目で、次のキーのいずれか1つ（該当する英字キーのみ）を返すこと：' + sportKeysText + '。判断できなければ空文字。\n' +
+    'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
+    '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":""}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
 
@@ -717,13 +715,12 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
       var firstFmt = li.querySelector('[data-k="day_format"]');
       if (firstFmt && !firstFmt.value) firstFmt.value = obj.shiai_keishiki;
     }
-    // AIが判定した競技種目をセレクタ値と自動表示欄に反映（案X）
-    if (obj.sport && sportSel) {
-      var valid = (window.Dropper.sports() || []).filter(function (s) { return s.key === obj.sport; })[0];
-      if (valid) {
-        sportSel.value = valid.key;   // 登録時の説明文等のため値も確定
-        var auto = document.getElementById('sport-auto');
-        if (auto) auto.textContent = I18N.t('sportAutoLabel') + valid.label;
+    // AIが判定した競技種目を自動表示欄にそのまま表示（方式Q：自由記述・プロファイル照合なし）
+    if (isAiMode) {
+      var auto = document.getElementById('sport-auto');
+      if (auto) {
+        var sp = (typeof obj.sport === 'string') ? obj.sport.trim() : '';
+        auto.textContent = sp ? (I18N.t('sportAutoLabel') + sp) : I18N.t('sportAutoUnknown');
       }
     }
     if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算

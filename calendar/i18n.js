@@ -22,6 +22,7 @@
       stepDrop: '② 要項ファイルをドロップ',
       sportAutoWaiting: '競技は要項から自動判定します',
       sportAutoLabel: '競技（自動判定）：',
+      sportAutoUnknown: '競技：要項から判定できませんでした（手動でご確認ください）',
       sportAuto: '自動判定（おまかせ）',
       // --- ドロップゾーン ---
       dropTitle: 'ここに要項ファイルをドラッグ&ドロップ',
@@ -128,6 +129,7 @@
       stepDrop: '② Drop the requisition file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
       sportAutoLabel: 'Sport (auto): ',
+      sportAutoUnknown: 'Sport: could not be detected from the file (please check manually)',
       sportAuto: 'Auto-detect',
       dropTitle: 'Drag & drop your flyer here',
       dropSub: 'PDF and images (JPEG/PNG) supported. You can drop several files at once.',
@@ -225,6 +227,7 @@
       stepDrop: '② Requisition file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',
       sportAutoLabel: 'Sport (auto): ',
+      sportAutoUnknown: 'Sport: file se detect nahi hua (manually check karein)',
       sportAuto: 'Auto-detect',
       dropTitle: 'Apna flyer yahan drag & drop karein',
       dropSub: 'PDF aur images (JPEG/PNG) supported hain. Aap ek saath kai files bhi drop kar sakte hain.',
