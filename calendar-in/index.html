@@ -181,9 +181,31 @@
     .ai-btn-skip { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
     .ai-modal-foot { margin:14px 0 0; font-size:11.5px; color:var(--sub); line-height:1.6; }
     /* 設定（再選択）リンク */
-    .ai-settings-row { margin:10px 0 0; text-align:right; }
-    .ai-settings-link { background:none; border:none; box-shadow:none; color:var(--teal-d); font-size:13px; font-weight:700; padding:4px 8px; cursor:pointer; text-decoration:underline; }
-    .ai-settings-link:hover { transform:none; box-shadow:none; }
+    .mode-banner {
+      display:flex; align-items:center; gap:12px;
+      border-radius:16px; padding:13px 16px; margin:0 0 16px;
+      border:2px solid var(--line); background:#f5f7f8;
+    }
+    .mode-banner-icon { font-size:26px; line-height:1; flex:0 0 auto; }
+    .mode-banner-text { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .mode-banner-title { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px; line-height:1.3; }
+    .mode-banner-desc { font-size:12.5px; color:var(--sub); line-height:1.4; }
+    .mode-banner-change {
+      flex:0 0 auto; font-size:12.5px; font-weight:700; padding:7px 13px; border-radius:10px;
+      background:#fff; border:2px solid var(--line); color:var(--sub);
+      box-shadow:none; cursor:pointer; transition:border-color .15s, color .15s;
+    }
+    .mode-banner-change:hover { transform:none; box-shadow:none; border-color:var(--teal); color:var(--teal-d); }
+    /* AIモード：ティール系で目立たせる */
+    .mode-banner.mode-ai { border-color:var(--teal); background:linear-gradient(100deg,#e6fffb,#f4fff7); }
+    .mode-banner.mode-ai .mode-banner-title { color:var(--teal-d); }
+    /* 通常モード：落ち着いたグレー系 */
+    .mode-banner.mode-hybrid { border-color:var(--line); background:#f5f7f8; }
+    .mode-banner.mode-hybrid .mode-banner-title { color:#555; }
+    @media (max-width:520px){
+      .mode-banner { flex-wrap:wrap; }
+      .mode-banner-change { width:100%; }
+    }
   </style>
 </head>
 <body>
@@ -200,6 +222,14 @@
       <p class="note login-note" data-i18n="loginNote">大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
     </div>
     <div id="work" style="display:none">
+    <div id="mode-banner" class="mode-banner" role="status">
+      <span class="mode-banner-icon" aria-hidden="true"></span>
+      <span class="mode-banner-text">
+        <b class="mode-banner-title"></b>
+        <span class="mode-banner-desc"></span>
+      </span>
+      <button type="button" id="aiSettingsLink" class="mode-banner-change" data-i18n="aiSettingsLink">AI設定を変更</button>
+    </div>
     <div class="sport-row">
       <label for="sport" data-i18n="sportLabel">競技：</label>
       <select id="sport"></select>
@@ -230,9 +260,6 @@
     <ul id="list"></ul>
     <div id="bar" style="display:none"><button id="reg" data-i18n="registerBtn">Googleカレンダーに登録</button></div>
     <div id="msg"></div>
-    <div class="ai-settings-row">
-      <button type="button" id="aiSettingsLink" class="ai-settings-link" data-i18n="aiSettingsLink">AI設定を変更</button>
-    </div>
     </div>
   </main>
 

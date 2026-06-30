@@ -74,9 +74,24 @@ var AI_CHOICE_STORE = 'dropper_ai_choice';   // 'ai' | 'hybrid'
 function maybeShowAiModal_() {
   var choice = '';
   try { choice = localStorage.getItem(AI_CHOICE_STORE) || ''; } catch (e) {}
-  if (choice === 'ai') { aiMode = 'ai'; return; }
-  if (choice === 'hybrid') { aiMode = 'hybrid'; return; }
+  if (choice === 'ai') { aiMode = 'ai'; renderModeBanner_(); return; }
+  if (choice === 'hybrid') { aiMode = 'hybrid'; renderModeBanner_(); return; }
   openAiModal_();
+}
+
+// 現在のモード（aiMode）を画面上部の帯バナーに反映する
+function renderModeBanner_() {
+  var b = document.getElementById('mode-banner');
+  if (!b) return;
+  var isAi = (aiMode === 'ai');
+  b.classList.remove('mode-ai', 'mode-hybrid');
+  b.classList.add(isAi ? 'mode-ai' : 'mode-hybrid');
+  var icon = b.querySelector('.mode-banner-icon');
+  var title = b.querySelector('.mode-banner-title');
+  var desc = b.querySelector('.mode-banner-desc');
+  if (icon) icon.textContent = isAi ? '🤖' : '✋';
+  if (title) title.textContent = I18N.t(isAi ? 'bannerAiTitle' : 'bannerHybridTitle');
+  if (desc) desc.textContent = I18N.t(isAi ? 'bannerAiDesc' : 'bannerHybridDesc');
 }
 
 function openAiModal_() {
@@ -93,6 +108,8 @@ function chooseHybrid_() {
   aiMode = 'hybrid';
   try { localStorage.setItem(AI_CHOICE_STORE, 'hybrid'); } catch (e) {}
   closeAiModal_();
+  renderModeBanner_();
+  updateAiRecheckVisibility_();
 }
 // 「AIを使う」を選択 → キー入力 → 入力できたらAIモードで記憶。未入力なら通常モードのまま。
 function chooseAi_() {
@@ -101,6 +118,16 @@ function chooseAi_() {
   aiMode = 'ai';
   try { localStorage.setItem(AI_CHOICE_STORE, 'ai'); } catch (e) {}
   closeAiModal_();
+  renderModeBanner_();
+  updateAiRecheckVisibility_();
+}
+
+// AIモードのときは各カードの「この大会をAIで検算」ボタンを隠す（全項目が最初からAI取得済みのため不要）
+function updateAiRecheckVisibility_() {
+  var btns = document.querySelectorAll('.ai-recheck');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].style.display = (aiMode === 'ai') ? 'none' : '';
+  }
 }
 
 // ポップアップのボタン・設定リンクを配線
@@ -155,6 +182,7 @@ if (loginBtn) {
       if (loginArea) loginArea.style.display = 'none';
       if (workArea) workArea.style.display = '';
       maybeShowAiModal_();   // ログイン直後：未選択ならAI利用ポップアップを出す
+      renderModeBanner_();   // 現在のモードを帯バナーに表示
     } catch (e) {
       setMsg(e && e.message ? e.message : I18N.t('msgLoginFailed'));
       loginBtn.disabled = false;
@@ -456,6 +484,7 @@ function addCard(name) {
   // AI検算ボタン（この大会の全項目をAIで取り直す。⚠の有無に関わらず実行できる）
   var aiBtn = li.querySelector('.ai-recheck');
   if (aiBtn) aiBtn.addEventListener('click', function () { runAiRecheck_(li, ocrText); });
+  if (aiBtn && aiMode === 'ai') aiBtn.style.display = 'none';   // AIモードでは検算ボタン不要
 
   var cardApi = {
     el: li,
