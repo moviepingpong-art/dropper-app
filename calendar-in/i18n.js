@@ -87,6 +87,9 @@
       fldAddress: '住所',
       fldOpening: '開会式',
       fldFormat: '試合形式',
+      dayAddBtn: '＋ 日を追加',
+      dayRemoveBtn: '削除',
+      dayLabel: '{n}日目',
       fldDeadline: '申込締切',
       fldNote: 'メモ・備考',
       // --- 登録結果 ---
@@ -174,6 +177,9 @@
       fldAddress: 'Address',
       fldOpening: 'Opening ceremony',
       fldFormat: 'Format',
+      dayAddBtn: '+ Add day',
+      dayRemoveBtn: 'Remove',
+      dayLabel: 'Day {n}',
       fldDeadline: 'Entry deadline',
       fldNote: 'Notes',
       msgNoItems: 'There is nothing to add.',
@@ -257,6 +263,9 @@
       fldAddress: 'Address',
       fldOpening: 'Opening ceremony',
       fldFormat: 'Format',
+      dayAddBtn: '+ Din add karein',
+      dayRemoveBtn: 'Hatayein',
+      dayLabel: 'Din {n}',
       fldDeadline: 'Entry deadline',
       fldNote: 'Notes',
       msgNoItems: 'Add karne ke liye kuch nahi hai.',
@@ -282,10 +291,12 @@
     return I18N[lang] || I18N.ja;
   }
 
-  // キーから文言を引く
-  function t(key) {
+  // キーから文言を引く（vars を渡すと {name} 形式のプレースホルダを置換）
+  function t(key, vars) {
     var d = dict();
-    return (key in d) ? d[key] : ((key in I18N.ja) ? I18N.ja[key] : key);
+    var s = (key in d) ? d[key] : ((key in I18N.ja) ? I18N.ja[key] : key);
+    if (vars) { for (var k in vars) { s = s.replace('{' + k + '}', vars[k]); } }
+    return s;
   }
 
   // data-i18n 属性を持つ要素に文言を流し込む。data-i18n-attr があればその属性に、なければテキストに。

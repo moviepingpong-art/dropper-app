@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="in">
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -81,6 +81,43 @@
     .f.warn input { border-color:#e5484d; background:#fff5f5; }
     .date-warn { grid-column:1 / -1; color:#e5484d; font-size:12px; font-weight:700; margin-top:2px; }
     @media (max-width:520px){ .f { grid-template-columns:1fr; gap:3px; } }
+
+    /* ===== 開催日＋試合形式のペア行（day-row） ===== */
+    .day-rows-wrap { display:grid; gap:9px; }
+    .day-rows { display:grid; gap:10px; }
+    .day-row {
+      display:grid; gap:6px 10px; align-items:center;
+      grid-template-columns:1fr auto;
+      border:2px solid var(--line); border-radius:14px; padding:11px 12px;
+      background:linear-gradient(180deg,#f7fffd,#ffffff);
+    }
+    .day-row-label {
+      grid-column:1 / -1; font-size:13px; font-weight:700; color:var(--teal-d);
+      display:inline-flex; align-items:center; gap:6px;
+    }
+    .day-row-label::before {
+      content:''; width:8px; height:8px; border-radius:50%;
+      background:linear-gradient(100deg,var(--teal),var(--lime-d)); display:inline-block;
+    }
+    .day-row .f { grid-column:1 / -1; }
+    .day-row-remove {
+      grid-column:2; grid-row:1;
+      align-self:start; justify-self:end;
+      font-size:12px; font-weight:700; padding:6px 12px; border-radius:10px;
+      color:var(--sub); background:#fff; border:2px solid var(--line);
+      box-shadow:none; cursor:pointer; transition:border-color .15s, color .15s;
+    }
+    .day-row-remove:hover:not(:disabled) {
+      transform:none; box-shadow:none; border-color:#e5484d; color:#e5484d;
+    }
+    /* 全行の日付が空のときの警告（既存 .f.warn と同じ赤枠表現） */
+    .day-row-date.warn input { border-color:#e5484d; background:#fff5f5; }
+    .day-add {
+      justify-self:start; font-size:14px; font-weight:700; padding:9px 18px; border-radius:12px;
+      color:var(--teal-d); background:#fff; border:2px dashed var(--teal);
+      box-shadow:none; cursor:pointer; transition:background .15s, transform .12s;
+    }
+    .day-add:hover:not(:disabled) { transform:translateY(-1px); box-shadow:none; background:#f0fffb; }
 
     #bar { margin-top:18px; display:flex; gap:8px; align-items:center; }
     button {

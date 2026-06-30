@@ -376,11 +376,13 @@ function addCard(name) {
     '<div class="fields" style="display:none">' +
     '<p class="edit-hint">' + I18N.t('editHint') + '</p>' +
     fieldHtml(I18N.t('fldName'), 'taikai_mei') +
-    fieldHtml(I18N.t('fldDates'), 'kaisai_dates') +
+    '<div class="day-rows-wrap">' +
+      '<div class="day-rows"></div>' +
+      '<button type="button" class="day-add">' + I18N.t('dayAddBtn') + '</button>' +
+    '</div>' +
     fieldHtml(I18N.t('fldVenue'), 'kaijo') +
     fieldHtml(I18N.t('fldAddress'), 'kaijo_jusho') +
     fieldHtml(I18N.t('fldOpening'), 'kaikai_jikan') +
-    fieldHtml(I18N.t('fldFormat'), 'shiai_keishiki') +
     fieldHtml(I18N.t('fldDeadline'), 'shimekiri') +
     fieldHtml(I18N.t('fldNote'), 'note') +
     '</div>' +
@@ -394,10 +396,62 @@ function addCard(name) {
   list.appendChild(li);
   var stEl = li.querySelector('.st');
   var ocrText = '';   // この要項のOCR生テキスト（AI検算で使用）
+  var rowsEl = li.querySelector('.day-rows');
 
-  // 開催日が入力されたら警告を消す
-  var dateInput = li.querySelector('[data-k="kaisai_dates"]');
-  if (dateInput) dateInput.addEventListener('input', function () { markDateWarn_(li, !dateInput.value.trim()); });
+  // ===== day-row（開催日＋試合形式のペア行）管理 =====
+  // 行番号ラベル（1日目／2日目…）を振り直す
+  function renumberRows_() {
+    var rows = rowsEl.querySelectorAll('[data-day-row]');
+    rows.forEach(function (row, idx) {
+      var lab = row.querySelector('.day-row-label');
+      if (lab) lab.textContent = dayLabel_(idx + 1);
+    });
+    markDateRowsWarn_();
+  }
+  // 行を1行追加（date/formatの初期値を指定可）
+  function addRow_(date, format) {
+    var div = document.createElement('div');
+    div.innerHTML = dayRowHtml_(rowsEl.children.length + 1);
+    var row = div.firstChild;
+    rowsEl.appendChild(row);
+    var dEl = row.querySelector('[data-k="day_date"]');
+    var fEl = row.querySelector('[data-k="day_format"]');
+    if (dEl) dEl.value = date || '';
+    if (fEl) fEl.value = format || '';
+    if (dEl) dEl.addEventListener('input', markDateRowsWarn_);
+    var rmBtn = row.querySelector('.day-row-remove');
+    if (rmBtn) rmBtn.addEventListener('click', function () {
+      if (rowsEl.children.length <= 1) { return; }   // 最低1行は残す
+      row.remove();
+      renumberRows_();
+    });
+    return row;
+  }
+  // 現在の行をすべて消して、日付配列（＋任意で日付→試合形式の対応表）から作り直す
+  function rebuildRows_(dates, formatByDate) {
+    rowsEl.innerHTML = '';
+    formatByDate = formatByDate || {};
+    if (!dates || !dates.length) { addRow_('', ''); }
+    else { dates.forEach(function (d) { addRow_(d, formatByDate[d] || ''); }); }
+    renumberRows_();
+  }
+  // 「＋日を追加」ボタン
+  var addBtn = li.querySelector('.day-add');
+  if (addBtn) addBtn.addEventListener('click', function () { addRow_('', ''); });
+  // 開催日が1件も無い（全行空）時に警告
+  function markDateRowsWarn_() {
+    var rows = rowsEl.querySelectorAll('[data-day-row]');
+    var anyFilled = Array.prototype.some.call(rows, function (row) {
+      var d = row.querySelector('[data-k="day_date"]');
+      return d && d.value.trim();
+    });
+    rows.forEach(function (row) {
+      var label = row.querySelector('.day-row-date');
+      if (!label) return;
+      if (!anyFilled) label.classList.add('warn'); else label.classList.remove('warn');
+    });
+  }
+  rebuildRows_([], {});   // 初期状態：1行だけ（空）
 
   // AI検算ボタン（この大会の全項目をAIで取り直す。⚠の有無に関わらず実行できる）
   var aiBtn = li.querySelector('.ai-recheck');
@@ -407,40 +461,62 @@ function addCard(name) {
     el: li,
     setText: function (t) { ocrText = t || ''; },
     setStatus: function (t, cls) { stEl.textContent = t; stEl.className = 'st ' + (cls || 'wait'); },
+    // fields.kaisai_dates: string[]、fields.schedule: [{date, events}]（あれば日付ごとの試合形式に割当）、
+    // fields.shiai_keishiki: 旧来の単一文字列（scheduleが無い時のフォールバック、1行目に入れる）
     fill: function (fields) {
       stEl.textContent = I18N.t('stDone'); stEl.className = 'st ok';
       li.querySelector('.fields').style.display = 'block';
       li.querySelector('.card-foot').style.display = 'block';
       setVal(li, 'taikai_mei', fields.taikai_mei);
-      setVal(li, 'kaisai_dates', (fields.kaisai_dates || []).join(', '));
+      var dates = fields.kaisai_dates || [];
+      var formatByDate = {};
+      (fields.schedule || []).forEach(function (s) { if (s && s.date) formatByDate[s.date] = s.events || ''; });
+      rebuildRows_(dates, formatByDate);
+      if (!Object.keys(formatByDate).length && fields.shiai_keishiki && dates.length) {
+        var firstFmt = rowsEl.querySelector('[data-k="day_format"]');
+        if (firstFmt) firstFmt.value = fields.shiai_keishiki;
+      }
       setVal(li, 'kaijo', fields.kaijo);
       setVal(li, 'kaijo_jusho', fields.kaijo_jusho);
       setVal(li, 'kaikai_jikan', fields.kaikai_jikan);
-      setVal(li, 'shiai_keishiki', fields.shiai_keishiki);
       setVal(li, 'shimekiri', fields.shimekiri);
       setVal(li, 'note', fields.note);
-      markDateWarn_(li, !(fields.kaisai_dates && fields.kaisai_dates.length));   // 開催日が空なら強調
       renderWarnings_(li, fields.warnings || []);   // 採点係：⚠を該当項目に表示
     },
     isChecked: function () { return li.querySelector('.chk input').checked; },
     read: function () {
+      var rows = rowsEl.querySelectorAll('[data-day-row]');
+      var dates = [], formats = [];
+      rows.forEach(function (row) {
+        var d = (row.querySelector('[data-k="day_date"]').value || '').trim();
+        var f = (row.querySelector('[data-k="day_format"]').value || '').trim();
+        if (d) { dates.push(d); formats.push({ date: d, format: f }); }
+      });
       return {
         taikai_mei: getVal(li, 'taikai_mei'),
-        kaisai_dates: getVal(li, 'kaisai_dates').split(/[,、\s]+/).map(function (s) { return s.trim(); }).filter(Boolean),
+        kaisai_dates: dates,
+        shiai_keishiki_by_day: formats,   // [{date, format}] 日ごとの試合形式
         kaijo: getVal(li, 'kaijo'),
         kaijo_jusho: getVal(li, 'kaijo_jusho'),
         kaikai_jikan: getVal(li, 'kaikai_jikan'),
-        shiai_keishiki: getVal(li, 'shiai_keishiki'),
         shimekiri: getVal(li, 'shimekiri'),
         note: getVal(li, 'note')
       };
     },
-    markDateEmpty: function () { markDateWarn_(li, true); },
+    markDateEmpty: function () { markDateRowsWarn_(); },
     focusDate: function () {
-      var f = li.querySelector('[data-k="kaisai_dates"]');
+      var f = rowsEl.querySelector('[data-k="day_date"]');
       if (f) { li.scrollIntoView({ behavior: 'smooth', block: 'center' }); f.focus(); }
+    },
+    // AI検算（runAiRecheck_）から呼ぶ窓口：day-rowsの再構築だけを行う（他項目はrunAiRecheck_側でsetVal）
+    applyDayRows: function (dates, schedule) {
+      var formatByDate = {};
+      (schedule || []).forEach(function (s) { if (s && s.date) formatByDate[s.date] = s.events || ''; });
+      rebuildRows_(dates, formatByDate);
+      return formatByDate;
     }
   };
+  li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
   return cardApi;
 }
 
@@ -468,6 +544,8 @@ function renderWarnings_(li, warnings) {
   // 既存の強調をクリア
   li.querySelectorAll('.f.warn-blink').forEach(function (el) { el.classList.remove('warn-blink'); });
   (warnings || []).forEach(function (w) {
+    // 注意：day-row化により kaisai_dates / shiai_keishiki の単一欄は廃止。
+    //   これらを field に指す採点係の警告は現状ターゲットが無く点滅しない（parser側の対応は別タスク）。
     var input = li.querySelector('[data-k="' + w.field + '"]');
     if (!input) return;
     var label = input.closest('.f');
@@ -510,7 +588,9 @@ async function runAiRecheck_(li, ocrText) {
     '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切を読み取り、' +
     'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
     '開催日は YYYY-MM-DD の配列。練習日・受付日・申込締切日は開催日に含めないこと。' +
-    '複数日開催なら schedule に日ごとの種目を入れる。値が不明な項目は空文字または空配列。\n' +
+    '複数日開催なら schedule に日ごとの種目（events）を入れる。' +
+    'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は kaisai_dates と同じ YYYY-MM-DD 形式にすること。' +
+    'その日の種目が不明なら events は空文字でよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}]}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
 
@@ -538,19 +618,20 @@ async function runAiRecheck_(li, ocrText) {
 
     // AI結果を入力欄へ反映（必ず人が確認する前提）
     if ('taikai_mei' in obj) setVal(li, 'taikai_mei', obj.taikai_mei);
-    if ('kaisai_dates' in obj) setVal(li, 'kaisai_dates', (obj.kaisai_dates || []).join(', '));
+    var dates = obj.kaisai_dates || [];
+    if (li.__cardApi && (dates.length || obj.schedule)) {
+      li.__cardApi.applyDayRows(dates, obj.schedule);
+    }
     if ('kaijo' in obj) setVal(li, 'kaijo', obj.kaijo);
     if ('kaijo_jusho' in obj) setVal(li, 'kaijo_jusho', obj.kaijo_jusho);
     if ('kaikai_jikan' in obj) setVal(li, 'kaikai_jikan', obj.kaikai_jikan);
-    if ('shiai_keishiki' in obj) setVal(li, 'shiai_keishiki', obj.shiai_keishiki);
     if ('shimekiri' in obj) setVal(li, 'shimekiri', obj.shimekiri);
-    if (obj.schedule && obj.schedule.length) {
-      var note = li.querySelector('[data-k="note"]');
-      var sched = obj.schedule.filter(function (s) { return s && (s.date || s.events); })
-        .map(function (s) { return s.date + '：' + (s.events || ''); }).join(' / ');
-      if (note && sched) note.value = (note.value ? note.value + ' / ' : '') + sched;
+    // schedule が無く shiai_keishiki のみの場合は、1行目の試合形式欄に入れる（従来挙動の温存）
+    if ((!obj.schedule || !obj.schedule.length) && obj.shiai_keishiki) {
+      var firstFmt = li.querySelector('[data-k="day_format"]');
+      if (firstFmt && !firstFmt.value) firstFmt.value = obj.shiai_keishiki;
     }
-    markDateWarn_(li, !getVal(li, 'kaisai_dates').trim());
+    if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算
     renderWarnings_(li, []);   // AI反映後は採点係の⚠を一旦消す（再確認はユーザー）
     setAi(I18N.t('aiDone'));
   } catch (e) {
@@ -560,26 +641,21 @@ async function runAiRecheck_(li, ocrText) {
 function fieldHtml(label, key) {
   return '<label class="f"><span>' + label + '</span><input data-k="' + key + '" type="text"></label>';
 }
-// 開催日フィールドの警告（赤枠＋注意文）を on/off する
-function markDateWarn_(li, on) {
-  var f = li.querySelector('[data-k="kaisai_dates"]');
-  if (!f) return;
-  var label = f.closest('.f');
-  if (!label) return;
-  var warnEl = label.querySelector('.date-warn');
-  if (on) {
-    label.classList.add('warn');
-    if (!warnEl) {
-      warnEl = document.createElement('span');
-      warnEl.className = 'date-warn';
-      warnEl.textContent = I18N.t('dateWarn');
-      label.appendChild(warnEl);
-    }
-  } else {
-    label.classList.remove('warn');
-    if (warnEl && warnEl.parentNode) warnEl.parentNode.removeChild(warnEl);
-  }
+
+// 「○日目」ラベル（t()のプレースホルダ拡張版：辞書は dayLabel: '{n}日目' / 'Day {n}' 等）
+function dayLabel_(n) { return I18N.t('dayLabel', { n: n }); }
+
+// 開催日＋試合形式のペア行を1行分のHTMLで返す（n=1始まりの行番号）
+function dayRowHtml_(n) {
+  return '' +
+    '<div class="day-row" data-day-row>' +
+      '<span class="day-row-label">' + dayLabel_(n) + '</span>' +
+      '<label class="f day-row-date"><span>' + I18N.t('fldDates') + '</span><input data-k="day_date" type="text"></label>' +
+      '<label class="f day-row-format"><span>' + I18N.t('fldFormat') + '</span><input data-k="day_format" type="text"></label>' +
+      '<button type="button" class="day-row-remove" title="' + I18N.t('dayRemoveBtn') + '">' + I18N.t('dayRemoveBtn') + '</button>' +
+    '</div>';
 }
+// 開催日フィールドの警告（赤枠＋注意文）は、各カード内の markDateRowsWarn_（day-row方式）に移行済み。
 function setVal(li, k, v) { var el = li.querySelector('[data-k="' + k + '"]'); if (el) el.value = v || ''; }
 function getVal(li, k) { var el = li.querySelector('[data-k="' + k + '"]'); return el ? el.value : ''; }
 
@@ -649,8 +725,26 @@ async function cleanupUnregistered_() {
 async function createEvent(f, fileId, mimeType) {
   var dates = f.kaisai_dates.slice().sort();
   var folderUrl = dropperFolderId ? 'https://drive.google.com/drive/folders/' + dropperFolderId : 'https://drive.google.com/drive/';
+
+  // 試合形式：日付順に並べ、複数日のときだけ各行に日付（M/D）を付ける。1日開催は形式のみ。
+  var byDay = (f.shiai_keishiki_by_day || []).slice().sort(function (a, b) {
+    return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+  });
+  var filled = byDay.filter(function (s) { return s.format; });
+  var formatText = '';
+  if (filled.length) {
+    if (dates.length <= 1) {
+      formatText = filled.map(function (s) { return s.format; }).join(' / ');
+    } else {
+      formatText = filled.map(function (s) {
+        var md = s.date.replace(/^\d+-0?(\d+)-0?(\d+)$/, '$1/$2');
+        return md + ' ' + s.format;
+      }).join(' / ');
+    }
+  }
+
   var description = [
-    f.shiai_keishiki ? I18N.t('descFormat') + f.shiai_keishiki : '',
+    formatText ? I18N.t('descFormat') + formatText : '',
     f.shimekiri ? I18N.t('descDeadline') + f.shimekiri : '',
     f.kaikai_jikan ? I18N.t('descOpening') + f.kaikai_jikan : '',
     f.note ? I18N.t('descNote') + f.note : '',
