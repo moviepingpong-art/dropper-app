@@ -122,12 +122,14 @@ function chooseAi_() {
   updateAiRecheckVisibility_();
 }
 
-// AIモードのときは各カードの「この大会をAIで検算」ボタンを隠す（全項目が最初からAI取得済みのため不要）
+// AIモードのときは各カードの「この大会をAIで検算」ボタンと「どの項目にもかけられます」注意文を隠す
+// （全項目が最初からAI取得済みで、項目ごとの検算は使わないため不要）
 function updateAiRecheckVisibility_() {
+  var isAi = (aiMode === 'ai');
   var btns = document.querySelectorAll('.ai-recheck');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].style.display = (aiMode === 'ai') ? 'none' : '';
-  }
+  for (var i = 0; i < btns.length; i++) { btns[i].style.display = isAi ? 'none' : ''; }
+  var notes = document.querySelectorAll('.ai-anyfield');
+  for (var j = 0; j < notes.length; j++) { notes[j].style.display = isAi ? 'none' : ''; }
 }
 
 // ポップアップのボタン・設定リンクを配線
@@ -267,8 +269,12 @@ async function processOne(file) {
     card.setText(res.text);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
-    // ③「最初からAI」モード：正規表現の結果（フォールバック）を表示後、全項目をAIで取り直す
-    if (aiMode === 'ai') { await runAiRecheck_(card.el, res.text); }
+    // 「最初からAI」モード：正規表現の結果はフォールバックとして裏で保持し画面では隠す。
+    // AI成功→AI結果を表示、AI失敗→正規表現の結果を表示し理由を添える（案①）。
+    if (aiMode === 'ai') {
+      card.hideFields();   // 正規表現結果のちらつきを防ぐ
+      await runAiRecheck_(card.el, res.text, true);   // 第3引数=AIモード（失敗時フォールバック説明を出す）
+    }
   } catch (e) {
     card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
   }
@@ -484,7 +490,11 @@ function addCard(name) {
   // AI検算ボタン（この大会の全項目をAIで取り直す。⚠の有無に関わらず実行できる）
   var aiBtn = li.querySelector('.ai-recheck');
   if (aiBtn) aiBtn.addEventListener('click', function () { runAiRecheck_(li, ocrText); });
-  if (aiBtn && aiMode === 'ai') aiBtn.style.display = 'none';   // AIモードでは検算ボタン不要
+  if (aiMode === 'ai') {   // AIモードでは検算ボタン・any-field注意文は不要
+    if (aiBtn) aiBtn.style.display = 'none';
+    var anyNote = li.querySelector('.ai-anyfield');
+    if (anyNote) anyNote.style.display = 'none';
+  }
 
   var cardApi = {
     el: li,
@@ -543,6 +553,29 @@ function addCard(name) {
       (schedule || []).forEach(function (s) { if (s && s.date) formatByDate[s.date] = s.events || ''; });
       rebuildRows_(dates, formatByDate);
       return formatByDate;
+    },
+    // 入力欄を隠す（AIモードで正規表現結果のちらつきを防ぐ。fill直後に呼ぶ）
+    hideFields: function () {
+      var f = li.querySelector('.fields'); if (f) f.style.display = 'none';
+      var foot = li.querySelector('.card-foot'); if (foot) foot.style.display = 'none';
+    },
+    // 入力欄を表示する（AI成功時、またはAI失敗でフォールバック表示するとき）
+    showFields: function () {
+      var f = li.querySelector('.fields'); if (f) f.style.display = 'block';
+      var foot = li.querySelector('.card-foot'); if (foot) foot.style.display = 'block';
+    },
+    // AI失敗時：正規表現の結果を表示しつつ、フォールバックである旨と理由をカード上部に出す
+    showAiFallback: function (reason) {
+      this.showFields();
+      var box = li.querySelector('.ai-fallback');
+      if (!box) {
+        box = document.createElement('p');
+        box.className = 'ai-fallback';
+        var fieldsEl = li.querySelector('.fields');
+        if (fieldsEl) fieldsEl.insertBefore(box, fieldsEl.firstChild);
+      }
+      box.textContent = I18N.t('aiFallbackNotice') + (reason ? '（' + reason + '）' : '');
+      box.style.display = 'block';
     }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
@@ -604,12 +637,16 @@ function getAiKey_() {
   return k;
 }
 
-async function runAiRecheck_(li, ocrText) {
+async function runAiRecheck_(li, ocrText, isAiMode) {
   var statusEl = li.querySelector('.ai-status');
   var setAi = function (t) { if (statusEl) statusEl.textContent = t || ''; };
-  if (!ocrText) { setAi(I18N.t('aiFail') + 'no text'); return; }
+  // AIモードの失敗時：正規表現の結果を表示し、フォールバックである旨＋理由を添える
+  var fallback = function (reason) {
+    if (isAiMode && li.__cardApi && li.__cardApi.showAiFallback) li.__cardApi.showAiFallback(reason);
+  };
+  if (!ocrText) { setAi(I18N.t('aiFail') + 'no text'); fallback('no text'); return; }
   var key = getAiKey_();
-  if (!key) { setAi(I18N.t('aiNoKey')); return; }
+  if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
 
   setAi(I18N.t('aiRunning'));
   var prompt =
@@ -633,11 +670,11 @@ async function runAiRecheck_(li, ocrText) {
         generationConfig: { temperature: 0, responseMimeType: 'application/json' }
       })
     });
-    if (resp.status === 429) { setAi(I18N.t('aiLimit')); return; }
+    if (resp.status === 429) { setAi(I18N.t('aiLimit')); fallback(I18N.t('aiLimit')); return; }
     if (!resp.ok) {
       var et = await resp.text();
       if (resp.status === 400 && /API key not valid|API_KEY_INVALID/i.test(et)) { try { localStorage.removeItem(AI_KEY_STORE); } catch (e) {} }
-      setAi(I18N.t('aiFail') + resp.status); return;
+      setAi(I18N.t('aiFail') + resp.status); fallback('HTTP ' + resp.status); return;
     }
     var data = await resp.json();
     var txt = ((((data.candidates || [])[0] || {}).content || {}).parts || [])
@@ -661,10 +698,15 @@ async function runAiRecheck_(li, ocrText) {
       if (firstFmt && !firstFmt.value) firstFmt.value = obj.shiai_keishiki;
     }
     if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算
+    if (isAiMode && li.__cardApi && li.__cardApi.showFields) {
+      li.__cardApi.showFields();   // AIモード：成功したので結果を表示
+      var fb = li.querySelector('.ai-fallback'); if (fb) fb.style.display = 'none';
+    }
     renderWarnings_(li, []);   // AI反映後は採点係の⚠を一旦消す（再確認はユーザー）
     setAi(I18N.t('aiDone'));
   } catch (e) {
     setAi(I18N.t('aiFail') + (e && e.message ? e.message : e));
+    fallback(e && e.message ? e.message : String(e));
   }
 }
 function fieldHtml(label, key) {
