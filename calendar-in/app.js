@@ -690,9 +690,10 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切・競技種目を読み取り、' +
     'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
     '開催日は YYYY-MM-DD の配列。練習日・受付日・申込締切日は開催日に含めないこと。' +
-    '複数日開催なら schedule に日ごとの種目（events）を入れる。' +
     'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は kaisai_dates と同じ YYYY-MM-DD 形式にすること。' +
-    'その日の種目が不明なら events は空文字でよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
+    'events には、その日に行われる試合形式・競技方法・種目（例：トーナメント方式、予選リーグ、優勝決定戦、個人戦、団体戦、◯◯の部 など）を必ず入れること。' +
+    '1日開催の場合も、要項に競技方法・試合形式・種目の記載があれば、その内容を schedule の events に必ず入れること（要項本文の「競技方法」「試合方法」「試合内容」「試合形式」などの項目を必ず参照する）。' +
+    'その日の種目がどうしても判断できないときのみ events を空文字にしてよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
     'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
     '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
     'format_label は、その競技で「試合形式」に相当する項目の自然な見出し名（例：卓球なら「試合形式」、陸上なら「実施種目」、駅伝なら「区間」、武道なら「部門・階級」）。判断できなければ空文字。\n' +
@@ -734,10 +735,13 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     if ('kaijo_jusho' in obj) setVal(li, 'kaijo_jusho', obj.kaijo_jusho);
     if ('kaikai_jikan' in obj) setVal(li, 'kaikai_jikan', obj.kaikai_jikan);
     if ('shimekiri' in obj) setVal(li, 'shimekiri', obj.shimekiri);
-    // schedule が無く shiai_keishiki のみの場合は、1行目の試合形式欄に入れる（従来挙動の温存）
-    if ((!obj.schedule || !obj.schedule.length) && obj.shiai_keishiki) {
-      var firstFmt = li.querySelector('[data-k="day_format"]');
-      if (firstFmt && !firstFmt.value) firstFmt.value = obj.shiai_keishiki;
+    // 競技方法（試合形式）の補完：schedule.events が空でも shiai_keishiki に値があれば、
+    // 空の day_format 欄をそれで埋める。1日開催で events が漏れるケースの保険。
+    if (obj.shiai_keishiki) {
+      var fmtInputs = li.querySelectorAll('[data-k="day_format"]');
+      // 全行が空のときだけ補完（既にAIがscheduleで日別に入れている場合は尊重）
+      var allEmpty = Array.prototype.every.call(fmtInputs, function (el) { return !el.value.trim(); });
+      if (allEmpty && fmtInputs.length) { fmtInputs[0].value = obj.shiai_keishiki; }
     }
     // AIが判定した競技種目を自動表示欄にそのまま表示（方式Q：自由記述・プロファイル照合なし）
     if (isAiMode) {
