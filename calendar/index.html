@@ -139,6 +139,10 @@
     .sport-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
     .sport-row label { font-size:14px; font-weight:700; color:var(--teal-d); }
     .sport-row select { font-family:inherit; font-weight:500; padding:9px 13px; border:2px solid var(--teal); border-radius:12px; font-size:14px; background:#fff; color:var(--ink); cursor:pointer; }
+    .step-num { font-size:14px; font-weight:700; color:var(--teal-d); }
+    .step-drop-label { font-size:14px; font-weight:700; color:var(--teal-d); margin:0 0 8px; }
+    .sport-auto { font-size:14px; font-weight:700; color:var(--teal-d); display:inline-flex; align-items:center; gap:6px; }
+    .sport-auto::before { content:'🤖'; font-size:16px; }
     #login-area { text-align:center; padding:30px 10px 10px; }
     .login-btn {
       font-family:'Zen Maru Gothic',sans-serif; font-size:18px; font-weight:700;
@@ -233,9 +237,11 @@
       <button type="button" id="aiSettingsLink" class="mode-banner-change" data-i18n="aiSettingsLink">AI設定を変更</button>
     </div>
     <div class="sport-row">
-      <label for="sport" data-i18n="sportLabel">競技：</label>
+      <label for="sport"><span class="step-num" data-i18n="stepSport">① 競技を選ぶ：</span></label>
       <select id="sport"></select>
+      <span id="sport-auto" class="sport-auto" style="display:none"></span>
     </div>
+    <p class="step-drop-label" data-i18n="stepDrop">② 要項ファイルをドロップ</p>
     <div id="drop">
       <div class="anim">
         <svg class="cal" viewBox="0 0 48 48" fill="none" aria-hidden="true">
