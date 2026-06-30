@@ -696,7 +696,10 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
     '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
     'format_label は、その競技で「試合形式」に相当する項目の自然な見出し名（例：卓球なら「試合形式」、陸上なら「実施種目」、駅伝なら「区間」、武道なら「部門・階級」）。判断できなければ空文字。\n' +
-    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":""}\n\n' +
+    'eligibility は参加資格・出場制限を、参加者が読んで分かるよう簡潔にまとめた文（年齢・性別・所属・段位・出場できない条件など。複数あれば「、」で区切る）。記載が無ければ空文字。\n' +
+    'fee は参加費・参加料を、金額と単位が分かるよう簡潔にまとめた文（例「1人8,000円（3名1チーム24,000円）」）。記載が無ければ空文字。\n' +
+    'payment_deadline は参加費の振込・支払期限。YYYY-MM-DD 形式、無ければ空文字。\n' +
+    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","eligibility":"","fee":"","payment_deadline":""}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
@@ -747,6 +750,8 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
       if (li.__cardApi && li.__cardApi.setFormatLabel && typeof obj.format_label === 'string') {
         li.__cardApi.setFormatLabel(obj.format_label);
       }
+      // 参加するにあたって重要な情報（参加資格・参加費・振込期限）をメモ欄にカテゴリ見出し付きで追記
+      appendParticipationInfo_(li, obj);
     }
     if (li.__cardApi) li.__cardApi.markDateEmpty();   // 行の警告状態を再計算
     if (isAiMode && li.__cardApi && li.__cardApi.showFields) {
@@ -760,6 +765,26 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     fallback(e && e.message ? e.message : String(e));
   }
 }
+
+// 参加するにあたって重要な情報（参加資格・参加費・振込期限）を、カテゴリ見出し付きでメモ欄に追記する。
+// 既存のメモ内容は残し、その下に足す（重複追記は防ぐ）。値が無い項目は出さない。
+function appendParticipationInfo_(li, obj) {
+  var note = li.querySelector('[data-k="note"]');
+  if (!note) return;
+  var parts = [];
+  var elig = (typeof obj.eligibility === 'string') ? obj.eligibility.trim() : '';
+  var fee = (typeof obj.fee === 'string') ? obj.fee.trim() : '';
+  var pay = (typeof obj.payment_deadline === 'string') ? obj.payment_deadline.trim() : '';
+  if (elig) parts.push(I18N.t('noteEligibility') + elig);
+  if (fee) parts.push(I18N.t('noteFee') + fee);
+  if (pay) parts.push(I18N.t('notePayment') + pay);
+  if (!parts.length) return;
+  var block = parts.join('\n');
+  var cur = note.value || '';
+  if (cur.indexOf(block) !== -1) return;   // 同一内容が既にあれば追記しない
+  note.value = cur ? (cur + '\n' + block) : block;
+}
+
 function fieldHtml(label, key) {
   return '<label class="f"><span>' + label + '</span><input data-k="' + key + '" type="text"></label>';
 }

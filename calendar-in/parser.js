@@ -22,6 +22,7 @@
   var SPORT_PROFILES = {
     tabletennis: {
       label: '卓球・バドミントン',
+      formatLabel: '試合形式',
       sportKeywords: /卓\s*球|ラ\s*ー\s*ジ\s*ボ\s*ー\s*ル|ピ\s*ン\s*ポ\s*ン|バ\s*ド\s*ミ\s*ン\s*ト\s*ン/,
       formats: [
         { re: /団\s*体/, label: '団体戦' },
@@ -37,6 +38,7 @@
     },
     volleyball: {
       label: 'バレーボール',
+      formatLabel: '試合形式',
       sportKeywords: /バ\s*レ\s*ー\s*ボ\s*ー\s*ル|バ\s*レ\s*ー/,
       formats: [
         { re: /6\s*人\s*制|６\s*人\s*制/, label: '6人制' },
@@ -48,6 +50,7 @@
     },
     basketball: {
       label: 'バスケットボール',
+      formatLabel: '試合形式',
       sportKeywords: /バ\s*ス\s*ケ\s*ッ\s*ト\s*ボ\s*ー\s*ル|バ\s*ス\s*ケ|ミ\s*ニ\s*バ\s*ス/,
       formats: [
         { re: /3\s*[xX×]\s*3|３\s*[xX×]\s*３/, label: '3x3' },
@@ -59,6 +62,7 @@
     },
     budo: {
       label: '柔道・空手',
+      formatLabel: '部門・階級',
       sportKeywords: /柔\s*道|空\s*手|剣\s*道/,
       formats: [
         { re: /団\s*体/, label: '団体' },
@@ -73,6 +77,7 @@
     },
     soccer: {
       label: 'サッカー・フットサル',
+      formatLabel: '試合形式',
       sportKeywords: /サ\s*ッ\s*カ\s*ー|フ\s*ッ\s*ト\s*サ\s*ル/,
       formats: [
         { re: /フ\s*ッ\s*ト\s*サ\s*ル/, label: 'フットサル' },
@@ -85,6 +90,7 @@
     },
     baseball: {
       label: '野球・ソフトボール',
+      formatLabel: '試合形式',
       sportKeywords: /野\s*球|ソ\s*フ\s*ト\s*ボ\s*ー\s*ル/,
       formats: [
         { re: /硬\s*式/, label: '硬式' },
@@ -1239,7 +1245,7 @@
   function sports() {
     var profiles = profilesForLang();
     return Object.keys(profiles).map(function (key) {
-      return { key: key, label: profiles[key].label };
+      return { key: key, label: profiles[key].label, formatLabel: profiles[key].formatLabel || '' };
     });
   }
 
