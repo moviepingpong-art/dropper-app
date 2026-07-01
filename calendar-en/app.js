@@ -708,6 +708,24 @@ function renderWarnings_(li, warnings) {
 var AI_MODEL = 'gemini-flash-latest';   // 必要に応じて 'gemini-2.0-flash' 等に変更可
 var AI_KEY_STORE = 'dropper_ai_key';
 
+// ===== AIリクエストのスロットル（毎分制限=RPM回避） =====
+// Gemini無料枠のFlashは約10〜15リクエスト/分。連続ドロップで一気に送ると429になるため、
+// 各AIリクエストの間に最低 AI_MIN_INTERVAL_MS の間隔を空けて1件ずつ順番に処理する。
+var AI_MIN_INTERVAL_MS = 5000;   // 約5秒間隔（15回/分でも安全側）
+var aiLastRequestAt_ = 0;        // 直近のAIリクエスト時刻
+var aiThrottleChain_ = Promise.resolve();   // 直列化用チェーン
+
+// 前のAIリクエストから AI_MIN_INTERVAL_MS 経つまで待つ。呼び出しは直列化される。
+function aiThrottleWait_() {
+  aiThrottleChain_ = aiThrottleChain_.then(function () {
+    var now = Date.now();
+    var wait = Math.max(0, AI_MIN_INTERVAL_MS - (now - aiLastRequestAt_));
+    aiLastRequestAt_ = now + wait;
+    return wait ? new Promise(function (r) { setTimeout(r, wait); }) : null;
+  });
+  return aiThrottleChain_;
+}
+
 function getAiKey_() {
   var k = '';
   try { k = localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) {}
@@ -752,6 +770,10 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
+    // 毎分制限(RPM)回避：前のAIリクエストから一定間隔を空ける。待つ間は状態表示。
+    setAi(I18N.t('aiQueued'));
+    await aiThrottleWait_();
+    setAi(I18N.t('aiRunning'));
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
     var resp = await fetch(url, {
       method: 'POST',
