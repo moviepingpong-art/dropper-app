@@ -8,7 +8,7 @@ var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.c
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
-var DROPPER_FOLDER_NAME = 'DropperFiles';   // 要項を保存するアプリ専用フォルダ（自動作成）
+var DROPPER_FOLDER_NAME = '大会カレンダー登録';   // 要項を保存するアプリ専用フォルダ（自動作成）。この下に 年/月/大会名 の階層を作る
 
 /* ===== 状態 ===== */
 var accessToken = null;
@@ -311,10 +311,9 @@ async function processOne(file) {
    ・OCR用に作るGoogleドキュメント変換ファイルは使い捨て（毎回削除）
    すべて drive.file（アプリが作ったファイル/フォルダのみ）の範囲で完結する。 */
 async function ocrViaDrive(file) {
-  var text = await ocrText_(file);                      // 先にOCR
-  var folderId = await ensureDropperFolder();           // 保存先フォルダ（無ければ自動作成）
-  var fileId = await uploadOriginal_(file, folderId);   // 元要項を保存して残す → ファイルID
-  return { text: text, fileId: fileId, mimeType: (file.type || '') };
+  var text = await ocrText_(file);   // OCRのみ。要項の保存は登録ボタンを押したとき（doRegister）に、
+                                     // 確定した 年/月/大会名 フォルダへ行う（案X）。
+  return { text: text, fileId: null, mimeType: (file.type || '') };
 }
 
 // DropperFiles フォルダを確保してIDを返す。
@@ -359,6 +358,89 @@ async function ensureDropperFolder() {
   return dropperFolderId;
 }
 
+// ===== 大会カレンダー登録／年／月／大会名／ の階層フォルダを確保 =====
+// drive.file スコープでは files.list（検索）が使えないため、
+// 「階層パス→フォルダID」の対応を localStorage にキャッシュして二重作成を防ぐ。
+// キャッシュに無ければ新規作成し、そのIDを覚える。存在確認に失敗したら作り直す。
+var CHILD_FOLDER_CACHE_KEY = 'dropperChildFolders';   // { "親ID/子名": "子ID", ... }
+
+function loadChildFolderCache_() {
+  try { return JSON.parse(localStorage.getItem(CHILD_FOLDER_CACHE_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function saveChildFolderCache_(map) {
+  try { localStorage.setItem(CHILD_FOLDER_CACHE_KEY, JSON.stringify(map)); } catch (e) {}
+}
+
+// 指定フォルダIDが実在し、ゴミ箱でなければ true
+async function folderExists_(id) {
+  try {
+    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + id + '?fields=id,trashed', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+    if (!r.ok) return false;
+    var info = await r.json();
+    return !info.trashed;
+  } catch (e) {
+    if (e && e.message === I18N.t('msgSessionExpired')) throw e;
+    return false;
+  }
+}
+
+// parentId の下に name フォルダを作り、IDを返す（drive.file：自分で作るのでアクセス可能）
+async function createChildFolder_(parentId, name) {
+  var c = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
+  });
+  if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+  if (!c.ok) { throw new Error('フォルダ作成 ' + c.status + ': ' + (await c.text()).slice(0, 140)); }
+  return (await c.json()).id;
+}
+
+// parentId の下の name フォルダを確保（キャッシュ優先、無ければ作成）してIDを返す
+async function ensureChildFolder_(parentId, name) {
+  var cache = loadChildFolderCache_();
+  var key = parentId + '/' + name;
+  if (cache[key]) {
+    if (await folderExists_(cache[key])) return cache[key];
+    delete cache[key];   // 消えていたら作り直す
+  }
+  var id = await createChildFolder_(parentId, name);
+  cache[key] = id;
+  saveChildFolderCache_(cache);
+  return id;
+}
+
+// フォルダ名に使えない文字を除去し、長すぎる場合は詰める（大会名フォルダ用）
+function sanitizeFolderName_(name) {
+  var s = String(name || '').replace(/[\/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s) s = '名称未設定';
+  if (s.length > 80) s = s.slice(0, 80);
+  return s;
+}
+
+// 開催日(YYYY-MM-DD) と 大会名 から、大会カレンダー登録／年／月／大会名／ を確保して末端IDを返す。
+// 開催日が空/不正なら「未分類」フォルダに入れる（年月を決められないため）。
+async function ensureEventFolder_(kaisaiDate, taikaiMei) {
+  var root = await ensureDropperFolder();
+  var yearName, monthName;
+  var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
+  if (m) {
+    yearName = m[1];                       // 例: 2026（ゼロ埋めなし＝4桁そのまま）
+    monthName = String(Number(m[2])) + '月';  // 例: 10月 / 9月（ゼロ埋めなし）
+  } else {
+    yearName = '未分類';
+    monthName = '';
+  }
+  var yearId = await ensureChildFolder_(root, yearName);
+  var parentForName = monthName ? await ensureChildFolder_(yearId, monthName) : yearId;
+  var nameId = await ensureChildFolder_(parentForName, sanitizeFolderName_(taikaiMei));
+  return nameId;
+}
+
 // 元ファイルを保存して残す → ファイルIDを返す。
 // multipart（メタデータ＋本体の手組み）で400になるため、よりシンプルで確実な方式に変更：
 //  (1) メディアのみアップロード（本体だけ送る／手組みの境界・改行が不要）→ ファイルID取得
@@ -376,7 +458,7 @@ async function uploadOriginal_(file, folderId) {
   if (!up.ok) { throw new Error('要項の保存 ' + up.status + ': ' + (await up.text()).slice(0, 140)); }
   var fileId = (await up.json()).id;
 
-  // 名前を元ファイル名に、保存先をDropperFilesフォルダに（best-effort：失敗してもファイルは残る＝添付可能）
+  // 名前を元ファイル名に、保存先を渡されたフォルダ（大会名フォルダ）に（best-effort：失敗してもファイルは残る＝添付可能）
   try {
     var params = 'fields=id';
     if (folderId) params += '&addParents=' + folderId + '&removeParents=root';
@@ -885,12 +967,21 @@ async function doRegister() {
   }
 
   var ok = 0, ng = 0;
+  var lastFolderId = null;   // 登録成功時の保存先（メッセージのリンク用に最後の1件を覚える）
   for (var i = 0; i < targets.length; i++) {
     var f = targets[i].card.read();
     try {
       if (!f.taikai_mei) throw new Error('大会名が空です');
       if (!f.kaisai_dates.length) throw new Error('開催日が空です');
-      await createEvent(f, targets[i].fileId, targets[i].mimeType);   // 要項ファイルを添付
+      // 案X：登録した瞬間に、確定した 年/月/大会名 フォルダを作って要項を保存する。
+      var fileId = targets[i].fileId;
+      if (!fileId && targets[i].file) {
+        var folderId = await ensureEventFolder_(f.kaisai_dates[0], f.taikai_mei);
+        fileId = await uploadOriginal_(targets[i].file, folderId);
+        targets[i].fileId = fileId;
+        lastFolderId = folderId;
+      }
+      await createEvent(f, fileId, targets[i].mimeType);   // 要項ファイルを添付
       targets[i].registered = true;              // 登録済み（再実行でスキップ・ファイルは保持）
       targets[i].card.setStatus(I18N.t('stRegistered'), 'ok');
       ok++;
@@ -899,9 +990,10 @@ async function doRegister() {
       ng++;
     }
   }
-  await cleanupUnregistered_();   // 登録しなかった（チェックを外した）要項はDropperFilesから削除
+  // 案X では登録した要項だけを保存するため、未登録要項の後始末（cleanupUnregistered_）は不要。
   if (ok) {
-    var folderUrl = dropperFolderId ? 'https://drive.google.com/drive/folders/' + dropperFolderId : 'https://drive.google.com/drive/';
+    var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
+                  : (dropperFolderId ? 'https://drive.google.com/drive/folders/' + dropperFolderId : 'https://drive.google.com/drive/');
     msg.innerHTML =
       ok + I18N.t('msgRegDoneA') +
       '<a href="' + folderUrl + '" target="_blank" rel="noopener">' + I18N.t('msgFolderName') + '</a>' +
@@ -911,20 +1003,6 @@ async function doRegister() {
     setMsg(ng ? ng + I18N.t('msgRegAllFail') : I18N.t('msgNoItems'));
   }
   regBtn.disabled = false;
-}
-
-// チェックを外した（＝登録しない）要項の保存ファイルを削除。登録済みの項目のファイルは消さない（添付済みのため）
-async function cleanupUnregistered_() {
-  for (var i = 0; i < items.length; i++) {
-    var it = items[i];
-    if (!it.registered && !it.card.isChecked() && it.fileId) {
-      var id = it.fileId;
-      it.fileId = null;
-      fetch('https://www.googleapis.com/drive/v3/files/' + id, {
-        method: 'DELETE', headers: { 'Authorization': 'Bearer ' + accessToken }
-      }).catch(function () {});
-    }
-  }
 }
 
 async function createEvent(f, fileId, mimeType) {
