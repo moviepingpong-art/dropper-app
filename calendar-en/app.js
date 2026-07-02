@@ -8,13 +8,11 @@ var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.c
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
-var DROPPER_FOLDER_NAME = '大会カレンダー登録';   // 要項を保存するアプリ専用フォルダ（自動作成）。この下に 年/月/大会名 の階層を作る
 
 /* ===== 状態 ===== */
 var accessToken = null;
 var tokenClient = null;
 var pendingAuth = null;
-var dropperFolderId = null;   // DropperFilesフォルダのID（一度見つけ/作ったらキャッシュ）
 var items = [];   // { file, card, fileId }
 
 /* ===== DOM ===== */
@@ -316,48 +314,6 @@ async function ocrViaDrive(file) {
   return { text: text, fileId: null, mimeType: (file.type || '') };
 }
 
-// DropperFiles フォルダを確保してIDを返す。
-// drive.file スコープでは files.list（検索）が使えないため、フォルダIDを localStorage にキャッシュする方式を採用。
-//   1) メモリキャッシュ（dropperFolderId）があればそのまま使う
-//   2) localStorage に保存済みIDがあれば、実際に存在するか確認してから使う（削除済みなら再作成）
-//   3) どちらもなければ新規作成 → メモリ＆localStorage の両方に保存
-var FOLDER_ID_STORAGE_KEY = 'dropperFolderId';
-async function ensureDropperFolder() {
-  // 1) メモリキャッシュ
-  if (dropperFolderId) return dropperFolderId;
-
-  // 2) localStorage から取得して存在確認
-  var cached = null;
-  try { cached = localStorage.getItem(FOLDER_ID_STORAGE_KEY); } catch (e) {}
-  if (cached) {
-    var check = await fetch('https://www.googleapis.com/drive/v3/files/' + cached + '?fields=id,trashed', {
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    });
-    if (check.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
-    if (check.ok) {
-      var info = await check.json();
-      if (!info.trashed) {
-        dropperFolderId = cached;
-        return dropperFolderId;
-      }
-    }
-    // 存在しない or ゴミ箱済み → キャッシュ破棄して再作成へ
-    try { localStorage.removeItem(FOLDER_ID_STORAGE_KEY); } catch (e) {}
-  }
-
-  // 3) 新規作成
-  var c = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: DROPPER_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
-  });
-  if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
-  if (!c.ok) { throw new Error('フォルダ作成 ' + c.status + ': ' + (await c.text()).slice(0, 140)); }
-  dropperFolderId = (await c.json()).id;
-  try { localStorage.setItem(FOLDER_ID_STORAGE_KEY, dropperFolderId); } catch (e) {}
-  return dropperFolderId;
-}
-
 // ===== 大会カレンダー登録／年／月／大会名／ の階層フォルダを確保 =====
 // drive.file スコープでは files.list（検索）が使えないため、
 // 「階層パス→フォルダID」の対応を localStorage にキャッシュして二重作成を防ぐ。
@@ -422,20 +378,22 @@ function sanitizeFolderName_(name) {
   return s;
 }
 
-// 開催日(YYYY-MM-DD) と 大会名 から、大会カレンダー登録／年／月／大会名／ を確保して末端IDを返す。
-// 開催日が空/不正なら「未分類」フォルダに入れる（年月を決められないため）。
+// 開催日(YYYY-MM-DD) と 大会名 から、マイドライブ直下に 「<年>大会／<月>／大会名／」 を確保して末端IDを返す。
+// 例: 2026大会／10月／第三回…大会／。開催日が空/不正なら「未分類大会」フォルダに入れる（年月を決められないため）。
+// drive.file スコープでは既存フォルダの検索ができないため、Web版が作ったフォルダのIDを
+// localStorage にキャッシュして再利用する（他アプリ/手動で作った同名フォルダとは統合されない）。
 async function ensureEventFolder_(kaisaiDate, taikaiMei) {
-  var root = await ensureDropperFolder();
   var yearName, monthName;
   var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
   if (m) {
-    yearName = m[1];                       // 例: 2026（ゼロ埋めなし＝4桁そのまま）
-    monthName = String(Number(m[2])) + '月';  // 例: 10月 / 9月（ゼロ埋めなし）
+    yearName = m[1] + '大会';                    // 例: 2026大会（マイドライブ直下で識別しやすい固有名）
+    monthName = String(Number(m[2])) + '月';      // 例: 10月 / 9月（ゼロ埋めなし）
   } else {
-    yearName = '未分類';
+    yearName = '未分類大会';
     monthName = '';
   }
-  var yearId = await ensureChildFolder_(root, yearName);
+  // 'root' = マイドライブ直下（drive.file でも parents:['root'] で作成可能）
+  var yearId = await ensureChildFolder_('root', yearName);
   var parentForName = monthName ? await ensureChildFolder_(yearId, monthName) : yearId;
   var nameId = await ensureChildFolder_(parentForName, sanitizeFolderName_(taikaiMei));
   return nameId;
@@ -993,7 +951,7 @@ async function doRegister() {
   // 案X では登録した要項だけを保存するため、未登録要項の後始末（cleanupUnregistered_）は不要。
   if (ok) {
     var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
-                  : (dropperFolderId ? 'https://drive.google.com/drive/folders/' + dropperFolderId : 'https://drive.google.com/drive/');
+                  : 'https://drive.google.com/drive/';
     msg.innerHTML =
       ok + I18N.t('msgRegDoneA') +
       '<a href="' + folderUrl + '" target="_blank" rel="noopener">' + I18N.t('msgFolderName') + '</a>' +
@@ -1007,7 +965,8 @@ async function doRegister() {
 
 async function createEvent(f, fileId, mimeType) {
   var dates = f.kaisai_dates.slice().sort();
-  var folderUrl = dropperFolderId ? 'https://drive.google.com/drive/folders/' + dropperFolderId : 'https://drive.google.com/drive/';
+  // 添付要項へのリンク（保存したファイル自体を指す。フォルダIDに依存しない）
+  var fileUrl = fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : '';
 
   // 試合形式：日付順に並べ、複数日のときだけ各行に日付（M/D）を付ける。1日開催は形式のみ。
   var byDay = (f.shiai_keishiki_by_day || []).slice().sort(function (a, b) {
@@ -1040,7 +999,7 @@ async function createEvent(f, fileId, mimeType) {
     f.kaikai_jikan ? I18N.t('descOpening') + f.kaikai_jikan : '',
     keyInfoText ? keyInfoText : '',
     f.note ? I18N.t('descNote') + f.note : '',
-    fileId ? I18N.t('descFlyer') + folderUrl + I18N.t('descFlyerTail') : ''
+    fileId ? I18N.t('descFlyer') + fileUrl + I18N.t('descFlyerTail') : ''
   ].filter(Boolean).join('\n');
 
   var event = {
