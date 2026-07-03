@@ -3,8 +3,8 @@
 
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
-// Drive（OCR用・アプリが作ったファイルのみ）＋ Calendar（予定作成）の最小権限
-var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events';
+// Drive（OCR用・アプリが作ったファイルのみ）＋ appdata（フォルダID対応表を端末間で共有）＋ Calendar（予定作成）の最小権限
+var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/calendar.events';
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
@@ -316,16 +316,112 @@ async function ocrViaDrive(file) {
 
 // ===== 大会カレンダー登録／年／月／大会名／ の階層フォルダを確保 =====
 // drive.file スコープでは files.list（検索）が使えないため、
-// 「階層パス→フォルダID」の対応を localStorage にキャッシュして二重作成を防ぐ。
-// キャッシュに無ければ新規作成し、そのIDを覚える。存在確認に失敗したら作り直す。
+// 「階層パス→フォルダID」の対応を記録して二重作成を防ぐ。
+// 記録先は (1) appDataFolder 上の JSON（端末をまたいで共有）＋ (2) localStorage（高速な手元キャッシュ）の二段。
+// これにより、スマホとPCなど別端末でも同じ 年/月/大会名 フォルダを再利用できる。
 var CHILD_FOLDER_CACHE_KEY = 'dropperChildFolders';   // { "親ID/子名": "子ID", ... }
+var APPDATA_FILE_NAME = 'dropper-folders.json';       // appDataFolder上の対応表ファイル名
+var appDataFileId_ = null;                            // その対応表ファイルのID（一度見つけたら保持）
+var childFolderMap_ = null;                           // メモリ上の対応表（読み込み後に保持）
 
-function loadChildFolderCache_() {
+// --- localStorage（手元キャッシュ・フォールバック用） ---
+function loadLocalCache_() {
   try { return JSON.parse(localStorage.getItem(CHILD_FOLDER_CACHE_KEY) || '{}'); }
   catch (e) { return {}; }
 }
-function saveChildFolderCache_(map) {
+function saveLocalCache_(map) {
   try { localStorage.setItem(CHILD_FOLDER_CACHE_KEY, JSON.stringify(map)); } catch (e) {}
+}
+
+// --- appDataFolder（端末間で共有される保存先） ---
+// appDataFolder内は files.list で検索できる特別な領域。対応表ファイルのIDを探す（無ければ null）。
+async function findAppDataFile_() {
+  try {
+    var q = encodeURIComponent("name='" + APPDATA_FILE_NAME + "'");
+    var r = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + q + '&fields=files(id)', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+    if (!r.ok) return null;
+    var data = await r.json();
+    return (data.files && data.files.length) ? data.files[0].id : null;
+  } catch (e) {
+    if (e && e.message === I18N.t('msgSessionExpired')) throw e;
+    return null;
+  }
+}
+
+// appDataFolderから対応表を読む（無ければ空オブジェクト）。ファイルIDは appDataFileId_ に保持。
+async function readAppDataMap_() {
+  try {
+    if (!appDataFileId_) appDataFileId_ = await findAppDataFile_();
+    if (!appDataFileId_) return {};
+    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + appDataFileId_ + '?alt=media', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+    if (!r.ok) return {};
+    return await r.json();
+  } catch (e) {
+    if (e && e.message === I18N.t('msgSessionExpired')) throw e;
+    return {};
+  }
+}
+
+// 対応表を appDataFolder に書き戻す（既存ファイルがあれば更新、無ければ新規作成）。best-effort。
+async function writeAppDataMap_(map) {
+  var body = JSON.stringify(map);
+  try {
+    if (!appDataFileId_) appDataFileId_ = await findAppDataFile_();
+    if (appDataFileId_) {
+      // 既存ファイルの中身を更新（media アップロード）
+      var u = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + appDataFileId_ + '?uploadType=media', {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: body
+      });
+      if (u.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+      return;
+    }
+    // 新規作成：multipart で メタデータ（appDataFolder配下）＋本体 を一度に送る
+    var boundary = 'dropper' + Date.now();
+    var meta = { name: APPDATA_FILE_NAME, parents: ['appDataFolder'] };
+    var multipart =
+      '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
+      '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + body +
+      '\r\n--' + boundary + '--';
+    var c = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'multipart/related; boundary=' + boundary },
+      body: multipart
+    });
+    if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+    if (c.ok) { appDataFileId_ = (await c.json()).id; }
+  } catch (e) {
+    if (e && e.message === I18N.t('msgSessionExpired')) throw e;
+    // 書き込み失敗は致命的でない（localStorageが手元に残る）。次回リトライされる。
+  }
+}
+
+// メモリ上の対応表を初期化して返す（未初期化なら appDataFolder＋localStorage を読んで統合）。
+// 統合方針：両方のキーを合わせ持つ（どちらかにしか無いIDも活かす）。以後はメモリを使う。
+async function getChildFolderMap_() {
+  if (childFolderMap_) return childFolderMap_;
+  var local = loadLocalCache_();
+  var remote = await readAppDataMap_();
+  var merged = {};
+  var k;
+  for (k in local) if (Object.prototype.hasOwnProperty.call(local, k)) merged[k] = local[k];
+  for (k in remote) if (Object.prototype.hasOwnProperty.call(remote, k)) merged[k] = remote[k];
+  childFolderMap_ = merged;
+  return childFolderMap_;
+}
+
+// 対応表を保存（メモリ＋localStorage＋appDataFolder）。appDataは端末間共有のため best-effort で書く。
+async function saveChildFolderMap_(map) {
+  childFolderMap_ = map;
+  saveLocalCache_(map);
+  await writeAppDataMap_(map);
 }
 
 // 指定フォルダIDが実在し、ゴミ箱でなければ true
@@ -356,9 +452,10 @@ async function createChildFolder_(parentId, name) {
   return (await c.json()).id;
 }
 
-// parentId の下の name フォルダを確保（キャッシュ優先、無ければ作成）してIDを返す
+// parentId の下の name フォルダを確保（対応表優先、無ければ作成）してIDを返す。
+// 対応表は appDataFolder＋localStorage 統合版（端末をまたいでも同じフォルダを再利用できる）。
 async function ensureChildFolder_(parentId, name) {
-  var cache = loadChildFolderCache_();
+  var cache = await getChildFolderMap_();
   var key = parentId + '/' + name;
   if (cache[key]) {
     if (await folderExists_(cache[key])) return cache[key];
@@ -366,7 +463,7 @@ async function ensureChildFolder_(parentId, name) {
   }
   var id = await createChildFolder_(parentId, name);
   cache[key] = id;
-  saveChildFolderCache_(cache);
+  await saveChildFolderMap_(cache);
   return id;
 }
 
