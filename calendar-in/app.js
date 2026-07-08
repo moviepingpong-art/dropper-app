@@ -3,11 +3,20 @@
 
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
-// Drive（OCR用・アプリが作ったファイルのみ）＋ appdata（フォルダID対応表を端末間で共有）＋ Calendar（予定作成）の最小権限
-var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/calendar.events';
+// Drive（OCR用・アプリが作ったファイルのみ）＋ appdata（フォルダID対応表を端末間で共有）＋ spreadsheets（クラブ運用時の大会マスタ書き出し）＋ Calendar（予定作成）の最小権限
+var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar.events';
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
+
+// クラブ運用モード：?club=hakusan でアクセスしたときだけ有効。
+// このときだけ「大会マスタ・シート」への書き出し（出欠システム連携）を行う。一般公開URLでは動かない。
+// 運用ルール：クラブモード時は必ず hakusan.large@gmail.com でログインすること（シートがそのアカウント所有になる）。
+var CLUB_MODE = (function () {
+  try { return new URLSearchParams(window.location.search).get('club') === 'hakusan'; }
+  catch (e) { return false; }
+})();
+var MASTER_SHEET_TITLE = '大会マスタ（出欠連携）';   // クラブモードで新規作成する大会マスタ・シートのタイトル
 
 /* ===== 状態 ===== */
 var accessToken = null;
@@ -1040,6 +1049,15 @@ async function doRegister() {
       targets[i].registered = true;              // 登録済み（再実行でスキップ・ファイルは保持）
       targets[i].card.setStatus(I18N.t('stRegistered'), 'ok');
       ok++;
+      // クラブ運用モード（?club=hakusan）のときだけ、大会マスタ・シートに1行追記（出欠システム連携）。
+      // 追記失敗はカレンダー登録の成否に影響させない（best-effort。状態表示に注記のみ）。
+      if (CLUB_MODE) {
+        try {
+          await appendMasterRow_(f, fileId);
+        } catch (me) {
+          targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '）', 'ok');
+        }
+      }
     } catch (e) {
       targets[i].card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
       ng++;
@@ -1058,6 +1076,112 @@ async function doRegister() {
     setMsg(ng ? ng + I18N.t('msgRegAllFail') : I18N.t('msgNoItems'));
   }
   regBtn.disabled = false;
+}
+
+// ===== クラブ運用時のみ：大会マスタ・シート書き出し（出欠システム連携。案1） =====
+// 出欠システムが読む1大会=1行のデータを作る。列：
+//   大会名 / 開催日 / 申込締切 / 種目 / 要項ファイルID / 要項リンク / 登録日時
+var MASTER_HEADERS = ['大会名', '開催日', '申込締切', '種目', '要項ファイルID', '要項リンク', '登録日時'];
+
+// 締切を単一日付（必着＝終了日）にする。範囲 "A～B" なら B を返す。単一ならそのまま。
+function masterDeadline_(shimekiri) {
+  if (!shimekiri) return '';
+  var parts = String(shimekiri).split(/[~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+
+// 種目を「、」区切り文字列にする。合意ルール：全日まとめる（A案）。
+// ただし「同名種目が複数日にまたがる」ときだけ、その種目に「N日目 」接頭辞を付けて一意化する。
+// f.shiai_keishiki_by_day = [{date, format}]（format自体が「、」区切りの複数種目）を想定。
+function masterEvents_(byDay) {
+  var days = (byDay || []).filter(function (d) { return d && d.format && d.format.trim(); });
+  if (!days.length) return '';
+  // まず各日の種目を配列化
+  var perDay = days.map(function (d) {
+    return d.format.split(/[、,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  });
+  // 全種目を通して出現回数を数え、複数日で同名が出るものを検出
+  var count = {};
+  perDay.forEach(function (list) {
+    var uniqInDay = {};
+    list.forEach(function (name) { uniqInDay[name] = true; });
+    Object.keys(uniqInDay).forEach(function (name) { count[name] = (count[name] || 0) + 1; });
+  });
+  var out = [];
+  perDay.forEach(function (list, i) {
+    list.forEach(function (name) {
+      // 同名が2日以上に出る場合だけ「N日目 」を付けて一意化
+      out.push(count[name] >= 2 ? ((i + 1) + '日目 ' + name) : name);
+    });
+  });
+  return out.join('、');
+}
+
+// 開催日を単一日付にする（複数日開催なら開始日1つ）。f.kaisai_dates は昇順配列を想定。
+function masterEventDate_(dates) {
+  if (!dates || !dates.length) return '';
+  return dates.slice().sort()[0];
+}
+
+// 登録データ f と要項fileId から、大会マスタの1行（配列）を作る
+function masterRowFromFields_(f, fileId) {
+  var flyerLink = fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : '';
+  var stamp = new Date().toISOString();
+  return [
+    f.taikai_mei || '',
+    masterEventDate_(f.kaisai_dates),
+    masterDeadline_(f.shimekiri),
+    masterEvents_(f.shiai_keishiki_by_day),
+    fileId || '',
+    flyerLink,
+    stamp
+  ];
+}
+
+// 大会マスタ・シートのIDを確保する。appDataの対応表に 'master_sheet_id' で記録し端末間共有。
+// 無ければ新規スプレッドシートを作成し、1行目にヘッダーを書く。
+async function ensureMasterSheet_() {
+  var map = await getChildFolderMap_();
+  var KEY = 'master_sheet_id';
+  if (map[KEY]) {
+    // 実在確認（ゴミ箱でないか）。消えていたら作り直す。
+    if (await folderExists_(map[KEY])) return map[KEY];
+    delete map[KEY];
+  }
+  // 新規スプレッドシート作成（Sheets API）
+  var c = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ properties: { title: MASTER_SHEET_TITLE } })
+  });
+  if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+  if (!c.ok) { throw new Error('シート作成 ' + c.status + ': ' + (await c.text()).slice(0, 140)); }
+  var sheetId = (await c.json()).spreadsheetId;
+  // ヘッダー行を書く
+  await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
+              '/values/A1:append?valueInputOption=USER_ENTERED', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [MASTER_HEADERS] })
+  });
+  map[KEY] = sheetId;
+  await saveChildFolderMap_(map);
+  return sheetId;
+}
+
+// 大会1件を大会マスタ・シートの末尾に1行追記する（クラブモード時のみ呼ぶ）
+async function appendMasterRow_(f, fileId) {
+  var sheetId = await ensureMasterSheet_();
+  var row = masterRowFromFields_(f, fileId);
+  var r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
+                      '/values/A1:append?valueInputOption=USER_ENTERED', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [row] })
+  });
+  if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+  if (!r.ok) { throw new Error('シート追記 ' + r.status + ': ' + (await r.text()).slice(0, 140)); }
+  return sheetId;
 }
 
 async function createEvent(f, fileId, mimeType) {
