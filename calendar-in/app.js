@@ -1018,7 +1018,9 @@ function onRegisterClick() {
 async function doRegister() {
   await ensureToken();
   var targets = items.filter(function (it) { return it.card.isChecked() && !it.registered; });
-  if (!targets.length) { setMsg(I18N.t('msgNoItems')); regBtn.disabled = false; return; }
+  // クラブモード：登録は済んだがマスタ追記だけ失敗した大会（再試行対象）。カレンダー登録は再実行しない＝重複予定を作らない。
+  var retryTargets = CLUB_MODE ? items.filter(function (it) { return it.registered && !it.masterAppended && it.fileId; }) : [];
+  if (!targets.length && !retryTargets.length) { setMsg(I18N.t('msgNoItems')); regBtn.disabled = false; return; }
 
   // ② 登録前チェック：チェック済みで開催日が空のカードがあれば警告して中断
   var emptyCards = targets.filter(function (it) { return !it.card.read().kaisai_dates.length; });
@@ -1051,12 +1053,17 @@ async function doRegister() {
       ok++;
       // クラブ運用モード（?club=hakusan）のときだけ、大会マスタ・シートに1行追記（出欠システム連携）。
       // 追記失敗はカレンダー登録の成否に影響させない（best-effort。状態表示に注記のみ）。
+      // 失敗した大会は masterAppended が立たず、もう一度「登録」を押すと追記だけ再試行される。
       if (CLUB_MODE) {
         try {
           await appendMasterRow_(f, fileId);
+          targets[i].masterAppended = true;
         } catch (me) {
-          targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '）', 'ok');
+          targets[i].masterAppended = false;
+          targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
         }
+      } else {
+        targets[i].masterAppended = true;   // 一般モードでは追記対象外＝再試行不要の印
       }
     } catch (e) {
       targets[i].card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
@@ -1064,6 +1071,17 @@ async function doRegister() {
     }
   }
   // 案X では登録した要項だけを保存するため、未登録要項の後始末（cleanupUnregistered_）は不要。
+  // クラブモード：マスタ追記だけ失敗していた大会の再試行（カレンダー登録はしない）
+  for (var r = 0; r < retryTargets.length; r++) {
+    try {
+      await appendMasterRow_(retryTargets[r].card.read(), retryTargets[r].fileId);
+      retryTargets[r].masterAppended = true;
+      retryTargets[r].card.setStatus(I18N.t('stRegistered'), 'ok');
+      ok++;
+    } catch (re) {
+      retryTargets[r].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (re && re.message ? re.message : re) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
+    }
+  }
   if (ok) {
     var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
                   : 'https://drive.google.com/drive/';
