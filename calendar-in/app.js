@@ -732,7 +732,11 @@ function addCard(name) {
       var formatByDate = {};
       (fields.schedule || []).forEach(function (s) { if (s && s.date) formatByDate[s.date] = s.events || ''; });
       rebuildRows_(dates, formatByDate);
-      if (!Object.keys(formatByDate).length && fields.shiai_keishiki && dates.length) {
+      // 試合形式の補完：scheduleの器はあっても events が全部空なら、全体の試合形式(shiai_keishiki)を1行目へ。
+      // （parserは常にscheduleを空eventsで返すため、「キーの有無」でなく「値が全部空か」で判定する）
+      var fmtVals = Object.keys(formatByDate).map(function (k) { return (formatByDate[k] || '').trim(); });
+      var noDayFormats = !fmtVals.length || fmtVals.every(function (v) { return !v; });
+      if (noDayFormats && fields.shiai_keishiki && dates.length) {
         var firstFmt = rowsEl.querySelector('[data-k="day_format"]');
         if (firstFmt) firstFmt.value = fields.shiai_keishiki;
       }
@@ -916,19 +920,26 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
-    // 毎分制限(RPM)回避：前のAIリクエストから一定間隔を空ける。待つ間は状態表示。
-    setAi(I18N.t('aiQueued'));
-    await aiThrottleWait_();
-    setAi(I18N.t('aiRunning'));
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
-    var resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' }
-      })
-    });
+    // 一時的なサーバーエラー(503等)は自動で再試行する（最大2回）。各試行の間隔は
+    // 既存のスロットル(aiThrottleWait_ = 約5秒)を使うのでRPM制限も同時に守られる。
+    var resp = null;
+    for (var attempt = 0; attempt <= 2; attempt++) {
+      // 毎分制限(RPM)回避：前のAIリクエストから一定間隔を空ける。待つ間は状態表示。
+      setAi(attempt === 0 ? I18N.t('aiQueued') : I18N.t('aiRetry'));
+      await aiThrottleWait_();
+      setAi(I18N.t('aiRunning'));
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+        })
+      });
+      // 一時的なサーバー側エラー（混雑・過負荷）のときだけ再試行。それ以外は抜けて通常判定へ。
+      if ([500, 502, 503, 504].indexOf(resp.status) === -1) break;
+    }
     if (resp.status === 429) { setAi(I18N.t('aiLimit')); fallback(I18N.t('aiLimit')); return; }
     if (!resp.ok) {
       var et = await resp.text();
