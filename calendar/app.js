@@ -597,6 +597,11 @@ function addCard(name) {
     '</div>' +
     '<div class="card-foot" style="display:none;margin-top:6px">' +
       '<p class="warn-notice" style="display:none;margin:0 0 6px;padding:6px 8px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;font-size:12px;color:#7a4f01"></p>' +
+      (CLUB_MODE ?
+        '<label class="master-optin" style="display:block;margin:0 0 8px;padding:7px 10px;background:#f0f5ff;border:1px solid #adc6ff;border-radius:8px;font-size:13px;color:#1d39c4;cursor:pointer">' +
+          '<input type="checkbox" class="master-chk" checked style="margin-right:6px;vertical-align:middle">' +
+          '出欠フォームに載せる（大会マスタへ書き出し）' +
+        '</label>' : '') +
       '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
       '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
@@ -807,7 +812,12 @@ function addCard(name) {
     setFormatLabel: function (label) { setFormatLabel_(label); },
     // 重要情報欄をセット（AIモードのみ）／チェックされた重要情報を読み取る
     setKeyInfo: function (items) { setKeyInfo_(items); },
-    readKeyInfo: function () { return readKeyInfo_(); }
+    readKeyInfo: function () { return readKeyInfo_(); },
+    // 「出欠フォームに載せる」チェックの状態（クラブモード限定。チェックが無い＝一般モードは true 扱い）
+    masterOptIn: function () {
+      var chk = li.querySelector('.master-chk');
+      return chk ? chk.checked : true;
+    }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
   return cardApi;
@@ -1066,12 +1076,16 @@ async function doRegister() {
       // 追記失敗はカレンダー登録の成否に影響させない（best-effort。状態表示に注記のみ）。
       // 失敗した大会は masterAppended が立たず、もう一度「登録」を押すと追記だけ再試行される。
       if (CLUB_MODE) {
-        try {
-          await appendMasterRow_(f, fileId);
-          targets[i].masterAppended = true;
-        } catch (me) {
-          targets[i].masterAppended = false;
-          targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
+        if (!targets[i].card.masterOptIn()) {
+          targets[i].masterAppended = true;   // 「載せない」を選択＝追記対象外（再試行もしない）
+        } else {
+          try {
+            await appendMasterRow_(f, fileId);
+            targets[i].masterAppended = true;
+          } catch (me) {
+            targets[i].masterAppended = false;
+            targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
+          }
         }
       } else {
         targets[i].masterAppended = true;   // 一般モードでは追記対象外＝再試行不要の印
@@ -1084,6 +1098,7 @@ async function doRegister() {
   // 案X では登録した要項だけを保存するため、未登録要項の後始末（cleanupUnregistered_）は不要。
   // クラブモード：マスタ追記だけ失敗していた大会の再試行（カレンダー登録はしない）
   for (var r = 0; r < retryTargets.length; r++) {
+    if (!retryTargets[r].card.masterOptIn()) { retryTargets[r].masterAppended = true; continue; }   // 後からチェックを外した場合も尊重
     try {
       await appendMasterRow_(retryTargets[r].card.read(), retryTargets[r].fileId);
       retryTargets[r].masterAppended = true;
