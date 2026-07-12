@@ -1134,15 +1134,27 @@ function masterDeadline_(shimekiri) {
   return parts.length ? parts[parts.length - 1] : '';
 }
 
+// 種目候補から「競技方法・進行の説明」を除外する判定。
+// 出欠フォームは1項目=1種目として並ぶため、種目でない記述（予選リーグ、決勝トーナメント、
+// 競技方法の一文など）が混ざると誤った選択肢になる。種目名には現れにくい競技方法特有の語で弾く。
+var NON_EVENT_RE = /(競技方法|試合方法|試合形式|予選|決勝|リーグ戦|トーナメント|勝ち抜け|順位|決定戦|敗者|総当|ラウンドロビン|進出|による)/;
+function isEventName_(name) {
+  var s = (name || '').trim();
+  if (!s) return false;
+  if (NON_EVENT_RE.test(s)) return false;   // 競技方法らしい語を含む＝種目でない
+  return true;
+}
+
 // 種目を「、」区切り文字列にする。合意ルール：全日まとめる（A案）。
 // ただし「同名種目が複数日にまたがる」ときだけ、その種目に「N日目 」接頭辞を付けて一意化する。
 // f.shiai_keishiki_by_day = [{date, format}]（format自体が「、」区切りの複数種目）を想定。
+// 競技方法の説明が混ざっている場合は除外し、種目だけを出す。
 function masterEvents_(byDay) {
   var days = (byDay || []).filter(function (d) { return d && d.format && d.format.trim(); });
   if (!days.length) return '';
-  // まず各日の種目を配列化
+  // まず各日の種目を配列化し、競技方法（非種目）を除外
   var perDay = days.map(function (d) {
-    return d.format.split(/[、,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+    return d.format.split(/[、,]/).map(function (s) { return s.trim(); }).filter(isEventName_);
   });
   // 全種目を通して出現回数を数え、複数日で同名が出るものを検出
   var count = {};
