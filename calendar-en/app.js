@@ -3,11 +3,6 @@
 
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
-// Drive（OCR用・アプリが作ったファイルのみ）＋ appdata（フォルダID対応表を端末間で共有）＋ spreadsheets（クラブ運用時の大会マスタ書き出し）＋ Calendar（予定作成）の最小権限
-var SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar.events';
-var CALENDAR_ID = 'primary';
-var EVENT_COLOR_ID = '11';   // 赤
-var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
 
 // クラブ運用モード：?club=hakusan でアクセスしたときだけ有効。
 // このときだけ「大会マスタ・シート」への書き出し（出欠システム連携）を行う。一般公開URLでは動かない。
@@ -17,6 +12,24 @@ var CLUB_MODE = (function () {
   catch (e) { return false; }
 })();
 var MASTER_SHEET_TITLE = '大会マスタ（出欠連携）';   // クラブモードで新規作成する大会マスタ・シートのタイトル
+
+// OAuthスコープはアクセスモードで出し分ける（OAuth本番審査を軽くするため）。
+//   一般公開URL：drive.file（OCR用・アプリが作ったファイルのみ）＋ drive.appdata（フォルダID対応表の端末間共有）＋ calendar.events（予定作成）
+//   クラブURL（?club=hakusan）：上記に spreadsheets（大会マスタ書き出し）を追加
+// spreadsheets を一般ユーザーの同意対象から外すことで、一般公開の審査対象スコープを減らす。
+// クラブ運用は白山クラブ内部のみ（テストユーザー登録済みアカウントで利用）。
+var BASE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.appdata',
+  'https://www.googleapis.com/auth/calendar.events'
+];
+var CLUB_EXTRA_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets'
+];
+var SCOPE = (CLUB_MODE ? BASE_SCOPES.concat(CLUB_EXTRA_SCOPES) : BASE_SCOPES).join(' ');
+var CALENDAR_ID = 'primary';
+var EVENT_COLOR_ID = '11';   // 赤
+var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
 
 /* ===== 状態 ===== */
 var accessToken = null;
