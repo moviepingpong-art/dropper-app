@@ -826,6 +826,20 @@ function addCard(name) {
       box.textContent = I18N.t('aiFallbackNotice') + (reason ? '（' + reason + '）' : '');
       box.style.display = 'block';
     },
+    // AIが混み合っていて読み取れなかったとき：数字やHTTPを見せず、やさしい案内を出す。
+    // 下に表示中の読み取り結果を確認・手直しできることを伝える（reason文字列は付けない）。
+    showAiBusy: function () {
+      this.showFields();
+      var box = li.querySelector('.ai-fallback');
+      if (!box) {
+        box = document.createElement('p');
+        box.className = 'ai-fallback';
+        var fieldsEl = li.querySelector('.fields');
+        if (fieldsEl) fieldsEl.insertBefore(box, fieldsEl.firstChild);
+      }
+      box.textContent = I18N.t('aiBusyNotice');
+      box.style.display = 'block';
+    },
     // 「試合形式」欄のラベルを差し替える（AIのformat_label反映用）
     setFormatLabel: function (label) { setFormatLabel_(label); },
     // 重要情報欄をセット（AIモードのみ）／チェックされた重要情報を読み取る
@@ -948,10 +962,12 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '--- 要項テキスト ---\n' + ocrText;
 
   try {
-    // 一時的なサーバーエラー(503等)は自動で再試行する（最大2回）。各試行の間隔は
-    // 既存のスロットル(aiThrottleWait_ = 約5秒)を使うのでRPM制限も同時に守られる。
+    // 一時的なサーバーエラー（混雑・過負荷）のときは1回だけ再試行する。
+    // 一般利用者には待ち時間が長く感じられるため、2回→1回に短縮（体感重視）。
+    // 各試行の間隔は既存のスロットル(aiThrottleWait_ = 約5秒)を使うのでRPM制限も同時に守られる。
     var resp = null;
-    for (var attempt = 0; attempt <= 2; attempt++) {
+    var busy = false;   // 混雑系エラー(500/502/503/504)を最後に受けたか
+    for (var attempt = 0; attempt <= 1; attempt++) {
       // 毎分制限(RPM)回避：前のAIリクエストから一定間隔を空ける。待つ間は状態表示。
       setAi(attempt === 0 ? I18N.t('aiQueued') : I18N.t('aiRetry'));
       await aiThrottleWait_();
@@ -965,10 +981,18 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
           generationConfig: { temperature: 0, responseMimeType: 'application/json' }
         })
       });
-      // 一時的なサーバー側エラー（混雑・過負荷）のときだけ再試行。それ以外は抜けて通常判定へ。
-      if ([500, 502, 503, 504].indexOf(resp.status) === -1) break;
+      busy = ([500, 502, 503, 504].indexOf(resp.status) !== -1);
+      // 混雑系エラーのときだけ再試行。それ以外は抜けて通常判定へ。
+      if (!busy) break;
     }
     if (resp.status === 429) { setAi(I18N.t('aiLimit')); fallback(I18N.t('aiLimit')); return; }
+    // 混雑・過負荷（500/502/503/504）は、数字やHTTPを見せず「混み合っている」旨のやさしい文言で返す。
+    // 下に表示中の読み取り結果を確認・手直しできることも伝える（aiBusyNotice）。
+    if (busy || [500, 502, 503, 504].indexOf(resp.status) !== -1) {
+      setAi(I18N.t('aiBusyStatus'));
+      if (isAiMode && li.__cardApi && li.__cardApi.showAiBusy) li.__cardApi.showAiBusy();
+      return;
+    }
     if (!resp.ok) {
       var et = await resp.text();
       if (resp.status === 400 && /API key not valid|API_KEY_INVALID/i.test(et)) { try { localStorage.removeItem(AI_KEY_STORE); } catch (e) {} }
