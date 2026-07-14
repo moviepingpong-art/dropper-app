@@ -778,6 +778,11 @@ function addCard(name) {
       var f = rowsEl.querySelector('[data-k="day_date"]');
       if (f) { li.scrollIntoView({ behavior: 'smooth', block: 'center' }); f.focus(); }
     },
+    // 競技方法（試合形式）欄の最初の行にフォーカス。種目が読み取れず手入力を促すときに使う。
+    focusFormat: function () {
+      var f = rowsEl.querySelector('[data-k="day_format"]');
+      if (f) { li.scrollIntoView({ behavior: 'smooth', block: 'center' }); f.focus(); }
+    },
     // AI検算（runAiRecheck_）から呼ぶ窓口：day-rowsの再構築だけを行う（他項目はrunAiRecheck_側でsetVal）
     applyDayRows: function (dates, schedule) {
       var formatByDate = {};
@@ -1051,6 +1056,23 @@ async function doRegister() {
     emptyCards[0].card.focusDate();
     regBtn.disabled = false;
     return;
+  }
+
+  // ②-2 登録前チェック（クラブモード限定）：出欠フォームに載せるカードなのに、
+  // 競技方法欄から種目を1つも取り出せない（masterEvents_が空）ものがあれば、
+  // 手入力を促して中断する。空でも競技方法しか無い場合でもメッセージは同一（A案）。
+  // 出欠フォームは1項目=1種目で並ぶため、D列（種目）が空だと選択肢を作れないのを防ぐ。
+  if (CLUB_MODE) {
+    var noEventCards = targets.filter(function (it) {
+      if (!it.card.masterOptIn()) return false;   // 「載せない」カードは対象外
+      return !masterEvents_(it.card.read().shiai_keishiki_by_day);   // 種目が空なら対象
+    });
+    if (noEventCards.length) {
+      setMsg(I18N.t('msgEventEmptyA') + noEventCards.length + I18N.t('msgEventEmptyB'));
+      noEventCards[0].card.focusFormat();
+      regBtn.disabled = false;
+      return;
+    }
   }
 
   var ok = 0, ng = 0;
