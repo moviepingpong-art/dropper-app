@@ -14,6 +14,7 @@
       typeSports: 'スポーツ大会の要項ドロッパー',
       leadSports: '要項（PDF・画像）をドロップ → 内容を確認 → Googleカレンダーに登録',
       // --- ログイン ---
+      guideLink: '📖 使い方ガイド ↗',
       loginBtn: 'Googleでログイン',
       loginNote: '大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
       // --- 競技セレクタ ---
@@ -407,6 +408,9 @@
   // data-i18n 属性を持つ要素に文言を流し込む。data-i18n-attr があればその属性に、なければテキストに。
   function applyDom() {
     document.title = t('pageTitle');
+    // 使い方ガイドは日本語版のみ公開。en/in では導線ごと隠す（翻訳が済んだらこの分岐を外す）
+    var gl = document.getElementById('guideLink');
+    if (gl) { gl.style.display = (global.LANG === 'ja') ? '' : 'none'; }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');
