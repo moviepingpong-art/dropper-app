@@ -194,6 +194,24 @@
     .ai-modal-btns button { flex:1 1 auto; font-size:15px; padding:13px 18px; }
     .ai-btn-skip { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
     .ai-modal-foot { margin:14px 0 0; font-size:11.5px; color:var(--sub); line-height:1.6; }
+    /* ===== APIキー入力モーダル ===== */
+    #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
+    #key-modal.show { display:flex; }
+    .key-steps { margin:8px 0 14px; padding-left:1.3em; font-size:13px; color:var(--sub); line-height:1.9; }
+    .key-steps li { padding-left:2px; }
+    .key-studio-btn { display:inline-block; background:var(--teal); color:#fff !important; font-weight:700;
+      font-size:14px; padding:11px 18px; border-radius:12px; text-decoration:none; box-shadow:0 4px 14px rgba(6,182,164,.3);
+      transition:transform .15s, box-shadow .15s; }
+    .key-studio-btn:hover { transform:translateY(-2px); box-shadow:0 7px 20px rgba(6,182,164,.4); }
+    .key-field { display:block; margin:16px 0 0; }
+    .key-field span { display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+    .key-field input { width:100%; box-sizing:border-box; font-size:15px; padding:12px 14px; border:2px solid var(--line);
+      border-radius:12px; font-family:inherit; background:#fff; }
+    .key-field input:focus { outline:none; border-color:var(--teal); }
+    .key-error { margin:8px 0 0; font-size:12.5px; color:#d4380d; font-weight:700; }
+    .key-warn { margin:14px 0 16px; background:#fff8e6; border:1px solid #ffd591; border-radius:12px;
+      padding:11px 13px; font-size:12px; color:#7a4f01; line-height:1.7; }
     /* 設定（再選択）リンク */
     .mode-banner {
       display:flex; align-items:center; gap:12px;
@@ -305,6 +323,38 @@
         <button type="button" id="aiUseBtn" data-i18n="aiModalUseBtn">AIを使う（キーを入力）</button>
       </div>
       <p class="ai-modal-foot" data-i18n="aiModalFoot">※この選択は記憶され、次回からは表示されません。あとから「AI設定を変更」でいつでも変更できます。</p>
+    </div>
+
+  <!-- APIキー入力モーダル（window.promptの代替。手順とリンクを示して迷わず入力できるようにする） -->
+  <div id="key-modal" role="dialog" aria-modal="true" aria-labelledby="keyModalTitle">
+    <div class="ai-modal-card">
+      <h2 id="keyModalTitle" data-i18n="keyModalTitle">🔑 Gemini APIキーの設定</h2>
+      <p class="ai-intro" data-i18n="keyModalIntro">AIで読み取るには、Gemini APIキーが必要です。Googleアカウントがあれば無料で取得できます（3分ほど）。</p>
+
+      <div class="ai-opt aiuse">
+        <h3 data-i18n="keyModalStepsTitle">取得のしかた</h3>
+        <ol class="key-steps">
+          <li data-i18n="keyModalStep1">下のボタンから Google AI Studio を開く</li>
+          <li data-i18n="keyModalStep2">Googleアカウントでログインする</li>
+          <li data-i18n="keyModalStep3">「APIキーを作成」をクリックする</li>
+          <li data-i18n="keyModalStep4">できたキーをコピーして、下の欄に貼り付ける</li>
+        </ol>
+        <a class="key-studio-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="keyModalStudioBtn">Google AI Studio を開く ↗</a>
+      </div>
+
+      <label class="key-field">
+        <span data-i18n="keyModalLabel">APIキー</span>
+        <input type="text" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
+      </label>
+      <p class="key-error" id="keyError" style="display:none"></p>
+
+      <p class="key-warn" data-i18n="keyModalWarn">⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。機密文書はドロップしないでください。</p>
+
+      <div class="ai-modal-btns">
+        <button type="button" id="keyCancelBtn" class="ai-btn-skip" data-i18n="keyModalCancel">キャンセル</button>
+        <button type="button" id="keySaveBtn" data-i18n="keyModalSave">保存して使う</button>
+      </div>
+      <p class="ai-modal-foot" data-i18n="keyModalFoot">🔒 キーはお使いの端末内（ブラウザ）だけに保存され、当方のサーバーには送信も保存もしません。</p>
     </div>
   </div>
 

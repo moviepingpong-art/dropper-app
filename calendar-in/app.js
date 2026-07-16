@@ -156,10 +156,10 @@ function chooseHybrid_() {
   renderModeBanner_();
   updateAiRecheckVisibility_();
 }
-// 「AIを使う」を選択 → キー入力 → 入力できたらAIモードで記憶。未入力なら通常モードのまま。
-function chooseAi_() {
-  var key = getAiKey_();
-  if (!key) { return; }   // キー未入力ならポップアップは閉じず再選択を促す
+// 「AIを使う」を選択 → キー入力モーダル → 入力できたらAIモードで記憶。キャンセルなら通常モードのまま。
+async function chooseAi_() {
+  var key = await askAiKey_();
+  if (!key) { return; }   // キャンセル＝AI利用選択のポップアップは閉じず再選択を促す
   aiMode = 'ai';
   try { localStorage.setItem(AI_CHOICE_STORE, 'ai'); } catch (e) {}
   closeAiModal_();
@@ -918,14 +918,55 @@ function aiThrottleWait_() {
   return aiThrottleChain_;
 }
 
+// 保存済みのAIキーを返す（無ければ空文字）。入力を求めるときは askAiKey_() を使う。
 function getAiKey_() {
-  var k = '';
-  try { k = localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) {}
-  if (!k) {
-    k = (window.prompt(I18N.t('aiKeyPrompt')) || '').trim();
-    if (k) { try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {} }
-  }
-  return k;
+  try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; }
+}
+
+// ===== APIキー入力モーダル =====
+// window.prompt では取得手順やリンクを示せず、キーの取り方が分からない人が詰まるため、
+// 手順・AI Studioへのボタン・注意書きを備えた専用モーダルで入力してもらう。
+// 保存済みなら即その値を返す。未保存ならモーダルを開き、Promiseでキー（またはキャンセル時は空文字）を返す。
+function askAiKey_() {
+  var saved = getAiKey_();
+  if (saved) return Promise.resolve(saved);
+
+  var modal = document.getElementById('key-modal');
+  var input = document.getElementById('keyInput');
+  var errEl = document.getElementById('keyError');
+  var saveBtn = document.getElementById('keySaveBtn');
+  var cancelBtn = document.getElementById('keyCancelBtn');
+  if (!modal || !input || !saveBtn || !cancelBtn) return Promise.resolve('');
+
+  return new Promise(function (resolve) {
+    var finish = function (value) {
+      modal.classList.remove('show');
+      saveBtn.removeEventListener('click', onSave);
+      cancelBtn.removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+      resolve(value);
+    };
+    var onSave = function () {
+      var k = (input.value || '').trim();
+      if (!k) {
+        if (errEl) { errEl.textContent = I18N.t('keyModalEmpty'); errEl.style.display = 'block'; }
+        input.focus();
+        return;
+      }
+      try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
+      finish(k);
+    };
+    var onCancel = function () { finish(''); };
+    var onKey = function (e) { if (e.key === 'Enter') { e.preventDefault(); onSave(); } };
+
+    input.value = '';
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    saveBtn.addEventListener('click', onSave);
+    cancelBtn.addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
+    modal.classList.add('show');
+    setTimeout(function () { input.focus(); }, 50);
+  });
 }
 
 async function runAiRecheck_(li, ocrText, isAiMode) {
@@ -936,7 +977,7 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     if (isAiMode && li.__cardApi && li.__cardApi.showAiFallback) li.__cardApi.showAiFallback(reason);
   };
   if (!ocrText) { setAi(I18N.t('aiFail') + 'no text'); fallback('no text'); return; }
-  var key = getAiKey_();
+  var key = await askAiKey_();
   if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
 
   setAi(I18N.t('aiRunning'));
