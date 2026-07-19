@@ -497,20 +497,33 @@ function sanitizeFolderName_(name) {
   return s;
 }
 
-// 開催日(YYYY-MM-DD) と 大会名 から、マイドライブ直下に 「<年>大会／<月>／大会名／」 を確保して末端IDを返す。
-// 例: 2026大会／10月／第三回…大会／。開催日が空/不正なら「未分類大会」フォルダに入れる（年月を決められないため）。
+// 開催日(YYYY-MM-DD) と 大会名 から、マイドライブ直下に 「<年> Tournaments／<月>／大会名／」 を確保して末端IDを返す。
+// 例: 2026 Tournaments／10／第三回…大会／。開催日が空/不正なら Uncategorized Tournaments に入れる（年月を決められないため）。
 // drive.file スコープでは既存フォルダの検索ができないため、Web版が作ったフォルダのIDを
 // localStorage にキャッシュして再利用する（他アプリ/手動で作った同名フォルダとは統合されない）。
+//
+// 【フォルダ名は全言語で英語に統一（v43）】
+//   2026 Tournaments ／ 09 ／ 大会名        （月はゼロ埋め2桁＝ドライブ上で月順に並ぶ）
+//   開催日が読めないとき : Uncategorized Tournaments ／ 大会名
+// 大会名フォルダだけは要項どおりの名前（日本語の大会なら日本語のまま）。
+//
+// ⚠️ v42以前は「2026大会 ／ 9月」という日本語名だった。対応表のキーはフォルダ名なので、
+//    この変更で旧フォルダとは別系統になる。drive.file スコープでは既存フォルダを検索できず、
+//    ツール側での自動統合は不可能（旧フォルダは手作業で移動するしかない）。
+//    利用者が開発者のみの段階で入れた変更。
+function folderNames_(m) {
+  if (!m) return { year: 'Uncategorized Tournaments', month: '' };
+  return {
+    year:  m[1] + ' Tournaments',   // 例: 2026 Tournaments
+    month: m[2]                     // 例: 09（ゼロ埋め2桁のまま。月順に並ぶ）
+  };
+}
+
 async function ensureEventFolder_(kaisaiDate, taikaiMei) {
-  var yearName, monthName;
   var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
-  if (m) {
-    yearName = m[1] + '大会';                    // 例: 2026大会（マイドライブ直下で識別しやすい固有名）
-    monthName = String(Number(m[2])) + '月';      // 例: 10月 / 9月（ゼロ埋めなし）
-  } else {
-    yearName = '未分類大会';
-    monthName = '';
-  }
+  var names = folderNames_(m);
+  var yearName = names.year;
+  var monthName = names.month;
   // 'root' = マイドライブ直下（drive.file でも parents:['root'] で作成可能）
   var yearId = await ensureChildFolder_('root', yearName);
   var parentForName = monthName ? await ensureChildFolder_(yearId, monthName) : yearId;
