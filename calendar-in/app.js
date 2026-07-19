@@ -891,9 +891,24 @@ var WARN_CODE_KEY = {
 function renderWarnings_(li, warnings) {
   // 既存の強調をクリア
   li.querySelectorAll('.f.warn-blink').forEach(function (el) { el.classList.remove('warn-blink'); });
+  // 採点係の警告 field は旧・単一欄名(kaisai_dates / shiai_keishiki)で来る。
+  // day-row化でこれらの単一欄は廃止され day_date / day_format に分かれたため、旧名を各行の欄へ読み替える。
+  var LEGACY_FIELD_MAP = {
+    kaisai_dates: 'day_date',      // 開催日の警告 → 各 day-row の日付欄すべて
+    shiai_keishiki: 'day_format'   // 試合形式の警告 → 各 day-row の形式欄すべて
+  };
   (warnings || []).forEach(function (w) {
-    // 注意：day-row化により kaisai_dates / shiai_keishiki の単一欄は廃止。
-    //   これらを field に指す採点係の警告は現状ターゲットが無く点滅しない（parser側の対応は別タスク）。
+    var mapped = LEGACY_FIELD_MAP[w.field];
+    if (mapped) {
+      // 該当する day-row の欄をすべて点滅させる（複数日なら全行）
+      var inputs = li.querySelectorAll('[data-k="' + mapped + '"]');
+      for (var i = 0; i < inputs.length; i++) {
+        var lbl = inputs[i].closest('.f');
+        if (lbl) lbl.classList.add('warn-blink');
+      }
+      return;
+    }
+    // 通常の項目（会場・締切など）は従来どおり field 名で直接ヒット
     var input = li.querySelector('[data-k="' + w.field + '"]');
     if (!input) return;
     var label = input.closest('.f');
