@@ -2,6 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PQPKYYYXKG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-PQPKYYYXKG');
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>カレンダードロッパー</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -32,6 +40,8 @@
     .guide-link { margin:8px 0 0; font-size:13px; }
     .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; }
     .guide-link a:hover { border-bottom-color:var(--teal); }
+    .visitor-badge { margin:10px 0 0; }
+    .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
     main { padding:8px 22px 48px; max-width:760px; }
 
     #drop {
@@ -253,6 +263,10 @@
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
     <p class="guide-link" id="guideLink">
       <a href="https://dropper-tools.com/guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
+    </p>
+    <p class="visitor-badge" id="visitorBadge">
+      <img src="https://hits.sh/app.dropper-tools.com.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555"
+           alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
     </p>
   </header>
   <main>
