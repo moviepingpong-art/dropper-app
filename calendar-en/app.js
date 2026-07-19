@@ -910,7 +910,11 @@ function renderWarnings_(li, warnings) {
    ・キーはこの端末のみ（localStorage）に保持し、当方サーバーには送らない／保存しない。
    ・⚠の有無に関わらず、この大会の全項目をAIで取り直す。結果は必ず人が確認する前提。
    ・無料枠超過(429)時は「翌日まで利用不可」を表示する。 */
-var AI_MODEL = 'gemini-flash-latest';   // 必要に応じて 'gemini-2.0-flash' 等に変更可
+// AIモデル。先頭が主モデル、以降は混雑(500/502/503/504)時のフォールバック先。
+// 混雑したら「同じモデルで待って再試行」ではなく「別モデルへ即切り替え」で回数と待ち時間を抑える。
+// レート上限(RPD)はプロジェクト単位でモデル非依存なので、フォールバックは混雑回避のみが目的（上限突破ではない）。
+var AI_MODELS = ['gemini-flash-latest', 'gemini-2.0-flash'];
+var AI_MODEL = AI_MODELS[0];   // 後方互換（他所からの参照用）。主モデル
 var AI_KEY_STORE = 'dropper_ai_key';
 
 // ===== AIリクエストのスロットル（毎分制限=RPM回避） =====
@@ -1021,12 +1025,18 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     // 各試行の間隔は既存のスロットル(aiThrottleWait_ = 約5秒)を使うのでRPM制限も同時に守られる。
     var resp = null;
     var busy = false;   // 混雑系エラー(500/502/503/504)を最後に受けたか
-    for (var attempt = 0; attempt <= 1; attempt++) {
-      // 毎分制限(RPM)回避：前のAIリクエストから一定間隔を空ける。待つ間は状態表示。
-      setAi(attempt === 0 ? I18N.t('aiQueued') : I18N.t('aiRetry'));
-      await aiThrottleWait_();
+    // 主モデル→フォールバックの順に、各モデル1回ずつだけ試す（計 最大2回）。
+    // 混雑時は「同じモデルで待って再試行」せず、別モデルへ即切り替え＝待ち時間を最小化。
+    for (var mi = 0; mi < AI_MODELS.length; mi++) {
+      // スロットル(RPM回避)は最初の1回だけ待つ。モデル切り替え時は待たない（別モデルでRPM干渉が小さいため）。
+      if (mi === 0) {
+        setAi(I18N.t('aiQueued'));
+        await aiThrottleWait_();
+      } else {
+        setAi(I18N.t('aiRetry'));   // 「別のAIで再試行中…」相当。待たずに即投げる
+      }
       setAi(I18N.t('aiRunning'));
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODELS[mi] + ':generateContent?key=' + encodeURIComponent(key);
       resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1036,7 +1046,7 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
         })
       });
       busy = ([500, 502, 503, 504].indexOf(resp.status) !== -1);
-      // 混雑系エラーのときだけ再試行。それ以外は抜けて通常判定へ。
+      // 混雑系エラーのときだけ次のモデルへ。それ以外は抜けて通常判定へ。
       if (!busy) break;
     }
     if (resp.status === 429) { setAi(I18N.t('aiLimit')); fallback(I18N.t('aiLimit')); return; }
