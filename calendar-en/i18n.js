@@ -148,6 +148,7 @@
       appName: 'Calendar Dropper',
       typeSports: 'Sports event flyer dropper',
       leadSports: 'Drop a flyer (PDF / image) → Review the details → Add to Google Calendar',
+      guideLink: '📖 User guide ↗',
       loginBtn: 'Sign in with Google',
       loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
       sportLabel: 'Sport:',
@@ -271,6 +272,7 @@
       appName: 'Calendar Dropper',
       typeSports: 'Sports event ka flyer dropper',
       leadSports: 'Flyer (PDF / image) drop karein → Details check karein → Google Calendar mein add karein',
+      guideLink: '📖 Guide ↗',
       loginBtn: 'Google se sign in karein',
       loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
       sportLabel: 'Sport:',
@@ -408,9 +410,15 @@
   // data-i18n 属性を持つ要素に文言を流し込む。data-i18n-attr があればその属性に、なければテキストに。
   function applyDom() {
     document.title = t('pageTitle');
-    // 使い方ガイドは日本語版のみ公開。en/in では導線ごと隠す（翻訳が済んだらこの分岐を外す）
+    // 使い方ガイドは3言語とも公開済み。リンク先を言語別に切り替える。
     var gl = document.getElementById('guideLink');
-    if (gl) { gl.style.display = (global.LANG === 'ja') ? '' : 'none'; }
+    if (gl) {
+      var a = gl.querySelector('a');
+      if (a) {
+        var gp = (global.LANG === 'en') ? 'en/guide.html' : (global.LANG === 'in') ? 'in/guide.html' : 'guide.html';
+        a.href = 'https://dropper-tools.com/' + gp;
+      }
+    }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');
