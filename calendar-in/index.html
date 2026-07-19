@@ -265,9 +265,16 @@
       <a href="https://dropper-tools.com/guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
     </p>
     <p class="visitor-badge" id="visitorBadge">
-      <img src="https://hits.sh/app.dropper-tools.com.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555"
-           alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+      <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
     </p>
+    <script>
+      // 訪問者カウンター(hits.sh)を言語別に分ける。パスは window.LANG から決める。
+      (function(){
+        var seg = (window.LANG === 'en') ? 'calendar-en' : (window.LANG === 'in') ? 'calendar-in' : 'calendar';
+        var img = document.getElementById('visitorImg');
+        if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
+      })();
+    </script>
   </header>
   <main>
     <div id="login-area">
