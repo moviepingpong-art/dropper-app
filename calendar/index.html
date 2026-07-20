@@ -251,6 +251,20 @@
       .mode-banner { flex-wrap:wrap; }
       .mode-banner-change { width:100%; }
     }
+    /* 案内文ジェネレーター */
+    .ann-wrap { margin-top:10px; }
+    .ann-btn { font-size:13px; font-weight:700; padding:6px 12px; border:1px solid var(--teal); background:var(--teal); color:#fff; border-radius:8px; cursor:pointer; }
+    .ann-btn:hover { filter:brightness(1.05); }
+    .ann-panel { margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:12px; background:#fbfffe; }
+    .ann-tabs { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+    .ann-tab { font-size:12.5px; font-weight:700; padding:5px 12px; border:1px solid var(--teal); background:#fff; color:var(--teal-d); border-radius:999px; cursor:pointer; }
+    .ann-tab.on { background:var(--teal); color:#fff; }
+    .ann-text { width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; line-height:1.7; color:var(--ink); padding:10px; border:1px solid var(--line); border-radius:10px; background:#fff; resize:vertical; white-space:pre-wrap; word-break:break-word; }
+    .ann-actions { display:flex; gap:8px; margin-top:8px; }
+    .ann-copy, .ann-share { font-size:13px; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer; border:1px solid var(--teal); }
+    .ann-copy { background:#e6fffb; color:var(--teal-d); }
+    .ann-share { background:#fff; color:var(--teal-d); }
+    .ann-copy:hover, .ann-share:hover { filter:brightness(0.98); }
   </style>
 </head>
 <body>
