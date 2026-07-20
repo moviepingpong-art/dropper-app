@@ -668,16 +668,14 @@ function annGcalLink_(f) {
   var fmtLines = days.filter(function (s) { return s.format; }).map(function (s) {
     return (dates.length > 1 ? annMD_(s.date) + ' ' : '') + s.format;
   });
-  var keyInfoText = (f.key_info || []).map(function (it) {
-    var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
-    if (lbl && txt) return '【' + lbl + '】' + txt;
-    return lbl ? ('【' + lbl + '】') : txt;
-  }).filter(Boolean);
+  // カレンダー予定の詳細は軽く保つ（試合形式・締切・開会式のみ）。
+  // ポイント(key_info)は案内文本文に載るので入れない＝リンクを短くしLINEの長URL切れを防ぐ。
   var details = [
     fmtLines.length ? I18N.t('descFormat') + fmtLines.join(' / ') : '',
     f.shimekiri ? I18N.t('descDeadline') + f.shimekiri : '',
     f.kaikai_jikan ? I18N.t('descOpening') + f.kaikai_jikan : ''
-  ].concat(keyInfoText).filter(Boolean).join('\n');
+  ].filter(Boolean).join('\n');
+  if (details.length > 250) details = details.slice(0, 247) + '…';   // 保険：極端に長い形式文でもリンクを短く
   return annRedirect_({
     t: 'c',
     x: f.taikai_mei || '',
