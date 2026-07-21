@@ -644,7 +644,8 @@ function annFullDate_(iso) {   // ja: 'YYYY年M月D日(曜)' / en: 'YYYY-MM-DD (
 function annDateRange_(dates) {
   if (!dates.length) return '';
   if (dates.length === 1) return annMDwd_(dates[0]);
-  return annMDwd_(dates[0]) + '〜' + annMDwd_(dates[dates.length - 1]);
+  var sep = (window.LANG === 'en' || window.LANG === 'in') ? ' – ' : '〜';
+  return annMDwd_(dates[0]) + sep + annMDwd_(dates[dates.length - 1]);
 }
 function annSchedule_(f) {   // [{date, format}] 日付順。by_dayが無ければkaisai_datesから空formatで
   var byDay = (f.shiai_keishiki_by_day || []).slice().sort(function (a, b) {
@@ -697,6 +698,16 @@ function buildAnnouncement_(f, channel) {
   var gcal = annGcalLink_(f);
   var tag = annHashtag_();
   var keyInfo = (f.key_info || []).filter(function (it) { return (it.label || it.text); });
+  // 言語別の記号（ja=全角、en/in=半角）。ja出力は従来どおり。
+  var ja = (window.LANG !== 'en' && window.LANG !== 'in');
+  var CL = ja ? '：' : ': ';    // コロン
+  var OP = ja ? '（' : ' (';    // 開き括弧（住所を会場名に続けるとき）
+  var CP = ja ? '）' : ')';     // 閉じ括弧
+  var BR = ja ? '・' : '- ';    // 箇条書き
+  var IN = ja ? '　' : '  ';    // 字下げ
+  var BO = ja ? '【' : '[';     // 汎用タイトルの囲み
+  var BC = ja ? '】' : ']';
+  var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
   if (channel === 'x') {
     L.push('🏓' + name);
@@ -708,33 +719,33 @@ function buildAnnouncement_(f, channel) {
     return L.join('\n');
   }
   if (channel === 'plain') {
-    L.push('【' + name + '】');
+    L.push(BO + name + BC);
     L.push('');
     if (dates.length) {
-      L.push(I18N.t('annSchedule') + '：' + (dates.length > 1 ? annFullDate_(dates[0]) + '〜' + annFullDate_(dates[dates.length - 1]) : annFullDate_(dates[0])));
+      L.push(I18N.t('annSchedule') + CL + (dates.length > 1 ? annFullDate_(dates[0]) + RG + annFullDate_(dates[dates.length - 1]) : annFullDate_(dates[0])));
       days.forEach(function (s, i) {
-        var line = '　' + I18N.t('dayLabel', { n: i + 1 }) + ' ' + annMDwd_(s.date);
+        var line = IN + I18N.t('dayLabel', { n: i + 1 }) + ' ' + annMDwd_(s.date);
         if (s.format) line += ' ' + s.format;
         L.push(line);
       });
     }
-    if (f.kaijo) L.push(I18N.t('annVenue') + '：' + f.kaijo + (f.kaijo_jusho ? '（' + f.kaijo_jusho + '）' : ''));
-    if (f.shimekiri) L.push(I18N.t('annDeadline') + '：' + f.shimekiri);
+    if (f.kaijo) L.push(I18N.t('annVenue') + CL + f.kaijo + (f.kaijo_jusho ? OP + f.kaijo_jusho + CP : ''));
+    if (f.shimekiri) L.push(I18N.t('annDeadline') + CL + f.shimekiri);
     keyInfo.forEach(function (it) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
-      L.push((lbl ? lbl + '：' : '') + txt);
+      L.push((lbl ? lbl + CL : '') + txt);
     });
     if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     return L.join('\n');
   }
-  // channel === 'line'（既定）
+  // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
   L.push('🏓 ' + name);
   L.push('');
   if (days.length) {
     L.push('📅 ' + I18N.t('annSchedule'));
     days.forEach(function (s) {
-      var line = '・' + annMDwd_(s.date);
+      var line = BR + annMDwd_(s.date);
       if (s.format) line += ' ' + s.format;
       L.push(line);
     });
@@ -743,16 +754,16 @@ function buildAnnouncement_(f, channel) {
   if (f.kaijo) {
     L.push('📍 ' + I18N.t('annVenue'));
     L.push(f.kaijo);
-    if (f.kaijo_jusho) L.push('（' + f.kaijo_jusho + '）');
+    if (f.kaijo_jusho) L.push(ja ? ('（' + f.kaijo_jusho + '）') : ('(' + f.kaijo_jusho + ')'));
     if (maps) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
     L.push('');
   }
-  if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + '：' + f.shimekiri); L.push(''); }
+  if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
   if (keyInfo.length) {
     L.push('💡 ' + I18N.t('annPoints'));
     keyInfo.forEach(function (it) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
-      L.push('・' + (lbl ? lbl + '：' : '') + txt);
+      L.push(BR + (lbl ? lbl + CL : '') + txt);
     });
     L.push('');
   }

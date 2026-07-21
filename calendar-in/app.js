@@ -599,6 +599,218 @@ async function ocrText_(file) {
 }
 
 /* ===== カード（プレビュー＆その場修正） ===== */
+/* ===== 案内文ジェネレーター（要項抽出データ→LINE/SNS/汎用の案内文） =====
+   すべてカード上の read() 値から生成。サーバー・新スコープ不要（クライアント側完結）。 */
+// 案内リンクは中継ページ経由にする。理由＝LINE等が本文中URLの % をタップ時に再エンコードし
+// （二重エンコード）タイトル・場所が壊れるため。base64urlは % を含まないので二重エンコードが起きない。
+var ANN_REDIRECT_BASE = 'https://app.dropper-tools.com/add/';   // dropper-app リポジトリ直下の add/index.html
+function annB64url_(str) {
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function annRedirect_(payload) {
+  return ANN_REDIRECT_BASE + '?d=' + annB64url_(JSON.stringify(payload));
+}
+function annYmd_(iso) {   // 'YYYY-M-D' → 'YYYYMMDD'
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || '');
+  if (!m) return (iso || '').replace(/-/g, '');
+  return m[1] + ('0' + m[2]).slice(-2) + ('0' + m[3]).slice(-2);
+}
+function annWeekday_(iso) {
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || '');
+  if (!m) return '';
+  var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));   // ローカル時刻で構築（UTCずれ回避）
+  var en = (window.LANG === 'en' || window.LANG === 'in');
+  var days = en ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['日', '月', '火', '水', '木', '金', '土'];
+  return days[d.getDay()] || '';
+}
+function annMD_(iso) {
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || '');
+  if (!m) return iso || '';
+  return Number(m[2]) + '/' + Number(m[3]);
+}
+function annMDwd_(iso) {   // 'M/D(曜)'
+  var wd = annWeekday_(iso);
+  return annMD_(iso) + (wd ? '(' + wd + ')' : '');
+}
+function annFullDate_(iso) {   // ja: 'YYYY年M月D日(曜)' / en: 'YYYY-MM-DD (Wd)'
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || '');
+  if (!m) return iso || '';
+  var wd = annWeekday_(iso);
+  if (window.LANG === 'en' || window.LANG === 'in') {
+    return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) + (wd ? ' (' + wd + ')' : '');
+  }
+  return Number(m[1]) + '年' + Number(m[2]) + '月' + Number(m[3]) + '日' + (wd ? '(' + wd + ')' : '');
+}
+function annDateRange_(dates) {
+  if (!dates.length) return '';
+  if (dates.length === 1) return annMDwd_(dates[0]);
+  var sep = (window.LANG === 'en' || window.LANG === 'in') ? ' – ' : '〜';
+  return annMDwd_(dates[0]) + sep + annMDwd_(dates[dates.length - 1]);
+}
+function annSchedule_(f) {   // [{date, format}] 日付順。by_dayが無ければkaisai_datesから空formatで
+  var byDay = (f.shiai_keishiki_by_day || []).slice().sort(function (a, b) {
+    return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+  });
+  if (byDay.length) return byDay;
+  return (f.kaisai_dates || []).slice().sort().map(function (d) { return { date: d, format: '' }; });
+}
+function annMapsLink_(f) {
+  var q = [f.kaijo, f.kaijo_jusho].filter(Boolean).join(' ').trim();
+  if (!q) return '';
+  return annRedirect_({ t: 'm', q: q });
+}
+// Googleカレンダー「予定を追加」公開リンク（renderテンプレ）。認可・スコープ不要＝審査に触れない。
+function annGcalLink_(f) {
+  var dates = (f.kaisai_dates || []).slice().sort();
+  if (!dates.length) return '';
+  var startD = annYmd_(dates[0]);
+  var endD = annYmd_(window.Dropper.addDays(dates[dates.length - 1], 1));   // 終日は終了日+1（排他的）
+  // LINEは長いURLをリンク化しない（青下線・タップにならない）。カレンダーリンクは最小限
+  // ＝大会名＋日程＋会場名だけに絞り、地図リンク並みの短さにする。試合形式・締切・住所・
+  // ポイントは案内文本文と地図リンクでカバーする。
+  return annRedirect_({
+    t: 'c',
+    x: f.taikai_mei || '',
+    d: startD + '/' + endD,      // 'YYYYMMDD/YYYYMMDD'（数字と/のみ）
+    l: f.kaijo || ''             // 会場名のみ（住所は入れない＝短縮）
+  });
+}
+// ハッシュタグ：競技名から自動（AIモードの自動判定表示 or 種目セレクタ）。無ければ空。
+function annHashtag_() {
+  var auto = document.getElementById('sport-auto');
+  if (auto && auto.style.display !== 'none' && auto.textContent) {
+    var t = auto.textContent.split(/[:：]/).pop().trim();
+    if (t && t !== I18N.t('sportAutoUnknown') && t !== I18N.t('sportAutoWaiting')) return '#' + t.replace(/\s+/g, '');
+    return '';
+  }
+  var sel = document.getElementById('sport');
+  if (sel && sel.value && sel.value !== 'auto') {
+    var opt = sel.options[sel.selectedIndex];
+    if (opt && opt.text) return '#' + opt.text.replace(/\s+/g, '');
+  }
+  return '';
+}
+function buildAnnouncement_(f, channel) {
+  var name = (f.taikai_mei || '').trim();
+  var days = annSchedule_(f);
+  var dates = (f.kaisai_dates || []).slice().sort();
+  var maps = annMapsLink_(f);
+  var gcal = annGcalLink_(f);
+  var tag = annHashtag_();
+  var keyInfo = (f.key_info || []).filter(function (it) { return (it.label || it.text); });
+  // 言語別の記号（ja=全角、en/in=半角）。ja出力は従来どおり。
+  var ja = (window.LANG !== 'en' && window.LANG !== 'in');
+  var CL = ja ? '：' : ': ';    // コロン
+  var OP = ja ? '（' : ' (';    // 開き括弧（住所を会場名に続けるとき）
+  var CP = ja ? '）' : ')';     // 閉じ括弧
+  var BR = ja ? '・' : '- ';    // 箇条書き
+  var IN = ja ? '　' : '  ';    // 字下げ
+  var BO = ja ? '【' : '[';     // 汎用タイトルの囲み
+  var BC = ja ? '】' : ']';
+  var RG = ja ? '〜' : ' – ';   // 期間の区切り
+  var L = [];
+  if (channel === 'x') {
+    L.push('🏓' + name);
+    if (dates.length) L.push('📅' + annDateRange_(dates));
+    if (f.kaijo) L.push('📍' + f.kaijo);
+    if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
+    if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
+    if (tag) L.push(tag);
+    return L.join('\n');
+  }
+  if (channel === 'plain') {
+    L.push(BO + name + BC);
+    L.push('');
+    if (dates.length) {
+      L.push(I18N.t('annSchedule') + CL + (dates.length > 1 ? annFullDate_(dates[0]) + RG + annFullDate_(dates[dates.length - 1]) : annFullDate_(dates[0])));
+      days.forEach(function (s, i) {
+        var line = IN + I18N.t('dayLabel', { n: i + 1 }) + ' ' + annMDwd_(s.date);
+        if (s.format) line += ' ' + s.format;
+        L.push(line);
+      });
+    }
+    if (f.kaijo) L.push(I18N.t('annVenue') + CL + f.kaijo + (f.kaijo_jusho ? OP + f.kaijo_jusho + CP : ''));
+    if (f.shimekiri) L.push(I18N.t('annDeadline') + CL + f.shimekiri);
+    keyInfo.forEach(function (it) {
+      var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
+      L.push((lbl ? lbl + CL : '') + txt);
+    });
+    if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
+    if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
+    return L.join('\n');
+  }
+  // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
+  L.push('🏓 ' + name);
+  L.push('');
+  if (days.length) {
+    L.push('📅 ' + I18N.t('annSchedule'));
+    days.forEach(function (s) {
+      var line = BR + annMDwd_(s.date);
+      if (s.format) line += ' ' + s.format;
+      L.push(line);
+    });
+    L.push('');
+  }
+  if (f.kaijo) {
+    L.push('📍 ' + I18N.t('annVenue'));
+    L.push(f.kaijo);
+    if (f.kaijo_jusho) L.push(ja ? ('（' + f.kaijo_jusho + '）') : ('(' + f.kaijo_jusho + ')'));
+    if (maps) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
+    L.push('');
+  }
+  if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
+  if (keyInfo.length) {
+    L.push('💡 ' + I18N.t('annPoints'));
+    keyInfo.forEach(function (it) {
+      var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
+      L.push(BR + (lbl ? lbl + CL : '') + txt);
+    });
+    L.push('');
+  }
+  if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
+  if (tag) L.push(tag);
+  return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+}
+// 案内文パネルの配線（カード生成後に呼ぶ）
+function wireAnnouncement_(li, cardApi) {
+  var panel = li.querySelector('.ann-panel');
+  var btn = li.querySelector('.ann-btn');
+  if (!panel || !btn) return;
+  var ta = panel.querySelector('.ann-text');
+  var tabs = panel.querySelectorAll('.ann-tab');
+  var copyBtn = panel.querySelector('.ann-copy');
+  var shareBtn = panel.querySelector('.ann-share');
+  var current = 'line';
+  function regen() { ta.value = buildAnnouncement_(cardApi.read(), current); }
+  btn.addEventListener('click', function () {
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    regen();   // 開くたびに現在の入力値から作り直す（手直し反映）
+  });
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      current = t.getAttribute('data-ch') || 'line';
+      tabs.forEach(function (x) { x.classList.remove('on'); });
+      t.classList.add('on');
+      regen();
+    });
+  });
+  if (copyBtn) copyBtn.addEventListener('click', function () {
+    var done = function () {
+      var old = copyBtn.textContent;
+      copyBtn.textContent = I18N.t('annCopied');
+      setTimeout(function () { copyBtn.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(done, function () { ta.select(); try { document.execCommand('copy'); } catch (e) {} done(); });
+    } else { ta.select(); try { document.execCommand('copy'); } catch (e) {} done(); }
+  });
+  if (shareBtn) {
+    if (navigator.share) { shareBtn.addEventListener('click', function () { navigator.share({ text: ta.value }).catch(function () {}); }); }
+    else { shareBtn.style.display = 'none'; }
+  }
+}
+
 function addCard(name) {
   var li = document.createElement('li');
   li.className = 'card';
@@ -631,6 +843,21 @@ function addCard(name) {
       '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
       '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
+      '<div class="ann-wrap">' +
+        '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
+        '<div class="ann-panel" style="display:none">' +
+          '<div class="ann-tabs">' +
+            '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
+            '<button type="button" class="ann-tab" data-ch="x">' + I18N.t('annTabX') + '</button>' +
+            '<button type="button" class="ann-tab" data-ch="plain">' + I18N.t('annTabPlain') + '</button>' +
+          '</div>' +
+          '<textarea class="ann-text" rows="12" spellcheck="false"></textarea>' +
+          '<div class="ann-actions">' +
+            '<button type="button" class="ann-copy">' + I18N.t('annCopy') + '</button>' +
+            '<button type="button" class="ann-share">' + I18N.t('annShare') + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
     '</div>';
   li.querySelector('.fn').textContent = name;
   list.appendChild(li);
@@ -865,6 +1092,7 @@ function addCard(name) {
     }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
+  wireAnnouncement_(li, cardApi);   // 案内文パネルの配線
   return cardApi;
 }
 
