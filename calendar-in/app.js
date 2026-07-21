@@ -1241,7 +1241,9 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
   if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
 
   setAi(I18N.t('aiRunning'));
-  var prompt =
+  var promptEn =
+    'You are an assistant that extracts information from sports event guidelines. From the following text, read the actual competition date(s), event name, venue, address, opening ceremony time, match format, entry deadline, and sport, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. Do not include practice days, reception days, or the entry deadline in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format as kaisai_dates. events must contain the match format / competition method / categories held that day (e.g. knockout, round-robin, final round, singles, team event, division names). For a one-day event too, if the guidelines state the competition method / match format / categories, put them in schedule events (always refer to items such as competition method, match format, format, event details). Only leave events as an empty string if the categories for that day truly cannot be determined, but never omit the element itself. Use an empty string or empty array for unknown values.\nsport is the sport; answer with one concise sport name in English (e.g. Table Tennis, Badminton, Volleyball, Soccer, Kendo). For a multi-sport event, give the main one; empty string if it cannot be determined.\nformat_label is the natural heading for the item corresponding to match format for that sport (e.g. Format for table tennis, Events for athletics, Legs for a road relay, Division/Class for martial arts). Empty string if it cannot be determined.\nkey_info is an array of up to 5 items of the most important information a participant should know, taken from the guidelines in order of importance. Each element is {\"label\":\"short heading\",\"text\":\"content\"}. label is a concise heading matching the content, such as Eligibility, Entry fee, Entry deadline, Entry limit, What to bring, Parking, Safety, Awards. text summarizes the specific content clearly for a participant. Also include eligibility, entry restrictions, entry fees, and payment deadlines in key_info if they are stated and important. Empty array if there is none. Strictly keep to a maximum of 5, and omit trivial administrative details.\nSchema: {\"taikai_mei\":\"\",\"kaisai_dates\":[],\"kaijo\":\"\",\"kaijo_jusho\":\"\",\"kaikai_jikan\":\"\",\"shiai_keishiki\":\"\",\"shimekiri\":\"\",\"schedule\":[{\"date\":\"\",\"events\":\"\"}],\"sport\":\"\",\"format_label\":\"\",\"key_info\":[{\"label\":\"\",\"text\":\"\"}]}\n\n--- Guideline text ---\n' + ocrText;
+  var promptJa =
     'あなたはスポーツ大会の要項から情報を抽出するアシスタントです。' +
     '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切・競技種目を読み取り、' +
     'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
@@ -1261,6 +1263,7 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。\n' +
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
+  var prompt = (window.LANG === 'en' || window.LANG === 'in') ? promptEn : promptJa;
 
   try {
     // 一時的なサーバーエラー（混雑・過負荷）のときは1回だけ再試行する。
