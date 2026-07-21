@@ -664,24 +664,14 @@ function annGcalLink_(f) {
   if (!dates.length) return '';
   var startD = annYmd_(dates[0]);
   var endD = annYmd_(window.Dropper.addDays(dates[dates.length - 1], 1));   // 終日は終了日+1（排他的）
-  var days = annSchedule_(f);
-  var fmtLines = days.filter(function (s) { return s.format; }).map(function (s) {
-    return (dates.length > 1 ? annMD_(s.date) + ' ' : '') + s.format;
-  });
-  // カレンダー予定の詳細は軽く保つ（試合形式・締切・開会式のみ）。
-  // ポイント(key_info)は案内文本文に載るので入れない＝リンクを短くしLINEの長URL切れを防ぐ。
-  var details = [
-    fmtLines.length ? I18N.t('descFormat') + fmtLines.join(' / ') : '',
-    f.shimekiri ? I18N.t('descDeadline') + f.shimekiri : '',
-    f.kaikai_jikan ? I18N.t('descOpening') + f.kaikai_jikan : ''
-  ].filter(Boolean).join('\n');
-  if (details.length > 250) details = details.slice(0, 247) + '…';   // 保険：極端に長い形式文でもリンクを短く
+  // LINEは長いURLをリンク化しない（青下線・タップにならない）。カレンダーリンクは最小限
+  // ＝大会名＋日程＋会場名だけに絞り、地図リンク並みの短さにする。試合形式・締切・住所・
+  // ポイントは案内文本文と地図リンクでカバーする。
   return annRedirect_({
     t: 'c',
     x: f.taikai_mei || '',
-    d: startD + '/' + endD,            // 'YYYYMMDD/YYYYMMDD'（数字と/のみ＝そのまま）
-    l: [f.kaijo, f.kaijo_jusho].filter(Boolean).join(' '),
-    n: details
+    d: startD + '/' + endD,      // 'YYYYMMDD/YYYYMMDD'（数字と/のみ）
+    l: f.kaijo || ''             // 会場名のみ（住所は入れない＝短縮）
   });
 }
 // ハッシュタグ：競技名から自動（AIモードの自動判定表示 or 種目セレクタ）。無ければ空。
