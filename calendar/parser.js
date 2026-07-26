@@ -516,7 +516,7 @@
   // eventMode: true ならスポーツ以外の汎用イベント（タイトルをイベント語でも探す）
   function parseEn(rawText, sport, region, eventMode) {
     region = region || 'en';
-    var text = String(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
+    var text = normalizeChars(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
     var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
     var profile = enResolveProfile(text, sport || 'auto', region);
     var locale = (region === 'in') ? 'uk' : (profile.locale || 'uk');
@@ -656,6 +656,23 @@
 
   function toHalfWidthDigits(s) {
     return String(s).replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+  }
+  // 見た目が同じでもコードの異なる文字を、通常の漢字・記号へ揃える。
+  // Word等で作られたPDFには「康熙部首」（⽇ U+2F47 は通常の 日 U+65E5 とは別文字）や
+  // 縦書き用の記号（︓ U+FE13 はコロン）が混ざることがあり、そのままでは
+  // 「2025年12⽉25⽇」「13︓30」が日付・時刻として認識できない。
+  // NFKC正規化でこれらを一括して通常の文字に直す（全角英数の半角化も同時に行われる）。
+  // NFKCで戻らない「CJK部首補助」ブロックの文字だけ、対応する常用漢字へ手当てする。
+  // （Unicode名で対応を確認したものに限る。例: U+2EC4 CJK RADICAL WEST TWO → 西）
+  var RADICAL_FIX = {
+    '⻄': '西', '⻑': '長', '⻒': '長', '⺼': '月',
+    '⻝': '食', '⻞': '食', '⻤': '鬼', '⻩': '黄',
+    '⻫': '斉', '⻲': '亀'
+  };
+  function normalizeChars(s) {
+    s = String(s);
+    try { s = s.normalize ? s.normalize('NFKC') : s; } catch (e) {}
+    return s.replace(/[⺀-⻳]/g, function (c) { return RADICAL_FIX[c] || c; });
   }
   function iso(y, mo, d) { return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2); }
 
@@ -1017,7 +1034,7 @@
     if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode);
     if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode);
 
-    var text = collapseCjkSpaces(toHalfWidthDigits(rawText));
+    var text = collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText)));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
 
     // 汎用イベントモードでは競技判定をせず、常に汎用フォールバック（競技語で名称を弾かない）
@@ -1204,6 +1221,20 @@
       }
       if (evPairs.length) {
         r.kaikai_jikan = evPairs.map(function (p) { return p.label + p.time; }).join(' ');
+      }
+      // 開演・開場・開始のラベルが無いチラシ向けの補完。
+      // 「日時： 2025年12月25日（木） 13:30〜15:40」のように、日時欄に時刻だけが書かれる形式を拾う。
+      // 電話番号や金額を誤って拾わないよう、「時:分」の形（分は2桁）に限定する。
+      if (!r.kaikai_jikan) {
+        for (var t0 = 0; t0 < lines.length; t0++) {
+          var ln0 = lines[t0];
+          if (!/(日\s*時|時\s*間)/.test(ln0) && !/\d{1,2}\s*月\s*\d{1,2}\s*日/.test(ln0)) continue;
+          var mt0 = ln0.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
+          if (mt0 && Number(mt0[1]) <= 23) {
+            r.kaikai_jikan = ('0' + mt0[1]).slice(-2) + ':' + mt0[2];
+            break;
+          }
+        }
       }
     }
     if (!r.kaikai_jikan) {
