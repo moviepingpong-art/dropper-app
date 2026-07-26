@@ -1192,6 +1192,8 @@ function addCard(name) {
     showFields: function () {
       var f = li.querySelector('.fields'); if (f) f.style.display = 'block';
       var foot = li.querySelector('.card-foot'); if (foot) foot.style.display = 'block';
+      // 欄が隠れている間だけ見出しに出していたAIの進捗表示を、通常の状態に戻す
+      stEl.textContent = I18N.t('stDone'); stEl.className = 'st ok';
     },
     // AI失敗時：正規表現の結果を表示しつつ、フォールバックである旨と理由をカード上部に出す
     showAiFallback: function (reason) {
@@ -1382,7 +1384,15 @@ function askAiKey_() {
 
 async function runAiRecheck_(li, ocrText, isAiMode) {
   var statusEl = li.querySelector('.ai-status');
-  var setAi = function (t) { if (statusEl) statusEl.textContent = t || ''; };
+  // AIの状態表示（.ai-status）は .card-foot の中にあり、AIモードでは入力欄ごと隠れている。
+  // そのままでは処理中も失敗時も画面が空のままで、動いているのか分からない。
+  // 欄が隠れている間は、カード見出しの状態表示にも同じ文言を出して進捗を伝える。
+  var setAi = function (t) {
+    if (statusEl) statusEl.textContent = t || '';
+    if (!t || !li.__cardApi || !li.__cardApi.setStatus) return;
+    var f = li.querySelector('.fields');
+    if (f && f.style.display === 'none') li.__cardApi.setStatus(t, 'wait');
+  };
   // AIモードの失敗時：正規表現の結果を表示し、フォールバックである旨＋理由を添える
   var fallback = function (reason) {
     if (isAiMode && li.__cardApi && li.__cardApi.showAiFallback) li.__cardApi.showAiFallback(reason);

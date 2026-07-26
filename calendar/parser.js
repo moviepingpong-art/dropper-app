@@ -1014,6 +1014,8 @@
   // 住所文字列からラベル(N 会場/場所/住所)・電話を除去して整える
   function cleanAddress_(s) {
     s = String(s).trim();
+    // 全体が括弧で囲まれている場合は外す（会場名の後ろに「（茨城県…1階）」と続く書き方）
+    s = s.replace(/^[（(]\s*([^（()]*)\s*[）)]$/, '$1').trim();
     // 先頭のラベル（…会場/場所/住所/所在地）までを除去
     s = s.replace(/^.*?(会\s*場|場\s*所|住\s*所|所\s*在\s*地)\s*[:：]?\s*/, '');
     // 電話・FAX・☎ 以降を除去
@@ -1123,7 +1125,8 @@
     if (!r.taikai_mei && eventMode) {
       var evKw = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
       var evCands = lines.filter(function (ln) {
-        return evKw.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
+        // 句点を含む行は説明文（例「＊事前登録制…ライブ配信あり。」）で、催しの名前ではない
+        return evKw.test(ln) && !/。/.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
           && ln.replace(/\s/g, '').length <= 45;
       });
       // 「展示会開催のお知らせ」「〈展示会概要〉」のような文書の表題・見出しは、
@@ -1134,6 +1137,16 @@
       });
       var evCand = (named.length ? named : evCands)[0];
       if (evCand) r.taikai_mei = cleanTaikaiMei(evCand, activeProfile, true);
+      // 単独行に催し名が無く、本文中に「◯◯講演会」のように鉤括弧で示される案内文がある
+      // （例：…「令和7年度…建築研究所 講演会」をつくばカピオホールにて開催いたします。）
+      if (!r.taikai_mei) {
+        var q, reQuoted = /[「『]([^」』]{4,45})[」』]/g;
+        while ((q = reQuoted.exec(text)) !== null) {
+          // 本文は折り返されているため、括弧内に改行が挟まることがある（研究開\n発法人 等）
+          var qname = q[1].replace(/[\r\n]+/g, '').trim();
+          if (evKw.test(qname)) { r.taikai_mei = cleanTaikaiMei(qname, activeProfile, true); break; }
+        }
+      }
     }
 
     // 開催日
@@ -1274,22 +1287,30 @@
           evPairs.push({ label: lb, time: ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2) });
         }
       }
-      if (evPairs.length) {
+      // 日時・時間欄に書かれた「13:00〜17:20」「13時00分～17時20分」のような時間帯。
+      // 催しの本体の時間なので、開場時刻だけが取れている状態より優先する。
+      var hhmm_ = function (h, m) { return ('0' + h).slice(-2) + ':' + ('0' + (m || '0')).slice(-2); };
+      var rangeTime = '';
+      for (var t1 = 0; t1 < lines.length && !rangeTime; t1++) {
+        if (!/(日\s*時|時\s*間)/.test(lines[t1])) continue;
+        var mr1 = lines[t1].match(/(\d{1,2})\s*(?:[:：]|時)\s*(\d{1,2})?\s*分?\s*[〜~～\-–—]\s*(\d{1,2})\s*(?:[:：]|時)\s*(\d{1,2})?\s*分?/);
+        if (mr1 && Number(mr1[1]) <= 23 && Number(mr1[3]) <= 23) {
+          rangeTime = hhmm_(mr1[1], mr1[2]) + '〜' + hhmm_(mr1[3], mr1[4]);
+        }
+      }
+      if (rangeTime) {
+        // 時間帯に加えて開場時刻が別に書かれていれば併記する（例「13:00〜17:20 開場12:00」）
+        var doors = evPairs.filter(function (p) { return p.label === '開場'; });
+        r.kaikai_jikan = rangeTime + (doors.length ? ' ' + doors[0].label + doors[0].time : '');
+      } else if (evPairs.length) {
         r.kaikai_jikan = evPairs.map(function (p) { return p.label + p.time; }).join(' ');
       }
-      // 開演・開場・開始のラベルが無いチラシ向けの補完。
-      // 「日時： 2025年12月25日（木） 13:30〜15:40」のように、日時欄に時刻だけが書かれる形式を拾う。
+      // 開演・開場・開始のラベルも時間帯も無いチラシ向けの補完。
       // 電話番号や金額を誤って拾わないよう、「時:分」の形（分は2桁）に限定する。
       if (!r.kaikai_jikan) {
         for (var t0 = 0; t0 < lines.length; t0++) {
           var ln0 = lines[t0];
           if (!/(日\s*時|時\s*間)/.test(ln0) && !/\d{1,2}\s*月\s*\d{1,2}\s*日/.test(ln0)) continue;
-          // 開館時間などは「10:00〜20:00」と幅で書かれることが多いので、範囲を優先して拾う
-          var mr0 = ln0.match(/(\d{1,2})\s*[:：]\s*(\d{2})\s*[〜~～\-–—]\s*(\d{1,2})\s*[:：]\s*(\d{2})/);
-          if (mr0 && Number(mr0[1]) <= 23 && Number(mr0[3]) <= 23) {
-            r.kaikai_jikan = ('0' + mr0[1]).slice(-2) + ':' + mr0[2] + '〜' + ('0' + mr0[3]).slice(-2) + ':' + mr0[4];
-            break;
-          }
           var mt0 = ln0.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
           if (mt0 && Number(mt0[1]) <= 23) {
             r.kaikai_jikan = ('0' + mt0[1]).slice(-2) + ':' + mt0[2];
@@ -1314,6 +1335,8 @@
     var addrHint = /(〒|都|道|府|県|市|区|町|村|丁目|番地)/;
     var kaijoIdx = -1;
     for (var ki = 0; ki < lines.length; ki++) {
+      // 句点を含む行は説明文（例「…をつくばカピオホールにて開催いたします。」）なので会場候補にしない
+      if (/。/.test(lines[ki])) continue;
       if (venueRe.test(lines[ki]) && !venueNg.test(lines[ki])) { kaijoIdx = ki; break; }
     }
     if (kaijoIdx >= 0) {
