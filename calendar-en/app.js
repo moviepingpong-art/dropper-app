@@ -71,12 +71,14 @@ var DROPPER_TYPES = {
   sports: {
     subtitleKey: 'typeSports',
     leadKey: 'leadSports',
+    evKey: 'evSports', docKey: 'docSports',
     useSportSelector: true,
     annEmoji: '🏓'
   },
   music: {
     subtitleKey: 'typeMusic',
     leadKey: 'leadMusic',
+    evKey: 'evMusic', docKey: 'docMusic',
     useSportSelector: false,
     labels: { name: 'fldNameMusic', format: 'fldFormatMusic', opening: 'fldOpeningMusic', deadline: 'fldDeadlineMusic' },
     annEmoji: '🎵',
@@ -99,6 +101,7 @@ var DROPPER_TYPES = {
   exhibition: {
     subtitleKey: 'typeExhibition',
     leadKey: 'leadExhibition',
+    evKey: 'evExhibition', docKey: 'docExhibition',
     useSportSelector: false,
     labels: { name: 'fldNameExhibition', format: 'fldFormatExhibition', opening: 'fldOpeningExhibition', deadline: 'fldDeadlineExhibition' },
     annEmoji: '🖼️',
@@ -127,6 +130,7 @@ var DROPPER_TYPES = {
   lecture: {
     subtitleKey: 'typeLecture',
     leadKey: 'leadLecture',
+    evKey: 'evLecture', docKey: 'docLecture',
     useSportSelector: false,
     labels: { name: 'fldNameLecture', format: 'fldFormatLecture', opening: 'fldOpeningLecture', deadline: 'fldDeadlineLecture' },
     annEmoji: '🎓',
@@ -149,6 +153,7 @@ var DROPPER_TYPES = {
   festival: {
     subtitleKey: 'typeFestival',
     leadKey: 'leadFestival',
+    evKey: 'evFestival', docKey: 'docFestival',
     useSportSelector: false,
     labels: { name: 'fldNameFestival', format: 'fldFormatFestival', opening: 'fldOpeningFestival', deadline: 'fldDeadlineFestival' },
     annEmoji: '🎪',
@@ -174,6 +179,7 @@ var DROPPER_TYPES = {
   general: {
     subtitleKey: 'typeGeneral',
     leadKey: 'leadGeneral',
+    evKey: 'evGeneral', docKey: 'docGeneral',
     useSportSelector: false,
     labels: { name: 'fldNameGeneral', format: 'fldFormatGeneral', opening: 'fldOpeningGeneral' },
     annEmoji: '🎉'
@@ -330,6 +336,12 @@ function updateAiRecheckVisibility_() {
 function applyType(key) {
   var t = DROPPER_TYPES[key];
   currentType = t ? key : '';
+  // 画面の文言を種類に合わせて言い換える（大会/要項 ⇔ 公演/チラシ 等）。
+  // 未選択のうちは汎用の語のままにする。
+  if (I18N.setTerms) {
+    I18N.setTerms(t ? { ev: I18N.t(t.evKey), doc: I18N.t(t.docKey) } : {});
+    try { I18N.applyDom(); } catch (e) {}
+  }
   if (typePicker) {
     var btns = typePicker.querySelectorAll('.type-btn');
     for (var i = 0; i < btns.length; i++) {

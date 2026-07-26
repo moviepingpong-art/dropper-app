@@ -12,6 +12,13 @@
       // --- ヘッダー（種類セレクタ＝サブタイトル、リード文） ---
       // 種類ごとのサブタイトル・リード文は app.js の DROPPER_TYPES が辞書キーで参照する
       // 一覧のボタンは type* の短い名称、選択後は「短い名称＋dropperSuffix」を表示する
+      // 種類ごとの言い換え語。{ev}=催しの呼び名 / {doc}=配布物の呼び名（t() が自動で差し替える）
+      evSports: '大会', docSports: '要項',
+      evMusic: '公演', docMusic: 'チラシ',
+      evExhibition: '展示会', docExhibition: 'チラシ',
+      evLecture: '講演会', docLecture: 'チラシ',
+      evFestival: '催し', docFestival: 'チラシ',
+      evGeneral: 'イベント', docGeneral: 'チラシ',
       typePrompt: 'ドロッパーの選択',
       dropperSuffix: 'ドロッパー',
       typeSports: 'スポーツ大会の要項',
@@ -50,21 +57,21 @@
       // --- ログイン ---
       guideLink: '📖 使い方ガイド ↗',
       loginBtn: 'Googleでログイン',
-      loginNote: '大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
+      loginNote: '{ev}の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
       // --- 競技セレクタ ---
       sportLabel: '競技：',
       stepSport: '① 競技を選ぶ：',
-      stepDrop: '② 要項ファイルをドロップ',
-      sportAutoWaiting: '競技は要項から自動判定します',
+      stepDrop: '② {doc}ファイルをドロップ',
+      sportAutoWaiting: '競技は{doc}から自動判定します',
       sportAutoLabel: '競技（自動判定）：',
-      sportAutoUnknown: '競技：要項から判定できませんでした（手動でご確認ください）',
+      sportAutoUnknown: '競技：{doc}から判定できませんでした（手動でご確認ください）',
       sportAuto: '自動判定（おまかせ）',
       // --- ドロップゾーン ---
-      dropTitle: 'ここに要項ファイルをドラッグ&ドロップ',
+      dropTitle: 'ここに{doc}ファイルをドラッグ&ドロップ',
       dropSub: 'PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。',
       pickBtn: 'ファイルを選ぶ',
       // --- 注意書き ---
-      note: '※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。',
+      note: '※読み取りはGoogleのOCRで変換して必要項目を抽出します。{doc}はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。',
       // --- 登録ボタン ---
       registerBtn: 'Googleカレンダーに登録',
       // --- メッセージ（ログイン・読み込み） ---
@@ -72,7 +79,7 @@
       msgLoginFailed: 'ログインに失敗しました',
       msgLoginCancelled: 'ログインがキャンセルされました',
       msgLoginPreparing: 'Googleログインの準備中です。数秒後にもう一度お試しください。',
-      msgReading: '要項を読み込んでいます…',
+      msgReading: '{doc}を読み込んでいます…',
       msgSessionExpired: 'ログインの期限切れです。ファイルを入れ直してください。',
       // --- カード（抽出結果） ---
       stReading: '読み取り中…（Googleで変換）',
@@ -81,9 +88,9 @@
       stFailedPrefix: '失敗: ',
       editHint: '内容を確認してください。訂正、追加等はそのまま入力欄で書き換え可能です。メモ・備考欄にコメントの追加もできます。',
       dateWarn: '⚠ 開催日を入力してください',
-      msgDateEmptyA: '開催日が未入力の大会が ',
+      msgDateEmptyA: '開催日が未入力の{ev}が ',
       msgDateEmptyB: ' 件あります。日付を入力するか、チェックを外してください。',
-      msgEventEmptyA: '種目を読み取れない大会が ',
+      msgEventEmptyA: '種目を読み取れない{ev}が ',
       msgEventEmptyB: ' 件あります。競技方法欄に種目（例：男女ダブルス 等）を入力するか、「出欠フォームに載せる」のチェックを外してください。',
       // --- 要チェック（採点係）＆AI ---
       warnNotice: '点滅している枠は「特に注意したい箇所」の目印です。点滅していない項目にも誤りがある場合があります。気になる項目はそのまま手で直すか、処理モードを「AIモード」に変えて読み取り直してください。',
@@ -95,7 +102,7 @@
       warnFormatEmpty: '試合形式が取得できていません。',
       warnDatesFarApart: '⚠ 開催日が大きく離れています。1枚のチラシに別のイベント（次回公演など）の日程が併記されていないかご確認ください。不要な日は「削除」で外せます。',
       aiCheckField: 'AIで確認',
-      aiCheckCard: 'この大会をAIで検算',
+      aiCheckCard: 'この{ev}をAIで検算',
       aiAnyFieldNote: 'AIの確認は⚠が付いた項目に限らず、どの項目にもかけられます。',
       aiKeyPrompt: 'GeminiのAPIキーを貼り付けてください。\n（あなたのキーはこの端末内だけで使われ、当方サーバーには保存しません）',
       keyModalTitle: '🔑 Gemini APIキーの設定',
@@ -126,7 +133,7 @@
       modeHybrid: '通常モード（AIを使わない）',
       modeAi: 'AIモード（最初からAIで読み取る）',
       aiModalTitle: '🤖 AIで読み取り精度を上げますか？',
-      aiModalIntro: '要項の読み取りは、AIを使うとさらに正確になります。利用は任意です。',
+      aiModalIntro: '{doc}の読み取りは、AIを使うとさらに正確になります。利用は任意です。',
       aiModalSkipTitle: 'AIを使わない（通常モード）',
       aiModalSkipDesc: '追加設定なしで、いますぐ無料で使えます。読み取り結果はご自身で確認・修正できます。',
       aiModalUseTitle: 'AIを使う（AIモード）',
@@ -141,7 +148,7 @@
       aiModalFoot: '※この選択は記憶され、次回からは表示されません。あとから「AI設定を変更」でいつでも変更できます。',
       aiSettingsLink: 'AI設定を変更',
       msgError: 'エラー: ',
-      stRegistered: '登録しました（要項を添付）',
+      stRegistered: '登録しました（{doc}を添付）',
       // --- フィールドラベル ---
       fldName: '大会名',
       fldDates: '開催日（YYYY-MM-DD、複数はカンマ区切り）',
@@ -155,13 +162,13 @@
       dayLabelFirst: '初日',
       dayLabelLast: '最終日',
       bannerAiTitle: 'AIモードで動作中',
-      bannerAiDesc: 'ドロップした要項を、最初から全項目AIで読み取ります。',
+      bannerAiDesc: 'ドロップした{doc}を、最初から全項目AIで読み取ります。',
       bannerHybridTitle: '通常モードで動作中',
       bannerHybridDesc: 'AIは使いません。読み取り後、必要に応じて項目ごとにAI検算もできます。',
       fldDeadline: '申込締切',
       fldNote: 'メモ・備考',
       noteEligibility: '【参加資格】',
-      keyInfoHead: '参加するにあたっての重要情報（AIが要項から抽出。チェックした項目だけカレンダーの説明に入ります）',
+      keyInfoHead: '参加するにあたっての重要情報（AIが{doc}から抽出。チェックした項目だけカレンダーの説明に入ります）',
       keyInfoInclude: 'カレンダーの説明に含める',
       // --- 案内文ジェネレーター ---
       annBtn: '📣 案内文を作る',
@@ -181,7 +188,7 @@
       notePayment: '【振込期限】',
       // --- 登録結果 ---
       msgNoItems: '登録する項目がありません。',
-      msgRegDoneA: ' 件を登録しました。要項はGoogleドライブの',
+      msgRegDoneA: ' 件を登録しました。{doc}はGoogleドライブの',
       msgFolderName: '保存先フォルダ',
       msgRegDoneB: 'に保存し、カレンダーの予定に添付しています。このフォルダのファイルを削除するとカレンダーの添付も消えます。',
       msgRegFailCount: ' 件は失敗。',
@@ -191,12 +198,18 @@
       descDeadline: '申込締切: ',
       descOpening: '開会式: ',
       descNote: '備考: ',
-      descFlyer: '要項: Googleドライブ DropperFilesフォルダ ( ',
+      descFlyer: '{doc}: Googleドライブ DropperFilesフォルダ ( ',
       descFlyerTail: ' )\n※フォルダのファイルを削除するとこの添付も消えます。'
     },
     en: {
       pageTitle: 'Event Dropper',
       appName: 'Event Dropper',
+      evSports: 'tournament', docSports: 'guidelines',
+      evMusic: 'performance', docMusic: 'flyer',
+      evExhibition: 'exhibition', docExhibition: 'flyer',
+      evLecture: 'lecture', docLecture: 'flyer',
+      evFestival: 'event', docFestival: 'flyer',
+      evGeneral: 'event', docGeneral: 'flyer',
       typePrompt: 'Choose a dropper',
       dropperSuffix: ' dropper',
       typeSports: 'Sports event flyer',
@@ -236,21 +249,21 @@
       loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
       sportLabel: 'Sport:',
       stepSport: '① Select sport:',
-      stepDrop: '② Drop the requisition file',
+      stepDrop: '② Drop the {doc} file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
       sportAutoLabel: 'Sport (auto): ',
       sportAutoUnknown: 'Sport: could not be detected from the file (please check manually)',
       sportAuto: 'Auto-detect',
-      dropTitle: 'Drag & drop your flyer here',
+      dropTitle: 'Drag & drop your {doc} here',
       dropSub: 'PDF and images (JPEG/PNG) supported. You can drop several files at once.',
       pickBtn: 'Choose a file',
-      note: 'The file is converted with Google OCR to pull out the key details. Your flyer is saved to the DropperFiles folder in your Google Drive and linked to the calendar event.',
+      note: 'The file is converted with Google OCR to pull out the key details. Your {doc} is saved to the DropperFiles folder in your Google Drive and linked to the calendar event.',
       registerBtn: 'Add to Google Calendar',
       msgSigningIn: 'Signing in with Google…',
       msgLoginFailed: 'Sign-in failed.',
       msgLoginCancelled: 'Sign-in was cancelled.',
       msgLoginPreparing: 'Google sign-in is getting ready. Please try again in a few seconds.',
-      msgReading: 'Reading the flyer…',
+      msgReading: 'Reading the {doc}…',
       msgSessionExpired: 'Your session has expired. Please add the file again.',
       stReading: 'Reading… (converting with Google)',
       stReadingShort: 'Reading…',
@@ -271,7 +284,7 @@
       warnFormatEmpty: 'No format was detected.',
       warnDatesFarApart: '⚠ The dates found are far apart. This flyer may also advertise a different event (such as a next performance) — please check and use "Remove" to delete any date that does not belong.',
       aiCheckField: 'Check with AI',
-      aiCheckCard: 'Recheck this event with AI',
+      aiCheckCard: 'Recheck this {ev} with AI',
       aiAnyFieldNote: 'AI check is not limited to flagged items — you can run it on any field.',
       aiKeyPrompt: 'Paste your Gemini API key.\n(Your key is used only on this device and is not stored on our server.)',
       keyModalTitle: '🔑 Set up your Gemini API key',
@@ -302,7 +315,7 @@
       modeHybrid: 'Standard mode (no AI)',
       modeAi: 'AI mode (read everything with AI)',
       aiModalTitle: '🤖 Improve accuracy with AI?',
-      aiModalIntro: 'AI can make the requisition reading more accurate. Using it is optional.',
+      aiModalIntro: 'AI can make reading the {doc} more accurate. Using it is optional.',
       aiModalSkipTitle: 'Don\'t use AI (Standard mode)',
       aiModalSkipDesc: 'Free to use right now with no extra setup. You can review and edit the results yourself.',
       aiModalUseTitle: 'Use AI (AI mode)',
@@ -317,7 +330,7 @@
       aiModalFoot: '※ This choice is remembered and won\'t be shown again. You can change it anytime from "AI settings".',
       aiSettingsLink: 'AI settings',
       msgError: 'Error: ',
-      stRegistered: 'Added (flyer attached)',
+      stRegistered: 'Added ({doc} attached)',
       fldName: 'Event name',
       fldDates: 'Date (YYYY-MM-DD, comma-separated for multiple)',
       fldVenue: 'Venue',
@@ -330,7 +343,7 @@
       dayLabelFirst: 'First day',
       dayLabelLast: 'Last day',
       bannerAiTitle: 'AI mode is on',
-      bannerAiDesc: 'Dropped requisitions are read with AI from the start, for every field.',
+      bannerAiDesc: 'The dropped {doc} is read with AI from the start, for every field.',
       bannerHybridTitle: 'Standard mode is on',
       bannerHybridDesc: 'AI is not used. After reading, you can re-check individual fields with AI if needed.',
       fldDeadline: 'Entry deadline',
@@ -355,7 +368,7 @@
       noteFee: '[Fee] ',
       notePayment: '[Payment due] ',
       msgNoItems: 'There is nothing to add.',
-      msgRegDoneA: ' event(s) added. The flyer is saved in your Google Drive ',
+      msgRegDoneA: ' event(s) added. The {doc} is saved in your Google Drive ',
       msgFolderName: 'the saved folder',
       msgRegDoneB: ' and attached to the calendar event. Deleting the file from this folder will also remove it from the calendar event.',
       msgRegFailCount: ' failed.',
@@ -370,6 +383,12 @@
     "in": {
       pageTitle: 'Event Dropper',
       appName: 'Event Dropper',
+      evSports: 'tournament', docSports: 'guidelines',
+      evMusic: 'performance', docMusic: 'flyer',
+      evExhibition: 'exhibition', docExhibition: 'flyer',
+      evLecture: 'lecture', docLecture: 'flyer',
+      evFestival: 'event', docFestival: 'flyer',
+      evGeneral: 'event', docGeneral: 'flyer',
       typePrompt: 'Dropper chunein',
       dropperSuffix: ' dropper',
       typeSports: 'Sports event ka flyer',
@@ -409,21 +428,21 @@
       loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
       sportLabel: 'Sport:',
       stepSport: '① Sport chunein:',
-      stepDrop: '② Requisition file drop karein',
+      stepDrop: '② {doc} file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',
       sportAutoLabel: 'Sport (auto): ',
       sportAutoUnknown: 'Sport: file se detect nahi hua (manually check karein)',
       sportAuto: 'Auto-detect',
-      dropTitle: 'Apna flyer yahan drag & drop karein',
+      dropTitle: 'Apna {doc} yahan drag & drop karein',
       dropSub: 'PDF aur images (JPEG/PNG) supported hain. Aap ek saath kai files bhi drop kar sakte hain.',
       pickBtn: 'File choose karein',
-      note: 'File ko Google OCR se convert karke zaroori details nikaali jaati hain. Aapka flyer aapke Google Drive ke DropperFiles folder mein save hota hai aur calendar event se link ho jaata hai.',
+      note: 'File ko Google OCR se convert karke zaroori details nikaali jaati hain. Aapka {doc} aapke Google Drive ke DropperFiles folder mein save hota hai aur calendar event se link ho jaata hai.',
       registerBtn: 'Google Calendar mein add karein',
       msgSigningIn: 'Google se sign in ho raha hai…',
       msgLoginFailed: 'Sign-in fail ho gaya.',
       msgLoginCancelled: 'Sign-in cancel ho gaya.',
       msgLoginPreparing: 'Google sign-in ready ho raha hai. Kuch second baad dobara try karein.',
-      msgReading: 'Flyer read ho raha hai…',
+      msgReading: '{doc} read ho raha hai…',
       msgSessionExpired: 'Aapka session expire ho gaya hai. File dobara add karein.',
       stReading: 'Read ho raha hai… (Google se convert)',
       stReadingShort: 'Read ho raha hai…',
@@ -444,7 +463,7 @@
       warnFormatEmpty: 'Koi format detect nahi hua.',
       warnDatesFarApart: '⚠ Jo dates mili hain wo kaafi door-door hain. Ho sakta hai is flyer par koi dusra event (jaise agla show) bhi diya ho — check karke galat date ko "Delete" se hata dein.',
       aiCheckField: 'AI se check karein',
-      aiCheckCard: 'Is event ko AI se recheck karein',
+      aiCheckCard: 'Is {ev} ko AI se recheck karein',
       aiAnyFieldNote: 'AI check sirf flagged items tak seemit nahi hai — aap kisi bhi field par chala sakte hain.',
       aiKeyPrompt: 'Apni Gemini API key paste karein.\n(Aapki key sirf is device par use hoti hai, hamare server par store nahi hoti.)',
       keyModalTitle: '🔑 Gemini API key set karein',
@@ -475,7 +494,7 @@
       modeHybrid: 'Standard mode (AI ke bina)',
       modeAi: 'AI mode (sab kuch AI se padhein)',
       aiModalTitle: '🤖 AI se accuracy badhayein?',
-      aiModalIntro: 'AI se requisition ki reading aur accurate hoti hai. Iska use optional hai.',
+      aiModalIntro: 'AI se {doc} ki reading aur accurate hoti hai. Iska use optional hai.',
       aiModalSkipTitle: 'AI na use karein (Standard mode)',
       aiModalSkipDesc: 'Bina extra setup ke abhi free use karein. Result aap khud review aur edit kar sakte hain.',
       aiModalUseTitle: 'AI use karein (AI mode)',
@@ -501,7 +520,7 @@
       dayLabelFirst: 'Pehla din',
       dayLabelLast: 'Aakhri din',
       bannerAiTitle: 'AI mode chalu hai',
-      bannerAiDesc: 'Drop ki gayi requisition shuru se hi sabhi fields AI se padhi jaati hai.',
+      bannerAiDesc: 'Drop kiya gaya {doc} shuru se hi sabhi fields AI se padha jaata hai.',
       bannerHybridTitle: 'Standard mode chalu hai',
       bannerHybridDesc: 'AI use nahi hota. Padhne ke baad zaroorat ho to fields ko AI se re-check kar sakte hain.',
       fldDeadline: 'Entry deadline',
@@ -548,11 +567,19 @@
     return I18N[lang] || I18N.ja;
   }
 
-  // キーから文言を引く（vars を渡すと {name} 形式のプレースホルダを置換）
+  // 選択中のドロッパー種類に応じた言い換え語（{ev}=催しの呼び名 / {doc}=配布物の呼び名）。
+  // 例：スポーツなら「大会」「要項」、コンサートなら「公演」「チラシ」。
+  // 未選択のうちは汎用の語（イベント／チラシ）を使う。
+  var terms = {};
+  function setTerms(o) { terms = o || {}; }
+
+  // キーから文言を引く（{ev}/{doc} は自動、vars を渡すと {name} 形式も置換）
   function t(key, vars) {
     var d = dict();
     var s = (key in d) ? d[key] : ((key in I18N.ja) ? I18N.ja[key] : key);
-    if (vars) { for (var k in vars) { s = s.replace('{' + k + '}', vars[k]); } }
+    var all = { ev: terms.ev || d.evGeneral || '', doc: terms.doc || d.docGeneral || '' };
+    if (vars) { for (var k in vars) { all[k] = vars[k]; } }
+    for (var k2 in all) { s = s.split('{' + k2 + '}').join(all[k2]); }
     return s;
   }
 
@@ -578,7 +605,7 @@
     }
   }
 
-  global.I18N = { t: t, dict: dict, applyDom: applyDom };
+  global.I18N = { t: t, dict: dict, applyDom: applyDom, setTerms: setTerms };
 
   // 読み込み時に自動でDOMへ文言を流し込む（app.jsの状態に依存させない）
   if (document.readyState === 'loading') {
