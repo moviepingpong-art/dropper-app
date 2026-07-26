@@ -1374,11 +1374,16 @@
     // 住所らしさの判定：日本語チラシの住所には都道府県・市区町村・丁目番地・〒のいずれかが入る。
     // これが無いものは住所ではない（英語併記行「2:00p.m., Saturday, ... at Suntory Hall」等の紛れ込みを防ぐ）。
     var addrHint = /(〒|都|道|府|県|市|区|町|村|丁目|番地)/;
+    // 会場名は短い見出し的な行に書かれる。あいさつ文や説明文に施設名が出てくることも多いので、
+    // 「句点を含む」「敬体の語尾を含む」「極端に長い」行は会場候補から外す。
+    // （格式のある案内状は句点を打たない書式があるため、語尾と長さでも判定する）
+    var proseRe = /(います|ます|ください|下さい|致し|申し上げ|おります|ですので|ございま)/;
     var kaijoIdx = -1;
     for (var ki = 0; ki < lines.length; ki++) {
-      // 句点を含む行は説明文（例「…をつくばカピオホールにて開催いたします。」）なので会場候補にしない
-      if (/。/.test(lines[ki])) continue;
-      if (venueRe.test(lines[ki]) && !venueNg.test(lines[ki])) { kaijoIdx = ki; break; }
+      var lnv = lines[ki];
+      if (/。/.test(lnv) || proseRe.test(lnv)) continue;
+      if (lnv.replace(/\s/g, '').length > 70) continue;
+      if (venueRe.test(lnv) && !venueNg.test(lnv)) { kaijoIdx = ki; break; }
     }
     if (kaijoIdx >= 0) {
       var v = splitVenue(lines[kaijoIdx]);
