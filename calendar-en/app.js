@@ -700,12 +700,15 @@ function annGcalLink_(f) {
   });
 }
 // ハッシュタグ：競技名から自動（AIモードの自動判定表示 or 種目セレクタ）。無ければ空。
-function annHashtag_() {
+// 競技のない種類（コンサート等の汎用イベント）ではタグを付けない。
+// AIの判定結果は表示文字列ではなく data-sport 属性から読む（表示文言に依存すると
+// 「判定できませんでした」がそのままタグ化されるため）。
+function annHashtag_(typeKey) {
+  if (!typeCfg_(typeKey).useSportSelector) return '';
   var auto = document.getElementById('sport-auto');
-  if (auto && auto.style.display !== 'none' && auto.textContent) {
-    var t = auto.textContent.split(/[:：]/).pop().trim();
-    if (t && t !== I18N.t('sportAutoUnknown') && t !== I18N.t('sportAutoWaiting')) return '#' + t.replace(/\s+/g, '');
-    return '';
+  if (auto && auto.style.display !== 'none') {
+    var sp = (auto.getAttribute('data-sport') || '').trim();
+    return sp ? '#' + sp.replace(/\s+/g, '') : '';
   }
   var sel = document.getElementById('sport');
   if (sel && sel.value && sel.value !== 'auto') {
@@ -721,7 +724,7 @@ function buildAnnouncement_(f, channel, typeKey) {
   var dates = (f.kaisai_dates || []).slice().sort();
   var maps = annMapsLink_(f);
   var gcal = annGcalLink_(f);
-  var tag = annHashtag_();
+  var tag = annHashtag_(typeKey);
   var keyInfo = (f.key_info || []).filter(function (it) { return (it.label || it.text); });
   // 言語別の記号（ja=全角、en/in=半角）。ja出力は従来どおり。
   var ja = (window.LANG !== 'en' && window.LANG !== 'in');
@@ -1396,12 +1399,14 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
       var allEmpty = Array.prototype.every.call(fmtInputs, function (el) { return !el.value.trim(); });
       if (allEmpty && fmtInputs.length) { fmtInputs[0].value = obj.shiai_keishiki; }
     }
-    // AIが判定した競技種目を自動表示欄にそのまま表示（方式Q：自由記述・プロファイル照合なし）
     if (isAiMode) {
+      // AIが判定した競技種目を自動表示欄にそのまま表示（方式Q：自由記述・プロファイル照合なし）
+      // ただし競技の自動判定はスポーツ大会のカードのみ（汎用イベントに競技は無い）
       var auto = document.getElementById('sport-auto');
-      if (auto) {
+      if (auto && typeCfg_(li.getAttribute('data-type')).useSportSelector) {
         var sp = (typeof obj.sport === 'string') ? obj.sport.trim() : '';
         auto.textContent = sp ? (I18N.t('sportAutoLabel') + sp) : I18N.t('sportAutoUnknown');
+        auto.setAttribute('data-sport', sp);   // ハッシュタグ生成はこの値を見る（表示文言に依存しない）
       }
       // AIが答えた format_label（競技に合った項目名）を「試合形式」欄ラベルに反映
       if (li.__cardApi && li.__cardApi.setFormatLabel && typeof obj.format_label === 'string') {
