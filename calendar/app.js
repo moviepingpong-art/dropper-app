@@ -1018,6 +1018,10 @@ function addCard(name) {
   var cardApi = {
     el: li,
     setText: function (t) { ocrText = t || ''; },
+    // 抽出がうまくいかない要項を調べるための診断用。ブラウザのコンソールから
+    //   document.querySelectorAll('#list .card')[0].__cardApi.getOcrText()
+    // で、そのカードのOCR生テキストを取り出せる。
+    getOcrText: function () { return ocrText; },
     setStatus: function (t, cls) { stEl.textContent = t; stEl.className = 'st ' + (cls || 'wait'); },
     // fields.kaisai_dates: string[]、fields.schedule: [{date, events}]（あれば日付ごとの試合形式に割当）、
     // fields.shiai_keishiki: 旧来の単一文字列（scheduleが無い時のフォールバック、1行目に入れる）

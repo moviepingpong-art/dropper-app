@@ -1059,7 +1059,8 @@
     var dates = [];
     var dateLns = scanText.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     // 申込・締切などの文脈行は開催日として拾わない（開催日は要項前半の日時欄に書かれるのが通例）
-    var applyCtx = /(申込|締切|必着|受付|応募|エントリー)/;
+    // 「発売」＝チケット発売日で、開催日ではない（チラシに大きく併記されるため除外する）
+    var applyCtx = /(申込|締切|必着|受付|応募|エントリー|発売)/;
     // 締切日が「日付だけの単独行」で、キーワードが直前/直後の別行にある要項があるため近傍行も見る
     function nearDeadline(i) {
       if (applyCtx.test(dateLns[i] || '')) return true;
@@ -1132,7 +1133,7 @@
     if (!dates.length) {
       var lns = scanText.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
       for (var k = 0; k < lns.length; k++) {
-        if (/(締切|申込|必着|更新|掲載|投稿|公開|登録)/.test(lns[k])) continue;
+        if (/(締切|申込|必着|更新|掲載|投稿|公開|登録|発売)/.test(lns[k])) continue;
         var d = extractDates(lns[k]);
         if (d.length) { dates = d; break; }
       }
@@ -1171,15 +1172,26 @@
     r.kaisai_dates = dates;
 
     // 開会式の時刻（汎用イベントモードでは開場・開演・開始も拾い、複数あればラベル付きで併記する）
+    // チラシは「14:00開演［13:20開場］」のように時刻→ラベルの順が多い一方、「開演 14:00」の順もある。
+    // 両方の語順を1本の交替パターンで左から順に拾う（時刻→ラベルを先に試すことで、
+    // 「開演［13:20開場］」のようにラベルの先の別時刻を誤って結び付けるのを防ぐ）。
     if (eventMode) {
-      var evTimes = [];
-      for (var a0 = 0; a0 < lines.length && evTimes.length < 2; a0++) {
-        var reEv = /(開\s*演|開\s*場|開\s*始)[^0-9]{0,6}(\d{1,2})\s*[:：時]\s*(\d{1,2})?/g, mev;
-        while ((mev = reEv.exec(lines[a0])) && evTimes.length < 2) {
-          evTimes.push(mev[1].replace(/\s/g, '') + ('0' + mev[2]).slice(-2) + ':' + ('0' + (mev[3] || '0')).slice(-2));
+      var evPairs = [];   // [{label, time}] 出現順。同じラベルは最初の1件だけ採用
+      for (var a0 = 0; a0 < lines.length && evPairs.length < 2; a0++) {
+        var reEv = /(?:(\d{1,2})\s*[:：時]\s*(\d{1,2})?\s*(開\s*演|開\s*場|開\s*始))|(?:(開\s*演|開\s*場|開\s*始)[^0-9\n]{0,4}(\d{1,2})\s*[:：時]\s*(\d{1,2})?)/g, mev;
+        while ((mev = reEv.exec(lines[a0])) && evPairs.length < 2) {
+          var lb = (mev[3] || mev[4] || '').replace(/\s/g, '');
+          var hh = mev[1] || mev[5];
+          var mm = (mev[1] ? mev[2] : mev[6]) || '0';
+          if (!lb || hh === undefined) continue;
+          if (Number(hh) > 23 || Number(mm) > 59) continue;
+          if (evPairs.some(function (p) { return p.label === lb; })) continue;
+          evPairs.push({ label: lb, time: ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2) });
         }
       }
-      if (evTimes.length) r.kaikai_jikan = evTimes.join(' ');
+      if (evPairs.length) {
+        r.kaikai_jikan = evPairs.map(function (p) { return p.label + p.time; }).join(' ');
+      }
     }
     if (!r.kaikai_jikan) {
       for (var a = 0; a < lines.length; a++) {
@@ -1192,6 +1204,9 @@
     var venueRe = /(体育館|アリーナ|ARENA|武道館|記念|会館|センター|ホール|競技場|ドーム|グラウンド|総合運動|プラザ)/i;
     var venueNg = /(協会|連盟|主催|後援|協賛|主管|受付|支払|振込|問合|申込)/;
     var addrNg = /(申込|受付|問合|協会|連盟|郵送|宛|事務局|送付|部会)/;
+    // 住所らしさの判定：日本語チラシの住所には都道府県・市区町村・丁目番地・〒のいずれかが入る。
+    // これが無いものは住所ではない（英語併記行「2:00p.m., Saturday, ... at Suntory Hall」等の紛れ込みを防ぐ）。
+    var addrHint = /(〒|都|道|府|県|市|区|町|村|丁目|番地)/;
     var kaijoIdx = -1;
     for (var ki = 0; ki < lines.length; ki++) {
       if (venueRe.test(lines[ki]) && !venueNg.test(lines[ki])) { kaijoIdx = ki; break; }
@@ -1199,7 +1214,7 @@
     if (kaijoIdx >= 0) {
       var v = splitVenue(lines[kaijoIdx]);
       r.kaijo = cleanVenue(v.venue);
-      if (v.address) r.kaijo_jusho = cleanAddress_(v.address);
+      if (v.address && addrHint.test(v.address)) r.kaijo_jusho = cleanAddress_(v.address);
       // 住所が同じ行に無い（会場名が単独行）の場合、会場ラベル行や直後の行から住所を拾う
       if (!r.kaijo_jusho) {
         for (var ai = kaijoIdx; ai <= kaijoIdx + 2 && ai < lines.length; ai++) {
