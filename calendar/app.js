@@ -49,7 +49,9 @@ var pickBtn = document.getElementById('pickBtn');
 var loginArea = document.getElementById('login-area');
 var workArea = document.getElementById('work');
 var sportSel = document.getElementById('sport');
-var typeSel = document.getElementById('dropperType');
+var typePicker = document.getElementById('typePicker');
+var typeCurrentEl = document.getElementById('typeCurrent');
+var typePromptEl = document.getElementById('typePrompt');
 var leadEl = document.getElementById('lead');
 var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 
@@ -178,7 +180,9 @@ var DROPPER_TYPES = {
   }
 };
 var DEFAULT_TYPE = 'sports';
-var currentType = DEFAULT_TYPE;
+// 起動時はどのドロッパーも選ばれていない。利用者が一覧から選ぶまで、
+// 競技セレクタとドロップ欄は出さない（種類が決まらないと項目名が定まらないため）。
+var currentType = '';
 
 // 種類キー→設定（未知キーは既定タイプ）
 function typeCfg_(key) { return DROPPER_TYPES[key] || DROPPER_TYPES[DEFAULT_TYPE]; }
@@ -305,26 +309,46 @@ function updateAiRecheckVisibility_() {
 })();
 
 
-// 種類セレクタを生成し、選択に応じて表示を切り替える
-(function buildTypeSelector() {
-  if (!typeSel) return;
-  var opts = '';
+// 種類の一覧をボタンで並べる。一覧は「ドロッパー」を付けない短い名称、
+// 選択後は「◯◯ドロッパー」として選択中の名称を表示する。
+(function buildTypePicker() {
+  if (!typePicker) return;
   Object.keys(DROPPER_TYPES).forEach(function (key) {
-    opts += '<option value="' + key + '">' + I18N.t(DROPPER_TYPES[key].subtitleKey) + '</option>';
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'type-btn';
+    b.setAttribute('data-type', key);
+    b.textContent = I18N.t(DROPPER_TYPES[key].subtitleKey);
+    b.addEventListener('click', function () { applyType(key); });
+    typePicker.appendChild(b);
   });
-  typeSel.innerHTML = opts;
-  typeSel.value = DEFAULT_TYPE;
-  applyType(DEFAULT_TYPE);
-  typeSel.addEventListener('change', function () { applyType(typeSel.value); });
+  applyType('');   // 未選択の状態から始める
 })();
 
-// 選択中の種類に合わせてリード文・競技セレクタの表示を切り替える
+// 選択中の種類に合わせて、名称表示・リード文・競技セレクタ・ドロップ欄を切り替える。
+// key が空なら未選択（一覧だけを見せる）。
 function applyType(key) {
   var t = DROPPER_TYPES[key];
-  if (!t) return;
-  currentType = key;
-  if (leadEl && t.leadKey) leadEl.textContent = I18N.t(t.leadKey);
-  if (sportRow) sportRow.style.display = t.useSportSelector ? '' : 'none';
+  currentType = t ? key : '';
+  if (typePicker) {
+    var btns = typePicker.querySelectorAll('.type-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('on', btns[i].getAttribute('data-type') === currentType);
+    }
+  }
+  if (typeCurrentEl) {
+    typeCurrentEl.textContent = t ? (I18N.t(t.subtitleKey) + I18N.t('dropperSuffix')) : '';
+    typeCurrentEl.style.display = t ? 'inline-block' : 'none';
+  }
+  if (typePromptEl) typePromptEl.style.display = t ? 'none' : '';
+  if (leadEl) leadEl.style.display = t ? '' : 'none';
+  if (t && leadEl && t.leadKey) leadEl.textContent = I18N.t(t.leadKey);
+  if (sportRow) sportRow.style.display = (t && t.useSportSelector) ? '' : 'none';
+  // 種類が決まるまでドロップ欄は出さない（項目名が種類ごとに変わるため）
+  ['.step-drop-label', '#drop', '#ocrNote'].forEach(function (sel) {
+    var el = document.querySelector(sel);
+    if (el) el.style.display = t ? '' : 'none';
+  });
 }
 
 /* ===== 入力（ドロップ / 選択） ===== */

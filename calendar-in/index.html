@@ -190,11 +190,26 @@
     }
     .pick-btn:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.4); }
     .subtitle-row { margin:12px 0 4px; }
-    .subtitle-row select {
-      font-family:'Zen Maru Gothic',sans-serif; font-weight:700;
-      padding:9px 16px; border:none; border-radius:14px; font-size:17px;
+    /* ドロッパーの種類選択（ボタン一覧 → 選択後は名称を表示） */
+    .type-prompt { font-size:14px; font-weight:700; color:var(--teal-d); margin:0 0 8px; }
+    .type-picker { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 4px; }
+    .type-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700;
+      padding:10px 16px; border-radius:14px; cursor:pointer;
+      color:var(--teal-d); background:#fff; border:2px solid var(--line);
+      box-shadow:none; transition:border-color .15s, background .15s, transform .12s;
+    }
+    .type-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:none; border-color:var(--teal); background:#f0fffb; }
+    .type-btn.on {
+      border-color:transparent; color:var(--ink);
+      background:linear-gradient(100deg,var(--yellow),var(--lime));
+      box-shadow:0 6px 16px rgba(163,230,53,.3);
+    }
+    .type-current {
+      font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px;
+      display:inline-block; margin:8px 0 0; padding:9px 16px; border-radius:14px;
       background:linear-gradient(100deg,var(--yellow),var(--lime)); color:var(--ink);
-      cursor:pointer; box-shadow:0 6px 16px rgba(163,230,53,.3);
+      box-shadow:0 6px 16px rgba(163,230,53,.3);
     }
 
     /* ===== AI利用選択ポップアップ ===== */
@@ -281,7 +296,9 @@
     <p class="free-badge" data-i18n="freeBadge">🎉 今なら無料公開中</p>
     <h1 data-i18n="appName">イベントドロッパー</h1>
     <div class="subtitle-row">
-      <select id="dropperType"></select>
+      <p class="type-prompt" id="typePrompt" data-i18n="typePrompt">ドロッパーの選択</p>
+      <div class="type-picker" id="typePicker"></div>
+      <p class="type-current" id="typeCurrent" style="display:none"></p>
     </div>
     <p class="lead" id="lead">要項（PDF・画像）をドロップ → 内容を確認 → Googleカレンダーに登録</p>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
@@ -342,7 +359,7 @@
       <button id="pickBtn" class="pick-btn" type="button" data-i18n="pickBtn">ファイルを選ぶ</button>
       <input id="file" type="file" accept="image/*,application/pdf" multiple style="display:none">
     </div>
-    <p class="note" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
+    <p class="note" id="ocrNote" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
     <ul id="list"></ul>
     <div id="bar" style="display:none"><button id="reg" data-i18n="registerBtn">Googleカレンダーに登録</button></div>
     <div id="msg"></div>
