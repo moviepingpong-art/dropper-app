@@ -828,8 +828,11 @@
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i];
       if (!ln || /。/.test(ln)) continue;
+      if (/(います|ます|ください|下さい|致し|申し上げ|おります|ですので|ございま)/.test(ln)) continue;
       if (excludeRe && excludeRe.test(ln)) continue;
-      var m = ln.match(/^[^。]{0,8}?(?:会\s*場|場\s*所)\s*(?:[：:･・]|[\s　]+)\s*(.+)$/);
+      // ラベルと値の間の空白は、日本語の詰め処理で消えていることがある（「2会場国立◯◯センター」）。
+      // 行頭付近にラベルがあることを条件に、区切りが無くても値として取る。
+      var m = ln.match(/^[^。]{0,8}?(?:会\s*場|場\s*所)\s*[：:･・]?\s*(.+)$/);
       if (m && m[1].trim()) return m[1].trim();
     }
     return '';
@@ -1047,6 +1050,8 @@
     s = s.replace(/^.*?(会\s*場|場\s*所|住\s*所|所\s*在\s*地)\s*[:：]?\s*/, '');
     // 電話・FAX・☎ 以降を除去
     s = s.replace(/[\s　]*(ＴＥＬ|TEL|℡|Tel|電話|FAX|☎).*$/i, '');
+    // 「…3-1（電話番号：…）」の電話部分を消した後に残る開き括弧を落とす
+    s = s.replace(/[\s　]*[（(]\s*$/, '');
     // 末尾の括弧電話番号を除去
     s = s.replace(/[（(][\d\-－\s]{6,}[）)]\s*$/, '');
     return s.trim();
@@ -1126,7 +1131,24 @@
     // 大会名
     var greetingRe = /(さて|平素|拝啓|この度|このたび|各位|を開催|することと|お待ち|申し上げ|ご参加|いたします|となりました|ください)/;
     var formRe = /(申\s*込\s*書|代\s*表\s*者|フリガナ|登\s*録\s*番\s*号|選\s*考\s*基\s*準|解\s*説|掲\s*載\s*し)/;
-    var nameCands = lines.filter(function (ln) {
+    // 汎用イベントでは、本文中に「◯◯発表会」のように鉤括弧で示された催し名があれば最優先で採る。
+    // 別ページの表や「第N回◯◯大会」の見出しを拾ってしまうのを防ぐ（鉤括弧付きは書き手が明示した名前）。
+    if (eventMode) {
+      var evKwEarly = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|例大祭|大祭|文化祭|学園祭|音楽祭|映画祭|収穫祭|感謝祭|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
+      // 探索は文書の冒頭に限る。裏面の紹介文に別の催し名が鉤括弧で出てくることがあるため。
+      var headText = lines.slice(0, 15).join('\n');
+      var qe, reQe = /[「『]([^」』]{4,45})[」』]/g;
+      while ((qe = reQe.exec(headText)) !== null) {
+        var qn = qe[1].replace(/[\r\n]+/g, '').trim();
+        if (evKwEarly.test(qn)) {
+          // 鉤括弧の前に「令和8年度」のような修飾があれば含めて1行分を名前にする
+          var whole = (headText.slice(0, qe.index).split('\n').pop() || '').trim() + '「' + qn + '」';
+          r.taikai_mei = cleanTaikaiMei(whole.replace(/\s/g, '').length <= 45 ? whole : qn, activeProfile, true);
+          break;
+        }
+      }
+    }
+    var nameCands = r.taikai_mei ? [] : lines.filter(function (ln) {
       return /第\s*\d+\s*回/.test(ln)
         && /(大会|選手権|フェスティバル)/.test(ln)
         && !greetingRe.test(ln)
@@ -1405,7 +1427,11 @@
     } else if (kaijoIdx >= 0) {
       var v = splitVenue(lines[kaijoIdx]);
       r.kaijo = cleanVenue(v.venue);
-      if (v.address && addrHint.test(v.address)) r.kaijo_jusho = cleanAddress_(v.address);
+      if (v.address && addrHint.test(v.address)) {
+        r.kaijo_jusho = cleanAddress_(v.address);
+      } else if (v.address && v.address.replace(/\s/g, '').length <= 15 && !/[A-Za-z]{3,}/.test(v.address)) {
+        r.kaijo = cleanVenue(v.venue + v.address);   // 「センター」＋「棟4階」のような会場名の続き
+      }
       // 住所が同じ行に無い（会場名が単独行）の場合、会場ラベル行や直後の行から住所を拾う
       if (!r.kaijo_jusho) {
         for (var ai = kaijoIdx; ai <= kaijoIdx + 2 && ai < lines.length; ai++) {
