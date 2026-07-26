@@ -361,6 +361,10 @@ function applyType(key) {
     var el = document.querySelector(sel);
     if (el) el.style.display = t ? '' : 'none';
   });
+  // 種類を選んだら、次の操作であるログインボタンを縁取り＋点滅で目立たせて誘導する
+  // （ログイン済みならログイン欄ごと非表示なので、付いていても影響しない）
+  var loginAttract = document.getElementById('loginBtn');
+  if (loginAttract) loginAttract.classList.toggle('attract', !!t);
 }
 
 /* ===== 入力（ドロップ / 選択） ===== */
