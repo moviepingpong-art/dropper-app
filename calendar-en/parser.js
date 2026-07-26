@@ -1,5 +1,7 @@
 // parser.js — 要項テキストから項目を推定
-// window.Dropper = { parse(text), addDays(iso,n), isPast(dates) } を公開する。
+// window.Dropper = { parse(text, sport, eventMode), addDays(iso,n), isPast(dates) } を公開する。
+// eventMode=true はスポーツ以外の汎用イベント（コンサート・展示・講演・祭り等）向け：
+// 競技判定・競技語による大会名の絞り込みを行わず、イベント語での名称フォールバックを加える。
 (function (global) {
   'use strict';
   var PAST_GRACE_DAYS = 10;
@@ -511,7 +513,8 @@
 
   // 英語/インド要項の解析本体（dropper_parser_en.py / _in.py の parse_text 相当）
   // region: 'en'（英語圏）/ 'in'（インド）
-  function parseEn(rawText, sport, region) {
+  // eventMode: true ならスポーツ以外の汎用イベント（タイトルをイベント語でも探す）
+  function parseEn(rawText, sport, region, eventMode) {
     region = region || 'en';
     var text = String(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
     var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
@@ -532,6 +535,14 @@
       }
       var picked = titled || titleCands.slice().sort(function (a, b) { return a.length - b.length; })[0];
       r.taikai_mei = enCleanTitle(picked, profile, region);
+    }
+    // 汎用イベントモード：大会語で拾えなかったとき、イベント語（concert/exhibition/festival等）でも探す
+    if (!r.taikai_mei && eventMode) {
+      var enEvKw = /\b(concert|recital|live|gig|exhibition|expo|gallery|art show|showcase|festival|fest|fair|market|bazaar|carnival|parade|lecture|talk|seminar|symposium|workshop|class|course|screening|premiere|musical|theatre|theater|play|performance|show|meetup|gathering|open day|open house|celebration|ceremony)\b/i;
+      var enEvCand = lines.find(function (l) {
+        return enEvKw.test(l) && !EN_GREETING.test(l) && !EN_FORM.test(l) && l.length <= 90;
+      });
+      if (enEvCand) r.taikai_mei = enCleanTitle(enEvCand, profile, region);
     }
 
     // --- 開催日（3段階フォールバック・締切行は全段階で除外）---
@@ -638,7 +649,7 @@
     });
     r.shiai_keishiki = fmts.join(', ');
 
-    buildSchedule(r);
+    buildSchedule(r, eventMode);
     return r;
   }
 
@@ -650,22 +661,24 @@
 
   // 日ごとに種目を持てる器を作る（案イ：events は空。日ごとの割り当ては後段=正規表現の試作/AIに任せる）
   // r.kaisai_dates と既存の r.shiai_keishiki はそのまま維持し、schedule と day_split を「追加」するだけ。
-  function buildSchedule(r) {
+  function buildSchedule(r, eventMode) {
     var dates = (r.kaisai_dates || []);
     r.schedule = dates.map(function (d) { return { date: d, events: '' }; });
     r.day_split = false;  // 日ごとに種目を割り当てられたか（現段階は常に false）
-    computeWarnings(r);
+    computeWarnings(r, eventMode);
     return r;
   }
 
   // 採点係：正規表現の抽出結果を見て「怪しい所」に印(warnings)を立てる。値は変えず、印だけ付ける。
   // 各 warning は { field, code }。表示文言は app.js 側で I18N により言語化（parserは言語非依存）。
   // field は確認カードの data-k と対応（'' はカード全体の注意）。
-  function computeWarnings(r) {
+  // eventMode=true（汎用イベント）では、スポーツ前提の警告（試合形式の空・複数日の種目振り分け）は出さない。
+  // 展示会等は会期（期間）開催が普通で、試合形式に相当する欄も無いことが多いため。
+  function computeWarnings(r, eventMode) {
     var w = [];
     var dates = r.kaisai_dates || [];
     // 1) 複数日開催だが日ごとの種目が分かれていない（練習日混入・種目振り分けの確認。開催日と試合形式の両方を点滅）
-    if ((r.schedule || []).length >= 2 && !r.day_split) {
+    if (!eventMode && (r.schedule || []).length >= 2 && !r.day_split) {
       w.push({ field: 'kaisai_dates', code: 'multi_day_events' });
       w.push({ field: 'shiai_keishiki', code: 'multi_day_events' });
     }
@@ -689,8 +702,8 @@
     if (r.kaijo && (r.kaijo.replace(/\s/g, '').length <= 2 || !/[^\d\s.,:\-]/.test(r.kaijo))) {
       w.push({ field: 'kaijo', code: 'venue_suspect' });
     }
-    // 6) 試合形式が空（取りこぼし）
-    if (!r.shiai_keishiki) w.push({ field: 'shiai_keishiki', code: 'format_empty' });
+    // 6) 試合形式が空（取りこぼし）※汎用イベントでは形式欄が無いのが普通なので出さない
+    if (!eventMode && !r.shiai_keishiki) w.push({ field: 'shiai_keishiki', code: 'format_empty' });
     r.warnings = w;
     return r;
   }
@@ -985,16 +998,19 @@
     return lang === 'en' || lang === 'in';
   }
 
-  function parse(rawText, sport) {
+  function parse(rawText, sport, eventMode) {
     var lang = global.LANG || 'ja';
     // 英語系の言語では英語/インドparserへ委譲
-    if (lang === 'in') return parseEn(rawText, sport, 'in');
-    if (lang === 'en') return parseEn(rawText, sport, 'en');
+    if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode);
+    if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode);
 
     var text = collapseCjkSpaces(toHalfWidthDigits(rawText));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
 
-    var resolved = resolveProfile(text, sport || DEFAULT_SPORT);
+    // 汎用イベントモードでは競技判定をせず、常に汎用フォールバック（競技語で名称を弾かない）
+    var resolved = eventMode
+      ? { profile: SPORT_PROFILES[DEFAULT_SPORT], generic: true }
+      : resolveProfile(text, sport || DEFAULT_SPORT);
     var activeProfile = resolved.profile;
     var genericMode = resolved.generic;
 
@@ -1024,6 +1040,15 @@
           && ln.replace(/\s/g, '').length <= 45;
       });
       if (cand) r.taikai_mei = cleanTaikaiMei(cand, activeProfile, genericMode);
+    }
+    // 汎用イベントモード：大会語で拾えなかったとき、イベント語（コンサート・展・祭・講演等）でも名称を探す
+    if (!r.taikai_mei && eventMode) {
+      var evKw = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
+      var evCand = lines.find(function (ln) {
+        return evKw.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
+          && ln.replace(/\s/g, '').length <= 45;
+      });
+      if (evCand) r.taikai_mei = cleanTaikaiMei(evCand, activeProfile, true);
     }
 
     // 開催日
@@ -1145,10 +1170,22 @@
     if (dates.length > 5) dates = [];
     r.kaisai_dates = dates;
 
-    // 開会式の時刻
-    for (var a = 0; a < lines.length; a++) {
-      var mt = lines[a].match(/開\s*会\s*式[^0-9]*?(\d{1,2})\s*[:：時]\s*(\d{1,2})?/);
-      if (mt) { r.kaikai_jikan = ('0' + mt[1]).slice(-2) + ':' + ('0' + (mt[2] || '0')).slice(-2); break; }
+    // 開会式の時刻（汎用イベントモードでは開場・開演・開始も拾い、複数あればラベル付きで併記する）
+    if (eventMode) {
+      var evTimes = [];
+      for (var a0 = 0; a0 < lines.length && evTimes.length < 2; a0++) {
+        var reEv = /(開\s*演|開\s*場|開\s*始)[^0-9]{0,6}(\d{1,2})\s*[:：時]\s*(\d{1,2})?/g, mev;
+        while ((mev = reEv.exec(lines[a0])) && evTimes.length < 2) {
+          evTimes.push(mev[1].replace(/\s/g, '') + ('0' + mev[2]).slice(-2) + ':' + ('0' + (mev[3] || '0')).slice(-2));
+        }
+      }
+      if (evTimes.length) r.kaikai_jikan = evTimes.join(' ');
+    }
+    if (!r.kaikai_jikan) {
+      for (var a = 0; a < lines.length; a++) {
+        var mt = lines[a].match(/開\s*会\s*式[^0-9]*?(\d{1,2})\s*[:：時]\s*(\d{1,2})?/);
+        if (mt) { r.kaikai_jikan = ('0' + mt[1]).slice(-2) + ':' + ('0' + (mt[2] || '0')).slice(-2); break; }
+      }
     }
 
     // 会場・住所
@@ -1213,7 +1250,7 @@
     });
     r.shiai_keishiki = fmts.join('、');
 
-    buildSchedule(r);
+    buildSchedule(r, eventMode);
     return r;
   }
 

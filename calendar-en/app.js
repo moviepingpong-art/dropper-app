@@ -55,21 +55,39 @@ var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 
 // ===== イベントドロッパーの種類定義 =====
 // 種類を増やすときはここに1件足すだけ。
-//   subtitle        : サブタイトル（種類セレクタの表示文言）
-//   lead            : 操作の流れ説明（ヘッダーのリード文）
+//   subtitleKey     : サブタイトル（種類セレクタの表示文言）のi18nキー
+//   leadKey         : 操作の流れ説明（ヘッダーのリード文）のi18nキー
 //   useSportSelector: 競技セレクタを表示するか（スポーツ用途のみtrue）
-// 将来：種類ごとの抽出設定（parserへ渡すモード等）をここに追加していく。
+//   labels          : カード欄ラベルの上書き（slot→i18nキー。無いslotは既定キーを使う）
+//                     slot: name(名称) / format(日ごとの内容) / opening(時刻) / deadline(締切)
+//   hideFields      : カードで非表示にする欄のフィールドキー配列（例: ['shimekiri']）
+//   annEmoji        : 案内文の先頭絵文字
+// AI抽出プロンプトは runAiRecheck_ 内で useSportSelector により競技用/汎用を切り替える。
 var DROPPER_TYPES = {
   sports: {
     subtitleKey: 'typeSports',
     leadKey: 'leadSports',
-    useSportSelector: true
+    useSportSelector: true,
+    annEmoji: '🏓'
+  },
+  general: {
+    subtitleKey: 'typeGeneral',
+    leadKey: 'leadGeneral',
+    useSportSelector: false,
+    labels: { name: 'fldNameGeneral', format: 'fldFormatGeneral', opening: 'fldOpeningGeneral' },
+    annEmoji: '🎉'
   }
-  // 例：今後追加する種類（辞書に typeXxx/leadXxx を足してキーで参照）
-  // school: { subtitleKey:'typeSchool', leadKey:'leadSchool', useSportSelector:false }
 };
 var DEFAULT_TYPE = 'sports';
 var currentType = DEFAULT_TYPE;
+
+// 種類キー→設定（未知キーは既定タイプ）
+function typeCfg_(key) { return DROPPER_TYPES[key] || DROPPER_TYPES[DEFAULT_TYPE]; }
+// 種類別のカード欄ラベルを引く（上書きが無ければ既定のi18nキー）
+function typeLabel_(typeKey, slot, defKey) {
+  var t = typeCfg_(typeKey);
+  return I18N.t((t.labels && t.labels[slot]) || defKey);
+}
 var aiMode = 'hybrid';   // 'hybrid'=正規表現＋必要時AI / 'ai'=最初から全項目AIで取り直す
 
 // 多言語：HTMLのdata-i18n要素に現在の言語の文言を流し込む
@@ -310,7 +328,13 @@ async function processOne(file) {
   try {
     card.setStatus(I18N.t('stReading'), 'wait');
     var res = await ocrViaDrive(file);
-    var fields = window.Dropper.parse(res.text, sportSel ? sportSel.value : undefined);
+    // スポーツ以外の種類では汎用イベントモードで解析（競技判定・競技語での絞り込みをしない）
+    var isSportsType_ = !!typeCfg_(currentType).useSportSelector;
+    var fields = window.Dropper.parse(
+      res.text,
+      isSportsType_ && sportSel ? sportSel.value : 'auto',
+      !isSportsType_
+    );
     card.setText(res.text);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
@@ -690,7 +714,8 @@ function annHashtag_() {
   }
   return '';
 }
-function buildAnnouncement_(f, channel) {
+function buildAnnouncement_(f, channel, typeKey) {
+  var emoji = typeCfg_(typeKey).annEmoji || '🏓';   // 種類別の先頭絵文字（sports=🏓 / general=🎉）
   var name = (f.taikai_mei || '').trim();
   var days = annSchedule_(f);
   var dates = (f.kaisai_dates || []).slice().sort();
@@ -710,7 +735,7 @@ function buildAnnouncement_(f, channel) {
   var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
   if (channel === 'x') {
-    L.push('🏓' + name);
+    L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
     if (f.kaijo) L.push('📍' + f.kaijo);
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
@@ -740,7 +765,7 @@ function buildAnnouncement_(f, channel) {
     return L.join('\n');
   }
   // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
-  L.push('🏓 ' + name);
+  L.push(emoji + ' ' + name);
   L.push('');
   if (days.length) {
     L.push('📅 ' + I18N.t('annSchedule'));
@@ -781,7 +806,7 @@ function wireAnnouncement_(li, cardApi) {
   var copyBtn = panel.querySelector('.ann-copy');
   var shareBtn = panel.querySelector('.ann-share');
   var current = 'line';
-  function regen() { ta.value = buildAnnouncement_(cardApi.read(), current); }
+  function regen() { ta.value = buildAnnouncement_(cardApi.read(), current, li.getAttribute('data-type')); }
   btn.addEventListener('click', function () {
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
@@ -812,22 +837,31 @@ function wireAnnouncement_(li, cardApi) {
 }
 
 function addCard(name) {
+  // カードは作成時点の種類（currentType）を記憶する。種類を切り替えても既存カードは元の種類のまま。
+  var cardType_ = currentType;
+  var hidden_ = typeCfg_(cardType_).hideFields || [];
+  // 種類別ラベル＋非表示指定に対応した欄HTML（hideFields指定の欄は出さない）
+  function typedFieldHtml_(slot, defKey, fieldKey) {
+    if (hidden_.indexOf(fieldKey) !== -1) return '';
+    return fieldHtml(typeLabel_(cardType_, slot, defKey), fieldKey);
+  }
   var li = document.createElement('li');
   li.className = 'card';
+  li.setAttribute('data-type', cardType_);
   li.innerHTML =
     '<div class="hd"><label class="chk"><input type="checkbox" checked> <span class="fn"></span></label><span class="st wait">' + I18N.t('stReadingShort') + '</span></div>' +
     '<div class="fields" style="display:none">' +
     '<p class="edit-hint">' + I18N.t('editHint') + '</p>' +
-    fieldHtml(I18N.t('fldName'), 'taikai_mei') +
+    typedFieldHtml_('name', 'fldName', 'taikai_mei') +
     '<div class="day-rows-wrap">' +
       '<div class="day-rows"></div>' +
       '<button type="button" class="day-add">' + I18N.t('dayAddBtn') + '</button>' +
     '</div>' +
-    fieldHtml(I18N.t('fldVenue'), 'kaijo') +
-    fieldHtml(I18N.t('fldAddress'), 'kaijo_jusho') +
-    fieldHtml(I18N.t('fldOpening'), 'kaikai_jikan') +
-    fieldHtml(I18N.t('fldDeadline'), 'shimekiri') +
-    fieldHtml(I18N.t('fldNote'), 'note') +
+    typedFieldHtml_('venue', 'fldVenue', 'kaijo') +
+    typedFieldHtml_('address', 'fldAddress', 'kaijo_jusho') +
+    typedFieldHtml_('opening', 'fldOpening', 'kaikai_jikan') +
+    typedFieldHtml_('deadline', 'fldDeadline', 'shimekiri') +
+    typedFieldHtml_('note', 'fldNote', 'note') +
     '<div class="keyinfo-wrap" style="display:none">' +
       '<p class="keyinfo-head">' + I18N.t('keyInfoHead') + '</p>' +
       '<div class="keyinfo-rows"></div>' +
@@ -914,7 +948,10 @@ function addCard(name) {
   }
   // この大会カードで使う「試合形式」欄のラベル。通常モードは競技プロファイルのformatLabel、
   // AIモードはAIのformat_labelで上書きされる。未設定なら既定（fldFormat）。
-  var formatLabel_ = currentSportFormatLabel_();
+  // スポーツ以外の種類では、種類定義のformatラベル（例：内容・プログラム）を使う。
+  var formatLabel_ = typeCfg_(cardType_).useSportSelector
+    ? currentSportFormatLabel_()
+    : typeLabel_(cardType_, 'format', 'fldFormat');
   // 行を1行追加（date/formatの初期値を指定可）
   function addRow_(date, format) {
     var div = document.createElement('div');
@@ -1241,6 +1278,9 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
   if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
 
   setAi(I18N.t('aiRunning'));
+  // カード作成時の種類（data-type）でプロンプトを切り替える（sports=競技用 / それ以外=汎用イベント用）
+  var cardType = li.getAttribute('data-type') || DEFAULT_TYPE;
+  var isSportsCard = !!typeCfg_(cardType).useSportSelector;
   var promptEn =
     'You are an assistant that extracts information from sports event guidelines. From the following text, read the actual competition date(s), event name, venue, address, opening ceremony time, match format, entry deadline, and sport, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. Do not include practice days, reception days, or the entry deadline in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format as kaisai_dates. events must contain the match format / competition method / categories held that day (e.g. knockout, round-robin, final round, singles, team event, division names). For a one-day event too, if the guidelines state the competition method / match format / categories, put them in schedule events (always refer to items such as competition method, match format, format, event details). Only leave events as an empty string if the categories for that day truly cannot be determined, but never omit the element itself. Use an empty string or empty array for unknown values.\nsport is the sport; answer with one concise sport name in English (e.g. Table Tennis, Badminton, Volleyball, Soccer, Kendo). For a multi-sport event, give the main one; empty string if it cannot be determined.\nformat_label is the natural heading for the item corresponding to match format for that sport (e.g. Format for table tennis, Events for athletics, Legs for a road relay, Division/Class for martial arts). Empty string if it cannot be determined.\nkey_info is an array of up to 5 items of the most important information a participant should know, taken from the guidelines in order of importance. Each element is {\"label\":\"short heading\",\"text\":\"content\"}. label is a concise heading matching the content, such as Eligibility, Entry fee, Entry deadline, Entry limit, What to bring, Parking, Safety, Awards. text summarizes the specific content clearly for a participant. Also include eligibility, entry restrictions, entry fees, and payment deadlines in key_info if they are stated and important. Empty array if there is none. Strictly keep to a maximum of 5, and omit trivial administrative details.\nSchema: {\"taikai_mei\":\"\",\"kaisai_dates\":[],\"kaijo\":\"\",\"kaijo_jusho\":\"\",\"kaikai_jikan\":\"\",\"shiai_keishiki\":\"\",\"shimekiri\":\"\",\"schedule\":[{\"date\":\"\",\"events\":\"\"}],\"sport\":\"\",\"format_label\":\"\",\"key_info\":[{\"label\":\"\",\"text\":\"\"}]}\n\n--- Guideline text ---\n' + ocrText;
   var promptJa =
@@ -1263,7 +1303,31 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。\n' +
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
-  var prompt = (window.LANG === 'en' || window.LANG === 'in') ? promptEn : promptJa;
+  // 汎用イベント用プロンプト（コンサート・展示・講演・祭り等。スキーマは競技用と同一で下流処理を共通化）
+  var promptEnGeneral =
+    'You are an assistant that extracts information from event flyers and notices (concerts, recitals, exhibitions, lectures, seminars, festivals, community events, etc.). From the following text, read the event date(s), event name, venue, address, start time, application/reservation deadline (if any), and the program for each day, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. For an event held over a continuous period (such as an exhibition), put the first day and the last day in kaisai_dates. Do not include deadlines in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format. events is a short description of the program or content for that day (e.g. performance title, session names, activities); empty string only if it truly cannot be determined, but never omit the element itself. kaikai_jikan is the start time as written, including doors-open / start distinctions if stated (e.g. "Doors 17:30 / Start 18:00"); empty string if unknown. shimekiri is the application or reservation deadline if any; empty string if none. sport must be an empty string. format_label is a natural short heading for the per-day content (e.g. Program); empty string if unsure.\nkey_info is an array of up to 5 items of the most important information a visitor or participant should know, in order of importance. Each element is {"label":"short heading","text":"content"}. label examples: Admission, Tickets, Performers, Target audience, Capacity, How to apply, Parking, Rain policy. Empty array if none; strictly keep to a maximum of 5. Use an empty string or empty array for unknown values.\nSchema: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n--- Flyer text ---\n' + ocrText;
+  var promptJaGeneral =
+    'あなたはイベントの案内チラシ（コンサート・発表会・展示会・個展・講演会・セミナー・祭り・地域の催し等）から情報を抽出するアシスタントです。' +
+    '次のテキストから、開催日・イベント名・会場・住所・開始時刻・申込や予約の締切・各日の内容を読み取り、' +
+    'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
+    '開催日は YYYY-MM-DD の配列。会期・期間で開催されるイベント（展示会・個展など）は、初日と最終日を kaisai_dates に入れること。締切日は開催日に含めないこと。' +
+    'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は同じ YYYY-MM-DD 形式にすること。' +
+    'events にはその日の内容・プログラム（例：◯◯公演、上映会、体験コーナー、ギャラリートーク など）を入れること。' +
+    'どうしても判断できないときのみ events を空文字にしてよいが、要素自体は省略しないこと。' +
+    'kaikai_jikan は開場・開演・開始時刻など（例：「開場17:30 開演18:00」）。不明なら空文字。' +
+    'shimekiri は申込・予約の締切（あれば）。無ければ空文字。' +
+    'sport は必ず空文字にすること。' +
+    'format_label は各日の内容欄に付ける自然な見出し（例：「内容」「プログラム」「上演内容」）。判断できなければ空文字。\n' +
+    'key_info は、来場者・参加者が知っておくべき重要な情報を、チラシから重要な順に最大5件抜き出した配列。' +
+    '各要素は {"label":"短い見出し","text":"内容"} の形。' +
+    'label は「入場料」「チケット」「出演」「対象」「定員」「申込方法」「駐車場」「雨天時」など内容に合った簡潔な見出し。' +
+    'text はその具体的な内容を読んで分かるよう簡潔にまとめる。' +
+    '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。値が不明な項目は空文字または空配列。\n' +
+    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
+    '--- チラシ本文 ---\n' + ocrText;
+  var prompt = (window.LANG === 'en' || window.LANG === 'in')
+    ? (isSportsCard ? promptEn : promptEnGeneral)
+    : (isSportsCard ? promptJa : promptJaGeneral);
 
   try {
     // 一時的なサーバーエラー（混雑・過負荷）のときは1回だけ再試行する。
