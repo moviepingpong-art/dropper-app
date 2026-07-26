@@ -674,6 +674,33 @@
     try { s = s.normalize ? s.normalize('NFKC') : s; } catch (e) {}
     return s.replace(/[⺀-⻳]/g, function (c) { return RADICAL_FIX[c] || c; });
   }
+  // 漢数字を数値にする（1〜999想定）。「十一」→11、「二〇二三」→2023。判定できなければ NaN。
+  function kanjiToNum_(s) {
+    var D = { '〇': 0, '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    if (/^[〇零一二三四五六七八九]+$/.test(s)) {   // 位取りを使わない並び（二〇二三 など）
+      var v = '';
+      for (var i = 0; i < s.length; i++) v += D[s.charAt(i)];
+      return Number(v);
+    }
+    var total = 0, cur = 0, ok = false;
+    for (var j = 0; j < s.length; j++) {
+      var c = s.charAt(j);
+      if (D[c] !== undefined) { cur = D[c]; ok = true; }
+      else if (c === '十') { total += (cur || 1) * 10; cur = 0; ok = true; }
+      else if (c === '百') { total += (cur || 1) * 100; cur = 0; ok = true; }
+      else return NaN;
+    }
+    return ok ? total + cur : NaN;
+  }
+  // 神社仏閣の案内や式典の招待状など、格式のある文書では日付が漢数字で書かれる
+  // （例「令和五年十一月三日」「午後一時」）。年月日・時分の直前に限って算用数字へ直す。
+  // 「九州」「三菱」のような固有名詞を壊さないよう、後ろに 年/月/日/時/分 が続く場合だけ変換する。
+  function convertKanjiDateNums(s) {
+    return String(s).replace(/[〇零一二三四五六七八九十百]{1,4}(?=\s*[年月日時分])/g, function (m) {
+      var n = kanjiToNum_(m);
+      return isNaN(n) ? m : String(n);
+    });
+  }
   // 西暦と和暦の併記を片方に整理する。要項では「2026（令和8）年11月15日」「令和8（2026）年…」
   // のように年号が括弧で挟まれる書き方が多く、そのままでは「◯◯◯◯年◯月◯日」の形に
   // 当てはまらず日付として拾えないため、括弧の側を落として連続した表記に直す。
@@ -850,7 +877,7 @@
     name = name.replace(/^[\s　]*\d+[\.．]\s*/, '');
     // 末尾の不要語を除去
     name = name.replace(/[\s　。．、,]*[（(][^）)]*[）)]\s*(実\s*施|要\s*項|開\s*催)[\s。．]*$/, '');
-    name = name.replace(/[\s　。．、,]*(実\s*施要\s*項|実\s*施|要\s*項|に\s*つ\s*い\s*て|の?\s*ご?\s*案\s*内|開\s*催\s*要\s*項|開\s*催)[\s。．]*$/, '');
+    name = name.replace(/[\s　。．、,]*(実\s*施要\s*項|実\s*施|要\s*項|に\s*つ\s*い\s*て|の?\s*(?:ご|御)?\s*案\s*内|開\s*催\s*要\s*項|開\s*催)[\s。．]*$/, '');
     // 末尾の事務的な語を除去（概要・規約・募集・受付係 等）
     name = name.replace(/[\s　。．、,]*(開\s*催\s*概\s*要|概\s*要|試\s*合\s*規\s*約|大\s*会\s*規\s*定|参\s*加\s*選\s*手\s*募\s*集|選\s*手\s*募\s*集|募\s*集\s*要\s*綱|募\s*集|広\s*告\s*受\s*付\s*係?|受\s*付\s*係)[\s。．]*$/, '');
     // 先頭の「大会名」「名称」ラベルを除去
@@ -1030,7 +1057,7 @@
     // OCRが日付・開会式・住所などの値を1行に連結するケース：先頭の日付/開会式/開始時刻を除去
     s = s.replace(/^\s*(?:令\s*和\s*\d+\s*年|平\s*成\s*\d+\s*年|\d{4}\s*年)?\s*\d+\s*月\s*\d+\s*日\s*[（(]?[月火水木金土日]?[）)]?\s*/, '');
     s = s.replace(/^(?:(?:開\s*会\s*式|開\s*始|受\s*付)[：:]?\s*午\s*[前後]\s*\d+\s*時(?:\s*\d+\s*分)?\s*)+/, '');
-    var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|広場|公園|プラザ|グラウンド|運動場|記念館|野球場|球場)/gi;
+    var suffixRe = /(体育館|アリーナ|ARENA|武道館|会館|センター|ホール|競技場|ドーム|広場|公園|プラザ|グラウンド|運動場|記念館|野球場|球場|神社|神宮|大社|美術館|博物館|図書館|公民館|ギャラリー)/gi;
     var last = null, m;
     while ((m = suffixRe.exec(s)) !== null) last = m;
     if (last) {
@@ -1084,7 +1111,7 @@
     if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode, opts);
     if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode, opts);
 
-    var text = collapseEraParens(collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText))));
+    var text = collapseEraParens(convertKanjiDateNums(collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText)))));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
 
     // 汎用イベントモードでは競技判定をせず、常に汎用フォールバック（競技語で名称を弾かない）
@@ -1123,7 +1150,7 @@
     }
     // 汎用イベントモード：大会語で拾えなかったとき、イベント語（コンサート・展・祭・講演等）でも名称を探す
     if (!r.taikai_mei && eventMode) {
-      var evKw = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
+      var evKw = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|例大祭|大祭|文化祭|学園祭|音楽祭|映画祭|収穫祭|感謝祭|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
       var evCands = lines.filter(function (ln) {
         // 句点を含む行は説明文（例「＊事前登録制…ライブ配信あり。」）で、催しの名前ではない
         return evKw.test(ln) && !/。/.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
@@ -1305,6 +1332,19 @@
       } else if (evPairs.length) {
         r.kaikai_jikan = evPairs.map(function (p) { return p.label + p.time; }).join(' ');
       }
+      // 「午後1時」「午前9時30分」のような和風の表記（漢数字は変換済み）。
+      // 午前/午後が付いているものだけを対象にし、「約1時間」のような所要時間を拾わないようにする。
+      if (!r.kaikai_jikan) {
+        for (var t2 = 0; t2 < lines.length; t2++) {
+          if (!/(日\s*時|時\s*刻|開\s*始|執\s*行)/.test(lines[t2])) continue;
+          var ma = lines[t2].match(/(午前|午後)\s*(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分)?/);
+          if (!ma) continue;
+          var h2 = Number(ma[2]) % 12;
+          if (ma[1] === '午後') h2 += 12;
+          r.kaikai_jikan = hhmm_(h2, ma[3] || 0);
+          break;
+        }
+      }
       // 開演・開場・開始のラベルも時間帯も無いチラシ向けの補完。
       // 電話番号や金額を誤って拾わないよう、「時:分」の形（分は2桁）に限定する。
       if (!r.kaikai_jikan) {
@@ -1327,7 +1367,8 @@
     }
 
     // 会場・住所
-    var venueRe = /(体育館|アリーナ|ARENA|武道館|記念|会館|センター|ホール|競技場|ドーム|グラウンド|総合運動|プラザ)/i;
+    // 会場になりうる施設語。スポーツ施設に加え、催しでよく使われる場所（神社・美術館・広場など）も見る。
+    var venueRe = /(体育館|アリーナ|ARENA|武道館|記念|会館|センター|ホール|競技場|ドーム|グラウンド|総合運動|プラザ|神社|神宮|大社|美術館|博物館|図書館|公民館|ギャラリー|広場|公園)/i;
     var venueNg = /(協会|連盟|主催|後援|協賛|主管|受付|支払|振込|問合|申込)/;
     var addrNg = /(申込|受付|問合|協会|連盟|郵送|宛|事務局|送付|部会)/;
     // 住所らしさの判定：日本語チラシの住所には都道府県・市区町村・丁目番地・〒のいずれかが入る。
