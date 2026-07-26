@@ -94,6 +94,34 @@ var DROPPER_TYPES = {
           'format_label should be "Programme".\n'
     }
   },
+  exhibition: {
+    subtitleKey: 'typeExhibition',
+    leadKey: 'leadExhibition',
+    useSportSelector: false,
+    labels: { name: 'fldNameExhibition', format: 'fldFormatExhibition', opening: 'fldOpeningExhibition', deadline: 'fldDeadlineExhibition' },
+    annEmoji: '🖼️',
+    // 会期（初日〜最終日）で開催する種類。日付行のラベルを初日/最終日にし、
+    // 案内文も期間として1行で書く。会期が長くても「日付が離れている」警告は出さない。
+    dateRange: true,
+    longRun: true,
+    aiHint: {
+      ja: 'このチラシは展示会・個展・作品展の告知です。' +
+          '会期（例：10月1日〜10月12日）は初日と最終日の2つだけを kaisai_dates に入れ、その間の日は入れないこと。' +
+          'kaikai_jikan には開館時間（例「10:00〜17:00」）を入れること。' +
+          'schedule の events には、その日に行われる関連催し（オープニング、ギャラリートーク、講評会など）があれば入れること。' +
+          'key_info には「入場料」「休館日」「関連イベント」「最終日の閉館時刻」「出品・応募方法」「主催・問合せ先」' +
+          'のうち記載があり重要なものを優先して入れること。' +
+          'shimekiri は公募展などで出品・応募の締切がある場合だけ入れ、単なる会期の終わりは入れないこと。' +
+          'format_label は「展示内容」。\n',
+      en: 'This flyer announces an exhibition, solo show, or art display. ' +
+          'For a run of dates (e.g. 1–12 October), put only the first and last day in kaisai_dates, not the days in between. ' +
+          'Put the opening hours in kaikai_jikan (e.g. "10:00-17:00"). ' +
+          'In schedule events, note any related happenings that day (opening reception, gallery talk, critique). ' +
+          'In key_info, prioritise: admission fee, closed days, related events, closing time on the final day, how to submit work, and the organiser or contact. ' +
+          'Only set shimekiri when there is a real submission or entry deadline; the end of the run is not a deadline. ' +
+          'format_label should be "Exhibits".\n'
+    }
+  },
   general: {
     subtitleKey: 'typeGeneral',
     leadKey: 'leadGeneral',
@@ -357,7 +385,8 @@ async function processOne(file) {
     var fields = window.Dropper.parse(
       res.text,
       isSportsType_ && sportSel ? sportSel.value : 'auto',
-      !isSportsType_
+      !isSportsType_,
+      { longRun: !!typeCfg_(currentType).longRun }   // 会期が長いのが普通の種類では日付が離れていても警告しない
     );
     card.setText(res.text);
     card.fill(fields);
@@ -743,6 +772,8 @@ function annHashtag_(typeKey) {
 }
 function buildAnnouncement_(f, channel, typeKey) {
   var emoji = typeCfg_(typeKey).annEmoji || '🏓';   // 種類別の先頭絵文字（sports=🏓 / general=🎉）
+  // 会期で開催する種類（展示会など）は、日を1件ずつ並べず「初日〜最終日」の1行にまとめる
+  var isRange = !!typeCfg_(typeKey).dateRange;
   var name = (f.taikai_mei || '').trim();
   var days = annSchedule_(f);
   var dates = (f.kaisai_dates || []).slice().sort();
@@ -775,11 +806,13 @@ function buildAnnouncement_(f, channel, typeKey) {
     L.push('');
     if (dates.length) {
       L.push(I18N.t('annSchedule') + CL + (dates.length > 1 ? annFullDate_(dates[0]) + RG + annFullDate_(dates[dates.length - 1]) : annFullDate_(dates[0])));
-      days.forEach(function (s, i) {
-        var line = IN + I18N.t('dayLabel', { n: i + 1 }) + ' ' + annMDwd_(s.date);
-        if (s.format) line += ' ' + s.format;
-        L.push(line);
-      });
+      if (!isRange) {
+        days.forEach(function (s, i) {
+          var line = IN + I18N.t('dayLabel', { n: i + 1 }) + ' ' + annMDwd_(s.date);
+          if (s.format) line += ' ' + s.format;
+          L.push(line);
+        });
+      }
     }
     if (f.kaijo) L.push(I18N.t('annVenue') + CL + f.kaijo + (f.kaijo_jusho ? OP + f.kaijo_jusho + CP : ''));
     if (f.shimekiri) L.push(I18N.t('annDeadline') + CL + f.shimekiri);
@@ -796,11 +829,19 @@ function buildAnnouncement_(f, channel, typeKey) {
   L.push('');
   if (days.length) {
     L.push('📅 ' + I18N.t('annSchedule'));
-    days.forEach(function (s) {
-      var line = BR + annMDwd_(s.date);
-      if (s.format) line += ' ' + s.format;
-      L.push(line);
-    });
+    if (isRange && dates.length > 1) {
+      // 会期は「10/1(木) 〜 10/12(月)」の1行にまとめる
+      var rangeLine = BR + annMDwd_(dates[0]) + RG + annMDwd_(dates[dates.length - 1]);
+      L.push(rangeLine);
+      // 期間中の関連催し（ギャラリートーク等）が入っていれば、その日だけ補足する
+      days.forEach(function (s) { if (s.format) L.push(BR + annMDwd_(s.date) + ' ' + s.format); });
+    } else {
+      days.forEach(function (s) {
+        var line = BR + annMDwd_(s.date);
+        if (s.format) line += ' ' + s.format;
+        L.push(line);
+      });
+    }
     L.push('');
   }
   if (f.kaijo) {
@@ -965,11 +1006,20 @@ function addCard(name) {
 
 
   // 行番号ラベル（1日目／2日目…）を振り直す
+  // 会期で開催する種類（展示会など）は、連続した日数ではなく期間なので「初日／最終日」で示す。
   function renumberRows_() {
     var rows = rowsEl.querySelectorAll('[data-day-row]');
+    var total = rows.length;
+    var isRange = !!typeCfg_(cardType_).dateRange;
     rows.forEach(function (row, idx) {
       var lab = row.querySelector('.day-row-label');
-      if (lab) lab.textContent = dayLabel_(idx + 1);
+      if (!lab) return;
+      if (isRange && total >= 2) {
+        lab.textContent = (idx === 0) ? I18N.t('dayLabelFirst')
+          : (idx === total - 1 ? I18N.t('dayLabelLast') : dayLabel_(idx + 1));
+      } else {
+        lab.textContent = dayLabel_(idx + 1);
+      }
     });
     markDateRowsWarn_();
   }

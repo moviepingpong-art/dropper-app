@@ -514,7 +514,7 @@
   // 英語/インド要項の解析本体（dropper_parser_en.py / _in.py の parse_text 相当）
   // region: 'en'（英語圏）/ 'in'（インド）
   // eventMode: true ならスポーツ以外の汎用イベント（タイトルをイベント語でも探す）
-  function parseEn(rawText, sport, region, eventMode) {
+  function parseEn(rawText, sport, region, eventMode, opts) {
     region = region || 'en';
     var text = normalizeChars(rawText).replace(/\uFEFF/g, '').replace(/\u200B/g, '').replace(/\r/g, '\n');
     var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
@@ -649,7 +649,7 @@
     });
     r.shiai_keishiki = fmts.join(', ');
 
-    buildSchedule(r, eventMode);
+    buildSchedule(r, eventMode, opts);
     return r;
   }
 
@@ -688,11 +688,11 @@
 
   // 日ごとに種目を持てる器を作る（案イ：events は空。日ごとの割り当ては後段=正規表現の試作/AIに任せる）
   // r.kaisai_dates と既存の r.shiai_keishiki はそのまま維持し、schedule と day_split を「追加」するだけ。
-  function buildSchedule(r, eventMode) {
+  function buildSchedule(r, eventMode, opts) {
     var dates = (r.kaisai_dates || []);
     r.schedule = dates.map(function (d) { return { date: d, events: '' }; });
     r.day_split = false;  // 日ごとに種目を割り当てられたか（現段階は常に false）
-    computeWarnings(r, eventMode);
+    computeWarnings(r, eventMode, opts);
     return r;
   }
 
@@ -701,7 +701,7 @@
   // field は確認カードの data-k と対応（'' はカード全体の注意）。
   // eventMode=true（汎用イベント）では、スポーツ前提の警告（試合形式の空・複数日の種目振り分け）は出さない。
   // 展示会等は会期（期間）開催が普通で、試合形式に相当する欄も無いことが多いため。
-  function computeWarnings(r, eventMode) {
+  function computeWarnings(r, eventMode, opts) {
     var w = [];
     var dates = r.kaisai_dates || [];
     // 1) 複数日開催だが日ごとの種目が分かれていない（練習日混入・種目振り分けの確認。開催日と試合形式の両方を点滅）
@@ -734,7 +734,8 @@
     // 7) 汎用イベントで開催日どうしが大きく離れている（同じチラシに別イベントが併記されている可能性）
     //    例：コンサートのチラシ裏面に次回公演が載っており、その日付まで拾ってしまうケース。
     //    値は消さずに印だけ付け、ユーザーに削除の判断を委ねる（会期の長い展示会を誤って削らないため）。
-    if (eventMode && dates.length >= 2) {
+    //    展示会など会期が長いのが普通の種類（opts.longRun）では出さない。
+    if (eventMode && !(opts && opts.longRun) && dates.length >= 2) {
       var sortedD = dates.slice().sort();
       var spanDays = Math.round(
         (Date.parse(sortedD[sortedD.length - 1]) - Date.parse(sortedD[0])) / 86400000
@@ -1040,11 +1041,12 @@
     return lang === 'en' || lang === 'in';
   }
 
-  function parse(rawText, sport, eventMode) {
+  // opts.longRun: 会期が長いのが普通の種類（展示会など）。日付が離れていても警告を出さない。
+  function parse(rawText, sport, eventMode, opts) {
     var lang = global.LANG || 'ja';
     // 英語系の言語では英語/インドparserへ委譲
-    if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode);
-    if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode);
+    if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode, opts);
+    if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode, opts);
 
     var text = collapseEraParens(collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText))));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -1321,7 +1323,7 @@
     });
     r.shiai_keishiki = fmts.join('、');
 
-    buildSchedule(r, eventMode);
+    buildSchedule(r, eventMode, opts);
     return r;
   }
 
