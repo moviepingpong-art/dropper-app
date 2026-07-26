@@ -1149,6 +1149,11 @@ var WARN_CODE_KEY = {
   venue_suspect: 'warnVenueSuspect',
   format_empty: 'warnFormatEmpty'
 };
+// 点滅だけでは伝わらず、理由文まで出したい警告はここに載せる。
+// （他の警告は従来どおり点滅のみ＝画面を文章で埋めない方針を維持する）
+var WARN_DETAIL_KEY = {
+  dates_far_apart: 'warnDatesFarApart'
+};
 // 点滅アニメ用のスタイルを一度だけ注入
 (function ensureWarnStyle_() {
   if (document.getElementById('dropper-warn-style')) return;
@@ -1169,7 +1174,10 @@ function renderWarnings_(li, warnings) {
     kaisai_dates: 'day_date',      // 開催日の警告 → 各 day-row の日付欄すべて
     shiai_keishiki: 'day_format'   // 試合形式の警告 → 各 day-row の形式欄すべて
   };
+  var details = [];   // 理由文を出す警告の文言（重複は1回だけ）
   (warnings || []).forEach(function (w) {
+    var dk = WARN_DETAIL_KEY[w.code];
+    if (dk) { var dt = I18N.t(dk); if (details.indexOf(dt) === -1) details.push(dt); }
     var mapped = LEGACY_FIELD_MAP[w.field];
     if (mapped) {
       // 該当する day-row の欄をすべて点滅させる（複数日なら全行）
@@ -1188,7 +1196,10 @@ function renderWarnings_(li, warnings) {
   });
   var notice = li.querySelector('.warn-notice');
   if (notice) {
-    if ((warnings || []).length) { notice.textContent = I18N.t('warnNotice'); notice.style.display = 'block'; }
+    if ((warnings || []).length) {
+      notice.textContent = details.concat(I18N.t('warnNotice')).join(' ');
+      notice.style.display = 'block';
+    }
     else { notice.style.display = 'none'; }
   }
 }

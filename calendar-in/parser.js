@@ -704,6 +704,16 @@
     }
     // 6) 試合形式が空（取りこぼし）※汎用イベントでは形式欄が無いのが普通なので出さない
     if (!eventMode && !r.shiai_keishiki) w.push({ field: 'shiai_keishiki', code: 'format_empty' });
+    // 7) 汎用イベントで開催日どうしが大きく離れている（同じチラシに別イベントが併記されている可能性）
+    //    例：コンサートのチラシ裏面に次回公演が載っており、その日付まで拾ってしまうケース。
+    //    値は消さずに印だけ付け、ユーザーに削除の判断を委ねる（会期の長い展示会を誤って削らないため）。
+    if (eventMode && dates.length >= 2) {
+      var sortedD = dates.slice().sort();
+      var spanDays = Math.round(
+        (Date.parse(sortedD[sortedD.length - 1]) - Date.parse(sortedD[0])) / 86400000
+      );
+      if (spanDays > 45) w.push({ field: 'kaisai_dates', code: 'dates_far_apart' });
+    }
     r.warnings = w;
     return r;
   }
