@@ -356,8 +356,8 @@ function applyType(key) {
   if (leadEl) leadEl.style.display = t ? '' : 'none';
   if (t && leadEl && t.leadKey) leadEl.textContent = I18N.t(t.leadKey);
   if (sportRow) sportRow.style.display = (t && t.useSportSelector) ? '' : 'none';
-  // 種類が決まるまでドロップ欄は出さない（項目名が種類ごとに変わるため）
-  ['.step-drop-label', '#drop', '#ocrNote'].forEach(function (sel) {
+  // 種類が決まるまでドロップ欄・機能ピル（カレンダー登録／SNS案内文）は出さない
+  ['.step-drop-label', '#drop', '#ocrNote', '#leadFeatures'].forEach(function (sel) {
     var el = document.querySelector(sel);
     if (el) el.style.display = t ? '' : 'none';
   });
