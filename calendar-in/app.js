@@ -144,6 +144,31 @@ var DROPPER_TYPES = {
           'format_label should be "Topic".\n'
     }
   },
+  festival: {
+    subtitleKey: 'typeFestival',
+    leadKey: 'leadFestival',
+    useSportSelector: false,
+    labels: { name: 'fldNameFestival', format: 'fldFormatFestival', opening: 'fldOpeningFestival', deadline: 'fldDeadlineFestival' },
+    annEmoji: '🎪',
+    aiHint: {
+      ja: 'このチラシは祭り・地域の催し・マルシェ・フリーマーケット・盆踊り・縁日などの告知です。' +
+          'kaikai_jikan には開催時間（例「10:00〜16:00」）を入れること。' +
+          'schedule の events には、その日の出し物・ステージ・体験コーナーなど催しの内容を入れること。' +
+          'key_info には「荒天・雨天時の扱い（中止／順延／小雨決行）」を最優先で入れ、続いて' +
+          '「入場料・参加費」「屋台・出店」「駐車場・交通アクセス」「交通規制」「対象」「主催・問合せ先」' +
+          'のうち記載があり重要なものを入れること。' +
+          '雨天時の記載は来場判断に直結するため、短くても必ず拾うこと。' +
+          'shimekiri は出店・参加の申込締切がある場合だけ入れること。' +
+          'format_label は「内容」。\n',
+      en: 'This flyer announces a festival, community event, market, or similar local gathering. ' +
+          'Put the opening times in kaikai_jikan (e.g. "10:00-16:00"). ' +
+          'In schedule events, describe what happens that day (stage acts, stalls, hands-on corners). ' +
+          'In key_info, put the bad-weather policy first (cancelled / postponed / goes ahead in light rain), then admission or fees, food stalls, parking and access, road closures, who it is for, and the organiser or contact. ' +
+          'Always capture the wet-weather note even if it is brief, since it decides whether people turn up. ' +
+          'Only set shimekiri when there is a deadline to apply or to book a stall. ' +
+          'format_label should be "Programme".\n'
+    }
+  },
   general: {
     subtitleKey: 'typeGeneral',
     leadKey: 'leadGeneral',
