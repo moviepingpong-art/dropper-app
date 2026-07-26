@@ -1,4 +1,4 @@
-# dropper-app — カレンダードロッパー（ツール本体）
+# dropper-app — イベントドロッパー（ツール本体）
 
 GitHub Pages で公開している静的サイト。サーバーは無い。
 公開URL: https://app.dropper-tools.com/calendar/ （en: /calendar-en/ 、Hinglish: /calendar-in/ ）

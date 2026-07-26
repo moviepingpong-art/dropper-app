@@ -11,7 +11,7 @@
     gtag('config', 'G-PQPKYYYXKG');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>カレンダードロッパー</title>
+  <title>イベントドロッパー</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
@@ -36,6 +36,15 @@
       -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
       filter:drop-shadow(0 2px 0 rgba(6,182,164,.12));
     }
+    .free-badge {
+      display:inline-block; margin:0 0 14px; padding:11px 26px;
+      font-size:18px; font-weight:700; color:#fff; letter-spacing:.03em;
+      background:linear-gradient(100deg,#16a34a,#22c55e);
+      border-radius:999px; box-shadow:0 8px 22px rgba(34,197,94,.38);
+      animation: freeBadgePulse 2.2s ease-in-out infinite;
+    }
+    @keyframes freeBadgePulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.06); } }
+    @media (prefers-reduced-motion: reduce){ .free-badge { animation:none; } }
     .lead { color:var(--sub); font-size:15px; font-weight:500; margin:10px 0 0; }
     .guide-link { margin:8px 0 0; font-size:13px; }
     .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; }
@@ -269,7 +278,8 @@
 </head>
 <body>
   <header>
-    <h1 data-i18n="appName">カレンダードロッパー</h1>
+    <p class="free-badge" data-i18n="freeBadge">🎉 今なら無料公開中</p>
+    <h1 data-i18n="appName">イベントドロッパー</h1>
     <div class="subtitle-row">
       <select id="dropperType"></select>
     </div>

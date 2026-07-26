@@ -53,7 +53,7 @@ var typeSel = document.getElementById('dropperType');
 var leadEl = document.getElementById('lead');
 var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 
-// ===== カレンダードロッパーの種類定義 =====
+// ===== イベントドロッパーの種類定義 =====
 // 種類を増やすときはここに1件足すだけ。
 //   subtitle        : サブタイトル（種類セレクタの表示文言）
 //   lead            : 操作の流れ説明（ヘッダーのリード文）

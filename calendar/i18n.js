@@ -1,4 +1,4 @@
-// i18n.js — カレンダードロッパーの多言語辞書
+// i18n.js — イベントドロッパーの多言語辞書
 // 各言語版ページは、このファイルを読み込んだ上で window.LANG を 'ja' / 'en' / 'in' のいずれかに設定する。
 // 文言を増やすときは、全言語に同じキーを足すこと。
 (function (global) {
@@ -7,12 +7,14 @@
   var I18N = {
     ja: {
       // --- ページ全体 ---
-      pageTitle: 'カレンダードロッパー',
-      appName: 'カレンダードロッパー',
+      pageTitle: 'イベントドロッパー',
+      appName: 'イベントドロッパー',
       // --- ヘッダー（種類セレクタ＝サブタイトル、リード文） ---
       // 種類ごとのサブタイトル・リード文は app.js の DROPPER_TYPES が辞書キーで参照する
       typeSports: 'スポーツ大会の要項ドロッパー',
       leadSports: '要項（PDF・画像）をドロップ → 内容を確認 → Googleカレンダーに登録',
+      // --- 無料公開バッジ ---
+      freeBadge: '🎉 今なら無料公開中',
       // --- ログイン ---
       guideLink: '📖 使い方ガイド ↗',
       loginBtn: 'Googleでログイン',
@@ -158,10 +160,11 @@
       descFlyerTail: ' )\n※フォルダのファイルを削除するとこの添付も消えます。'
     },
     en: {
-      pageTitle: 'Calendar Dropper',
-      appName: 'Calendar Dropper',
+      pageTitle: 'Event Dropper',
+      appName: 'Event Dropper',
       typeSports: 'Sports event flyer dropper',
       leadSports: 'Drop a flyer (PDF / image) → Review the details → Add to Google Calendar',
+      freeBadge: '🎉 Now FREE to use!',
       guideLink: '📖 User guide ↗',
       loginBtn: 'Sign in with Google',
       loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
@@ -296,10 +299,11 @@
       descFlyerTail: ' )\nNote: deleting the file from this folder will also remove this attachment.'
     },
     "in": {
-      pageTitle: 'Calendar Dropper',
-      appName: 'Calendar Dropper',
+      pageTitle: 'Event Dropper',
+      appName: 'Event Dropper',
       typeSports: 'Sports event ka flyer dropper',
       leadSports: 'Flyer (PDF / image) drop karein → Details check karein → Google Calendar mein add karein',
+      freeBadge: '🎉 Abhi bilkul FREE!',
       guideLink: '📖 Guide ↗',
       loginBtn: 'Google se sign in karein',
       loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
