@@ -738,6 +738,9 @@
       if (!labelRe.test(lines[i])) continue;
       // ラベル行の直前〜+2行を探索（「令和8年7月12日（日）」の次行に「締切」だけ来る要項に対応）
       for (var j = Math.max(0, i - 1); j <= i + 2 && j < lines.length; j++) {
+        // チケットの発売日は締切ではない。申込先の案内（「お申込み…」）の近くに
+        // 「◯月◯日発売」が並ぶチラシがあり、これを締切と誤認するのを防ぐ。
+        if (/発\s*売/.test(lines[j])) continue;
         var d = extractDates(lines[j]);
         if (!d.length && fallbackYear) {
           var md = [], m, reMD = /(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
