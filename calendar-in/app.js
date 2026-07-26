@@ -122,6 +122,28 @@ var DROPPER_TYPES = {
           'format_label should be "Exhibits".\n'
     }
   },
+  lecture: {
+    subtitleKey: 'typeLecture',
+    leadKey: 'leadLecture',
+    useSportSelector: false,
+    labels: { name: 'fldNameLecture', format: 'fldFormatLecture', opening: 'fldOpeningLecture', deadline: 'fldDeadlineLecture' },
+    annEmoji: '🎓',
+    aiHint: {
+      ja: 'このチラシは講演会・セミナー・シンポジウム・講座・教室の告知です。' +
+          'kaikai_jikan には開始〜終了の時刻（例「13:30〜15:40」）を、記載があればそのまま入れること。' +
+          'schedule の events には、その日の演題と講師（例：講演①「◯◯」／山田太郎 氏）を入れること。' +
+          'key_info には「講師（所属・肩書）」「参加費」「定員」「対象」「申込方法」' +
+          '「会場参加とオンライン（Zoom等）の別」「主催・問合せ先」のうち、記載があり重要なものを優先して入れること。' +
+          'shimekiri には申込の締切日を入れること（「◯月◯日までに申し込み」も締切として扱う）。' +
+          'format_label は「演題」。\n',
+      en: 'This flyer announces a lecture, seminar, symposium, course, or class. ' +
+          'Put the start and end time in kaikai_jikan as written (e.g. "13:30-15:40"). ' +
+          'In schedule events, put the talk title and speaker for that day. ' +
+          'In key_info, prioritise: speaker with affiliation and title, fee, capacity, who it is for, how to apply, whether it is in person or online (Zoom etc.), and the organiser or contact. ' +
+          'Put the application deadline in shimekiri (a phrase such as "apply by 12 December" counts as a deadline). ' +
+          'format_label should be "Topic".\n'
+    }
+  },
   general: {
     subtitleKey: 'typeGeneral',
     leadKey: 'leadGeneral',
