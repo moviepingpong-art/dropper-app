@@ -1378,14 +1378,31 @@
     // 「句点を含む」「敬体の語尾を含む」「極端に長い」行は会場候補から外す。
     // （格式のある案内状は句点を打たない書式があるため、語尾と長さでも判定する）
     var proseRe = /(います|ます|ください|下さい|致し|申し上げ|おります|ですので|ございま)/;
+    // 「会場：」「場所：」と明記された行は、文書の先頭に載る主催団体名などより確かなので先に見る。
+    var labelVenue = pickVenueLabel_(lines, venueNg);
+    // 値が「会場（◯◯ビル4階401号室）およびオンライン開催」の形なら、括弧の中が実際の会場。
+    var inner = labelVenue && labelVenue.match(/^会\s*場\s*[（(]([^）)]+)[）)]/);
+    if (inner) labelVenue = inner[1];
     var kaijoIdx = -1;
-    for (var ki = 0; ki < lines.length; ki++) {
-      var lnv = lines[ki];
-      if (/。/.test(lnv) || proseRe.test(lnv)) continue;
-      if (lnv.replace(/\s/g, '').length > 70) continue;
-      if (venueRe.test(lnv) && !venueNg.test(lnv)) { kaijoIdx = ki; break; }
+    if (!labelVenue) {
+      for (var ki = 0; ki < lines.length; ki++) {
+        var lnv = lines[ki];
+        if (/。/.test(lnv) || proseRe.test(lnv)) continue;
+        if (lnv.replace(/\s/g, '').length > 70) continue;
+        if (venueRe.test(lnv) && !venueNg.test(lnv)) { kaijoIdx = ki; break; }
+      }
     }
-    if (kaijoIdx >= 0) {
+    if (labelVenue) {
+      var lv = splitVenue(labelVenue);
+      r.kaijo = cleanVenue(lv.venue);
+      if (lv.address && addrHint.test(lv.address)) {
+        r.kaijo_jusho = cleanAddress_(lv.address);
+      } else if (lv.address && lv.address.replace(/\s/g, '').length <= 15 && !/[A-Za-z]{3,}/.test(lv.address)) {
+        // 「大阪科学技術センター」＋「ビル4階401号室」のように、施設語の後ろが住所ではなく
+        // 会場名の続き（階数・部屋番号）のことがある。短く住所らしさが無ければ会場名に戻す。
+        r.kaijo = cleanVenue(lv.venue + lv.address);
+      }
+    } else if (kaijoIdx >= 0) {
       var v = splitVenue(lines[kaijoIdx]);
       r.kaijo = cleanVenue(v.venue);
       if (v.address && addrHint.test(v.address)) r.kaijo_jusho = cleanAddress_(v.address);
@@ -1400,8 +1417,6 @@
           }
         }
       }
-    } else {
-      r.kaijo = cleanVenue(pickVenueLabel_(lines, venueNg));
     }
     if (!r.kaijo_jusho) {
       var jusho = lines.find(function (ln) {
