@@ -56,15 +56,11 @@
     /* 種類選択後：ドロップ→確認のあとに待っている2つの機能を大きく見せるピル */
     .lead-features { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0 0; }
     .feat-arrow { font-size:20px; font-weight:700; color:var(--teal-d); }
+    /* 配色は種類ボタン（未選択時）と同じ：白背景＋ティール文字＋薄い縁 */
     .feat-pill {
       display:inline-block; padding:12px 22px; border-radius:16px;
       font-size:18px; font-weight:700; letter-spacing:.02em;
-      color:#fff; background:linear-gradient(100deg,var(--teal),var(--lime-d));
-      box-shadow:0 8px 20px rgba(6,182,164,.32);
-    }
-    .feat-pill.feat-sns {
-      color:var(--ink); background:linear-gradient(100deg,var(--yellow),var(--lime));
-      box-shadow:0 8px 20px rgba(163,230,53,.35);
+      color:var(--teal-d); background:#fff; border:2px solid var(--line);
     }
     .lead { color:var(--sub); font-size:15px; font-weight:500; margin:10px 0 0; }
     .guide-link { margin:8px 0 0; font-size:13px; }
@@ -336,7 +332,7 @@
     <div class="lead-features" id="leadFeatures" style="display:none">
       <span class="feat-arrow" aria-hidden="true">→</span>
       <span class="feat-pill" data-i18n="featCalendar">📆 Googleカレンダーに登録</span>
-      <span class="feat-pill feat-sns" data-i18n="featAnnounce">📣 SNS案内文を自動作成</span>
+      <span class="feat-pill" data-i18n="featAnnounce">📣 SNS案内文を自動作成</span>
     </div>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
     <p class="guide-link" id="guideLink">
