@@ -62,13 +62,37 @@ var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 //                     slot: name(名称) / format(日ごとの内容) / opening(時刻) / deadline(締切)
 //   hideFields      : カードで非表示にする欄のフィールドキー配列（例: ['shimekiri']）
 //   annEmoji        : 案内文の先頭絵文字
-// AI抽出プロンプトは runAiRecheck_ 内で useSportSelector により競技用/汎用を切り替える。
+//   aiHint          : AI抽出プロンプトへ差し込む種類別の補足（{ja, en}）。
+//                     汎用プロンプトは共通で使い、この一文だけを種類ごとに足す。
+// スポーツは競技用プロンプト、それ以外は汎用プロンプト＋aiHint（runAiRecheck_ 内で選択）。
 var DROPPER_TYPES = {
   sports: {
     subtitleKey: 'typeSports',
     leadKey: 'leadSports',
     useSportSelector: true,
     annEmoji: '🏓'
+  },
+  music: {
+    subtitleKey: 'typeMusic',
+    leadKey: 'leadMusic',
+    useSportSelector: false,
+    labels: { name: 'fldNameMusic', format: 'fldFormatMusic', opening: 'fldOpeningMusic', deadline: 'fldDeadlineMusic' },
+    annEmoji: '🎵',
+    aiHint: {
+      ja: 'このチラシはコンサート・演奏会・発表会・舞台公演の告知です。' +
+          'kaikai_jikan には開場と開演の両方が書かれていれば「開場17:30 開演18:00」のように併記すること。' +
+          'schedule の events には、その日の演目・出演者・プログラム（例：ベートーヴェン交響曲第5番／第1部 合唱の部）を入れること。' +
+          'key_info には「出演」「指揮」「演目」「チケット料金（席種と価格）」「チケット発売日」「全席指定・自由席の別」' +
+          '「未就学児の入場可否」「主催・問合せ先」のうち、記載があり重要なものを優先して入れること。' +
+          'チケットの発売日は shimekiri（申込締切）ではない。発売日は key_info に入れ、shimekiri には予約や申込の締切がある場合だけ入れること。' +
+          'format_label は「演目」。\n',
+      en: 'This flyer announces a concert, recital, or stage performance. ' +
+          'If both doors-open and start times are given, put both in kaikai_jikan (e.g. "Doors 17:30 / Start 18:00"). ' +
+          'In schedule events, put the programme or performers for that day. ' +
+          'In key_info, prioritise: performers, conductor, programme, ticket prices by seat type, ticket on-sale date, reserved/unreserved seating, age restrictions, and the organiser or contact. ' +
+          'A ticket on-sale date is NOT an application deadline: put it in key_info and leave shimekiri empty unless there is a real booking or application deadline. ' +
+          'format_label should be "Programme".\n'
+    }
   },
   general: {
     subtitleKey: 'typeGeneral',
@@ -1322,8 +1346,12 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
     '--- 要項テキスト ---\n' + ocrText;
   // 汎用イベント用プロンプト（コンサート・展示・講演・祭り等。スキーマは競技用と同一で下流処理を共通化）
+  // 種類ごとの違いは aiHint の一文だけを差し込んで表現する（プロンプト全文は複製しない）。
+  var aiHint = typeCfg_(cardType).aiHint || {};
   var promptEnGeneral =
-    'You are an assistant that extracts information from event flyers and notices (concerts, recitals, exhibitions, lectures, seminars, festivals, community events, etc.). From the following text, read the event date(s), event name, venue, address, start time, application/reservation deadline (if any), and the program for each day, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. For an event held over a continuous period (such as an exhibition), put the first day and the last day in kaisai_dates. Do not include deadlines in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format. events is a short description of the program or content for that day (e.g. performance title, session names, activities); empty string only if it truly cannot be determined, but never omit the element itself. kaikai_jikan is the start time as written, including doors-open / start distinctions if stated (e.g. "Doors 17:30 / Start 18:00"); empty string if unknown. shimekiri is the application or reservation deadline if any; empty string if none. sport must be an empty string. format_label is a natural short heading for the per-day content (e.g. Program); empty string if unsure.\nkey_info is an array of up to 5 items of the most important information a visitor or participant should know, in order of importance. Each element is {"label":"short heading","text":"content"}. label examples: Admission, Tickets, Performers, Target audience, Capacity, How to apply, Parking, Rain policy. Empty array if none; strictly keep to a maximum of 5. Use an empty string or empty array for unknown values.\nSchema: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n--- Flyer text ---\n' + ocrText;
+    'You are an assistant that extracts information from event flyers and notices (concerts, recitals, exhibitions, lectures, seminars, festivals, community events, etc.). From the following text, read the event date(s), event name, venue, address, start time, application/reservation deadline (if any), and the program for each day, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. For an event held over a continuous period (such as an exhibition), put the first day and the last day in kaisai_dates. Do not include deadlines in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format. events is a short description of the program or content for that day (e.g. performance title, session names, activities); empty string only if it truly cannot be determined, but never omit the element itself. kaikai_jikan is the start time as written, including doors-open / start distinctions if stated (e.g. "Doors 17:30 / Start 18:00"); empty string if unknown. shimekiri is the application or reservation deadline if any; empty string if none. sport must be an empty string. format_label is a natural short heading for the per-day content (e.g. Program); empty string if unsure.\nkey_info is an array of up to 5 items of the most important information a visitor or participant should know, in order of importance. Each element is {"label":"short heading","text":"content"}. label examples: Admission, Tickets, Performers, Target audience, Capacity, How to apply, Parking, Rain policy. Empty array if none; strictly keep to a maximum of 5. Use an empty string or empty array for unknown values.\n' +
+    (aiHint.en || '') +
+    'Schema: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n--- Flyer text ---\n' + ocrText;
   var promptJaGeneral =
     'あなたはイベントの案内チラシ（コンサート・発表会・展示会・個展・講演会・セミナー・祭り・地域の催し等）から情報を抽出するアシスタントです。' +
     '次のテキストから、開催日・イベント名・会場・住所・開始時刻・申込や予約の締切・各日の内容を読み取り、' +
@@ -1341,6 +1369,7 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     'label は「入場料」「チケット」「出演」「対象」「定員」「申込方法」「駐車場」「雨天時」など内容に合った簡潔な見出し。' +
     'text はその具体的な内容を読んで分かるよう簡潔にまとめる。' +
     '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。値が不明な項目は空文字または空配列。\n' +
+    (aiHint.ja || '') +
     'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
     '--- チラシ本文 ---\n' + ocrText;
   var prompt = (window.LANG === 'en' || window.LANG === 'in')
