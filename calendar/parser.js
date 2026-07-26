@@ -674,6 +674,16 @@
     try { s = s.normalize ? s.normalize('NFKC') : s; } catch (e) {}
     return s.replace(/[⺀-⻳]/g, function (c) { return RADICAL_FIX[c] || c; });
   }
+  // 西暦と和暦の併記を片方に整理する。要項では「2026（令和8）年11月15日」「令和8（2026）年…」
+  // のように年号が括弧で挟まれる書き方が多く、そのままでは「◯◯◯◯年◯月◯日」の形に
+  // 当てはまらず日付として拾えないため、括弧の側を落として連続した表記に直す。
+  function collapseEraParens(s) {
+    return String(s)
+      .replace(/(\d{4})\s*[（(]\s*(?:令和|平成|昭和|大正|明治)\s*(?:\d{1,2}|元)\s*[）)]\s*年/g, '$1年')
+      .replace(/((?:令和|平成|昭和|大正|明治)\s*(?:\d{1,2}|元))\s*[（(]\s*\d{4}\s*[）)]\s*年/g, '$1年')
+      // 「令和元年」は以降の処理が数字の年しか扱えないため「令和1年」に直す
+      .replace(/(令和|平成|昭和|大正|明治)\s*元\s*年/g, function (_, era) { return era + '1年'; });
+  }
   function iso(y, mo, d) { return y + '-' + ('0' + mo).slice(-2) + '-' + ('0' + d).slice(-2); }
 
   // 日ごとに種目を持てる器を作る（案イ：events は空。日ごとの割り当ては後段=正規表現の試作/AIに任せる）
@@ -911,7 +921,9 @@
     s = s.replace(/[（(][^）)]*[市区町村]\d[^）)]*[）)]/g, '').trim();
     s = s.replace(/^[（(]\d+[）)]\s*(総\s*合\s*開\s*会\s*式|競\s*技)?\s*/, '');
     // 「日程・競技会場〜」プレフィックスを除去
-    s = s.replace(/^[・\s　]*[日程競技会場]+[\s　（(\d)）)]*[：:･・\s　]*/, '');
+    // 文字クラス [日程競技会場] だと「日」「場」など1文字にも当たり、
+    // 「日本青年館ホール」の先頭が削れてしまうため、語として並べる。
+    s = s.replace(/^[・\s　]*(?:日\s*程|競\s*技\s*会\s*場|会\s*場|場\s*所)[\s　（(\d)）)]*[：:･・\s　]*/, '');
     // 先頭の番号を除去
     s = s.replace(/^[\s　]*(?:[\d１-９][\.．）)]|[①-⑳])\s*/, '');
     // 日付が先頭に混入している場合除去
@@ -1034,7 +1046,7 @@
     if (lang === 'in') return parseEn(rawText, sport, 'in', eventMode);
     if (lang === 'en') return parseEn(rawText, sport, 'en', eventMode);
 
-    var text = collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText)));
+    var text = collapseEraParens(collapseCjkSpaces(toHalfWidthDigits(normalizeChars(rawText))));
     var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
 
     // 汎用イベントモードでは競技判定をせず、常に汎用フォールバック（競技語で名称を弾かない）
