@@ -792,6 +792,22 @@
     return '';
   }
 
+  // 「会場」「場所」がラベルとして使われている行から値を取る。
+  // 「ぜひ会場にてご覧ください。」のような本文中の語を拾わないよう、
+  //   ・句点（。）を含む文章の行は対象外
+  //   ・ラベルは行頭付近（先頭8文字以内）にあり、直後に区切り（：等）か空白が続くこと
+  // を条件にする。
+  function pickVenueLabel_(lines, excludeRe) {
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (!ln || /。/.test(ln)) continue;
+      if (excludeRe && excludeRe.test(ln)) continue;
+      var m = ln.match(/^[^。]{0,8}?(?:会\s*場|場\s*所)\s*(?:[：:･・]|[\s　]+)\s*(.+)$/);
+      if (m && m[1].trim()) return m[1].trim();
+    }
+    return '';
+  }
+
   function pickValue(lines, labelRe, excludeRe) {
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i];
@@ -806,6 +822,24 @@
   }
 
   // 大会名クリーニング
+  // 末尾の閉じ括弧を落とす。ただし対応する開き括弧が文字列内にある場合は残す。
+  // 個展「あること」のように題名の一部が括弧で閉じられている場合に、
+  // 末尾だけ削れて「あること のように壊れるのを防ぐ。
+  function trimTailBrackets_(s) {
+    var PAIR = { '】': '【', '』': '『', '」': '「', '》': '《', '〉': '〈', ']': '[', ')': '(', '）': '（' };
+    var out = String(s).replace(/[\s　]+$/, '');
+    while (out) {
+      var last = out.charAt(out.length - 1);
+      var open = PAIR[last];
+      if (!open) break;
+      var nOpen = out.split(open).length - 1;
+      var nClose = out.split(last).length - 1;
+      if (nClose <= nOpen) break;          // 対応が取れている＝題名の一部なので残す
+      out = out.slice(0, -1).replace(/[\s　]+$/, '');
+    }
+    return out;
+  }
+
   function cleanTaikaiMei(name, activeProfile, genericMode) {
     // BOM除去
     name = name.replace(/^[\uFEFF\u00EF\u00BB\u00BF]+/, '');
@@ -901,7 +935,7 @@
     // 50文字超は空にする
     if (name.replace(/\s/g, '').length > 50) name = '';
     // 前後の記号・空白を除去
-    name = name.replace(/^[【「\s　\uFEFF『]+/, '').replace(/[】」\s　』]+$/, '');
+    name = trimTailBrackets_(name.replace(/^[【「\s　\uFEFF『]+/, ''));
     return name.trim();
   }
 
@@ -909,7 +943,7 @@
   function cleanVenue(s) {
     if (!s) return '';
     // 先頭の括弧・記号を除去
-    s = s.replace(/^[【『「\[◆●▶►■♦\(（]+\s*/, '').replace(/[】』」\]\)）]+$/, '');
+    s = trimTailBrackets_(s.replace(/^[【『「\[◆●▶►■♦\(（]+\s*/, ''));
     // 「地域名：」プレフィックスを除去
     s = s.replace(/^[^\s　：:]{2,5}[：:]\s*/, '');
     // 付記を除去（現・旧・控室・サブ等）
@@ -1088,10 +1122,17 @@
     // 汎用イベントモード：大会語で拾えなかったとき、イベント語（コンサート・展・祭・講演等）でも名称を探す
     if (!r.taikai_mei && eventMode) {
       var evKw = /(コンサート|リサイタル|ライブ|発表会|演奏会|音楽会|公演|舞台|ミュージカル|上映会|展示会|個展|作品展|写真展|美術展|絵画展|展覧会|祭り|まつり|祭典|フェスティバル|フェスタ|フェア|マルシェ|バザー|縁日|講演会|セミナー|シンポジウム|ワークショップ|講座|教室|説明会|見学会|体験会|相談会|イベント|集い|つどい|コンクール|オーディション)/;
-      var evCand = lines.find(function (ln) {
+      var evCands = lines.filter(function (ln) {
         return evKw.test(ln) && !greetingRe.test(ln) && !formRe.test(ln)
           && ln.replace(/\s/g, '').length <= 45;
       });
+      // 「展示会開催のお知らせ」「〈展示会概要〉」のような文書の表題・見出しは、
+      // 催しの名前ではないので、他に候補があればそちらを優先する。
+      var genericHeadRe = /^(?:展示会|展覧会|作品展|イベント|催し物?|講演会|セミナー|公演|コンサート)?(?:開催)?(?:の)?(?:お知らせ|ご案内|案内|概要)$/;
+      var named = evCands.filter(function (ln) {
+        return !genericHeadRe.test(ln.replace(/[\s〈〉《》【】\[\]（）()]/g, ''));
+      });
+      var evCand = (named.length ? named : evCands)[0];
       if (evCand) r.taikai_mei = cleanTaikaiMei(evCand, activeProfile, true);
     }
 
@@ -1243,6 +1284,12 @@
         for (var t0 = 0; t0 < lines.length; t0++) {
           var ln0 = lines[t0];
           if (!/(日\s*時|時\s*間)/.test(ln0) && !/\d{1,2}\s*月\s*\d{1,2}\s*日/.test(ln0)) continue;
+          // 開館時間などは「10:00〜20:00」と幅で書かれることが多いので、範囲を優先して拾う
+          var mr0 = ln0.match(/(\d{1,2})\s*[:：]\s*(\d{2})\s*[〜~～\-–—]\s*(\d{1,2})\s*[:：]\s*(\d{2})/);
+          if (mr0 && Number(mr0[1]) <= 23 && Number(mr0[3]) <= 23) {
+            r.kaikai_jikan = ('0' + mr0[1]).slice(-2) + ':' + mr0[2] + '〜' + ('0' + mr0[3]).slice(-2) + ':' + mr0[4];
+            break;
+          }
           var mt0 = ln0.match(/(\d{1,2})\s*[:：]\s*(\d{2})/);
           if (mt0 && Number(mt0[1]) <= 23) {
             r.kaikai_jikan = ('0' + mt0[1]).slice(-2) + ':' + mt0[2];
@@ -1285,7 +1332,7 @@
         }
       }
     } else {
-      r.kaijo = cleanVenue(pickValue(lines, /(会\s*場|場\s*所)/, venueNg));
+      r.kaijo = cleanVenue(pickVenueLabel_(lines, venueNg));
     }
     if (!r.kaijo_jusho) {
       var jusho = lines.find(function (ln) {
