@@ -128,6 +128,7 @@ async function handleFile(file) {
 
   try {
     var fy = fiscalYearInput();
+    var noYear = false;
     if (aiMode) {
       var key = await askKey(false);
       if (!key) { setMsg('APIキーが未設定のため中止しました。'); return; }
@@ -145,16 +146,27 @@ async function handleFile(file) {
     } else {
       setMsg('予定表を読み取っています…（Googleで変換）');
       var text = await ocrText(file);
+      // 読み取れなかったときの調査用。ブラウザのコンソールで
+      //   copy(window.lastOcrText)
+      // とすると、OCRが実際に返した文字列を取り出せる。
+      window.lastOcrText = text;
       var r = window.SchedParser.parse(text, fy ? { fiscalYear: fy } : {});
       items = r.items;
       if (!fy && r.yearKnown) el('fy').value = String(r.fiscalYear);
-      if (!r.yearKnown && !fy) {
-        setMsg('予定表から年度を読み取れませんでした。上の「年度」欄に入力して、もう一度ドロップしてください。');
-      }
+      noYear = (!r.yearKnown && !fy);
     }
     items.forEach(function (it) { it.on = !!it.start; });   // 日付が取れた行だけ最初から選択
     render();
-    setMsg('');
+    // 案内は render のあとに出す（先に出すと render 後の setMsg で消えてしまう）
+    if (!items.length) {
+      setMsg(aiMode
+        ? 'この予定表からは予定を読み取れませんでした。年度を入れて、もう一度お試しください。'
+        : '予定を読み取れませんでした。カレンダー形式の予定表は通常モードでは読めません。AIモードでお試しください。');
+    } else if (noYear) {
+      setMsg('予定表から年度を読み取れませんでした。日付の年が違う場合は、上の「年度」欄に入力してもう一度ドロップしてください。');
+    } else {
+      setMsg('');
+    }
   } catch (e) {
     var m = String(e && e.message || e);
     if (m === 'no-key') setMsg('APIキーが未設定です。');
@@ -225,7 +237,6 @@ function render() {
     + (warn ? '（うち ' + warn + '件は要確認）' : '')
     + ' 内容を確認し、登録するものだけチェックを残してください。';
   resultEl.style.display = items.length ? 'block' : 'none';
-  if (!items.length) setMsg('予定を読み取れませんでした。AIモードもお試しください。');
   updateCount();
 }
 function updateCount() {
