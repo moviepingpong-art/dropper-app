@@ -12,8 +12,9 @@
 (function (global) {
   'use strict';
 
-  // 主モデル → 混雑時のフォールバック（イベントドロッパーと同じ考え方）
-  var MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  // 主モデル → 混雑時のフォールバック。イベントドロッパー（app.js の AI_MODELS）と揃える。
+  // 無料枠はモデルごとに数えられるため、実績のあるモデルを主に使う。
+  var MODELS = ['gemini-flash-latest', 'gemini-2.0-flash'];
   var MIN_INTERVAL_MS = 5000;      // レート制限対策のスロットル。外さないこと
   var MAX_BYTES = 15 * 1024 * 1024;   // Geminiのインライン送信の上限に対する安全側の目安
   var lastCallAt = 0;
@@ -131,7 +132,7 @@
     var prompt = (opts.lang === 'en' || opts.lang === 'in')
       ? promptEn(opts.fiscalYear) : promptJa(opts.fiscalYear);
 
-    var resp = null, busy = false;
+    var resp = null, busy = false, rate = false;
     for (var i = 0; i < MODELS.length; i++) {
       if (i === 0) { say('queued'); await throttle(); } else { say('retry'); }
       say('running');
@@ -146,10 +147,18 @@
         })
       });
       busy = ([500, 502, 503, 504].indexOf(resp.status) !== -1);
-      if (!busy) break;
+      rate = (resp.status === 429);
+      // 無料枠はモデルごとに数えられるので、上限に当たったら別のモデルも試す
+      if (!busy && !rate) break;
     }
     if (!resp) throw new Error('no-response');
-    if (resp.status === 429) throw new Error('rate-limit');
+    if (resp.status === 429) {
+      // 429 は「1分あたりの上限」と「1日あたりの上限」の両方で返る。
+      // どちらかで待ち時間がまったく違うため、応答の中身を見て区別する。
+      var q = '';
+      try { q = await resp.text(); } catch (e) {}
+      throw new Error(/per\s*minute|PerMinute|per_minute/i.test(q) ? 'rate-minute' : 'rate-day');
+    }
     if (busy) throw new Error('busy');
     if (!resp.ok) {
       var body = await resp.text();

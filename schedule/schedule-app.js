@@ -159,7 +159,8 @@ async function handleFile(file) {
     var m = String(e && e.message || e);
     if (m === 'no-key') setMsg('APIキーが未設定です。');
     else if (m === 'too-large') setMsg('ファイルが大きすぎます。ページを分けてお試しください。');
-    else if (m === 'rate-limit') setMsg('本日のAI無料枠を使い切ったようです。時間をおいてお試しください。');
+    else if (m === 'rate-minute') setMsg('AIへの送信が短時間に集中しました。1分ほどおいて、もう一度ドロップしてください。');
+    else if (m === 'rate-day') setMsg('AIの無料枠（1日あたり）を使い切ったようです。翌日（太平洋時間0時にリセット）以降にお試しください。通常モードなら今すぐ読み取れます。');
     else if (m === 'busy') setMsg('AIが混み合っています。少し時間をおいてもう一度お試しください。');
     else if (m === 'bad-json') setMsg('AIの返答を読み取れませんでした。もう一度お試しください。');
     else setMsg('失敗: ' + m);
