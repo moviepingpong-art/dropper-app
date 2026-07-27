@@ -119,9 +119,29 @@ function fiscalYearInput() {
   return (n >= 1900 && n <= 2999) ? n : null;
 }
 
+// 読み取れた文字を画面に出す。うまくいかない予定表の原因を、コンソールを開かずに確かめられる。
+function showDiag() {
+  var t = window.lastOcrText;
+  var box = el('diag'), pre = el('diagText');
+  if (!box || !pre) return;
+  if (!t) { box.style.display = 'none'; return; }
+  pre.textContent = t.slice(0, 3000) + (t.length > 3000 ? '\n…（以下略。全体は ' + t.length + ' 文字）' : '');
+  box.style.display = 'block';
+}
+if (el('diagCopy')) {
+  el('diagCopy').addEventListener('click', function () {
+    var t = window.lastOcrText || '';
+    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () {
+      el('diagCopied').textContent = ' コピーしました（' + t.length + '文字）';
+    });
+  });
+}
+
 async function handleFile(file) {
   if (!file) return;
   resultEl.style.display = 'none';
+  el('diag').style.display = 'none';
+  window.lastOcrText = '';
   try {
     await ensureToken();
   } catch (e) { setMsg(e.message); return; }
@@ -162,6 +182,7 @@ async function handleFile(file) {
       setMsg(aiMode
         ? 'この予定表からは予定を読み取れませんでした。年度を入れて、もう一度お試しください。'
         : '予定を読み取れませんでした。AIモードに切り替えてお試しください。');
+      showDiag();   // 実際に読み取れた文字を見せる（原因が分かるように）
     } else if (noYear) {
       setMsg('予定表から年度を読み取れませんでした。日付の年が違う場合は、上の「年度」欄に入力してもう一度ドロップしてください。');
     } else {

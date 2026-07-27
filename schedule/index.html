@@ -163,6 +163,15 @@
 
       <div id="msg"></div>
 
+      <!-- 読み取れなかったときに、実際に読み取れた文字を見せる。
+           何が起きているか利用者にも分かり、うまくいかない予定表の報告にも使える。 -->
+      <div id="diag" style="display:none">
+        <p class="fy-hint" style="margin:10px 0 6px">読み取れた文字（先頭のみ）：</p>
+        <pre id="diagText" style="max-height:260px;overflow:auto;background:#fff;border:2px solid var(--line);border-radius:12px;padding:12px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+        <button type="button" class="tool-btn" id="diagCopy" style="margin-top:8px">この文字をコピー</button>
+        <span class="fy-hint" id="diagCopied"></span>
+      </div>
+
       <div id="result" style="display:none">
         <p id="summary"></p>
         <div class="toolbar">

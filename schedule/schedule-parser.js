@@ -86,10 +86,26 @@
     if (!fy) fy = new Date().getFullYear();
 
     var items = [], skipped = [];
-    text.split(/\r?\n/).forEach(function (line) {
-      line = line.trim();
-      if (!line) return;
-      if (HEADER_RE.test(line.replace(/\s/g, ''))) return;
+    // GoogleのOCRは表を「1セル＝1行」に分解して返すことがある（日付だけの行が続く）。
+    // 行をまたいで本文を拾えるよう、配列にしてから位置を見て処理する。
+    var lines = text.split(/\r?\n/)
+      .map(function (s) { return s.replace(/\t/g, ' ').trim(); })
+      .filter(Boolean);
+
+    function hasDate(s) {
+      DATE_RE.lastIndex = 0;
+      var mm;
+      while ((mm = DATE_RE.exec(s)) !== null) {
+        var mo = mm[2] !== undefined ? mm[2] : mm[6];
+        var da = mm[3] !== undefined ? mm[3] : mm[7];
+        if (mo && valid(Number(mo), Number(da))) return true;
+      }
+      return false;
+    }
+    function isHeader(s) { return HEADER_RE.test(s.replace(/\s/g, '')); }
+
+    lines.forEach(function (line, li) {
+      if (isHeader(line)) return;
 
       // 行内のすべての日付位置を拾う（1行に複数レコードが並ぶ表に対応）
       var hits = [], m;
@@ -110,6 +126,16 @@
       hits.forEach(function (h, k) {
         var end = (k + 1 < hits.length) ? hits[k + 1].i : line.length;
         var body = tidy(line.slice(h.i + h.len, end));
+        // 同じ行に本文が無いとき（＝1セル1行で返ってきたとき）は、
+        // 次の日付が現れるまでの行をまとめて本文にする。
+        if (!body && k === hits.length - 1) {
+          var buf = [];
+          for (var j = li + 1; j < lines.length && buf.length < 8; j++) {
+            if (hasDate(lines[j]) || isHeader(lines[j])) break;
+            buf.push(lines[j]);
+          }
+          body = tidy(buf.join(' '));
+        }
         // 日付の直後が説明文なら、それは予定ではなく注記
         if (PROSE_RE.test(body)) { skipped.push({ reason: 'prose', raw: body.slice(0, 60) }); return; }
 
@@ -131,7 +157,8 @@
         // 時刻（19:00 / 13時30分）
         var time = '';
         var t1 = body.match(/(\d{1,2}):(\d{2})/);
-        var t2 = body.match(/(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分)?/);
+        // 「3時間授業」「約2時間」の "時間" は所要時間であって時刻ではないので拾わない
+        var t2 = body.match(/(\d{1,2})\s*時(?!\s*間)\s*(?:(\d{1,2})\s*分)?/);
         if (t1) { time = ('0' + t1[1]).slice(-2) + ':' + t1[2]; body = tidy(body.replace(t1[0], ' ')); }
         else if (t2) { time = ('0' + t2[1]).slice(-2) + ':' + ('0' + (t2[2] || '0')).slice(-2); body = tidy(body.replace(t2[0], ' ')); }
 
