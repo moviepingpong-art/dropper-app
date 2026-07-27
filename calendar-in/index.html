@@ -54,8 +54,10 @@
     }
     @media (max-width:640px){ .multi-badge { margin-left:0; } }
     /* 種類選択後：ドロップ→確認のあとに待っている2つの機能を大きく見せるピル */
-    .lead-features { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:12px 0 0; }
-    .feat-arrow { font-size:20px; font-weight:700; color:var(--teal-d); }
+    /* 矢印はピル群の外に置く。狭い画面で2つ目のピルが折り返しても、1つ目のピルと左端が揃う */
+    .lead-features { display:flex; flex-wrap:nowrap; align-items:center; gap:10px; margin:12px 0 0; }
+    .feat-pills { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-width:0; }
+    .feat-arrow { flex:none; font-size:20px; font-weight:700; color:var(--teal-d); }
     /* 配色は種類ボタン（未選択時）と同じ：白背景＋ティール文字＋薄い縁 */
     .feat-pill {
       display:inline-block; padding:12px 22px; border-radius:16px;
@@ -331,8 +333,10 @@
     <!-- 内容確認のあとに待っている2つの機能を大きく見せる（種類選択後のみ表示） -->
     <div class="lead-features" id="leadFeatures" style="display:none">
       <span class="feat-arrow" aria-hidden="true">→</span>
-      <span class="feat-pill" data-i18n="featCalendar">📆 Googleカレンダーに登録</span>
-      <span class="feat-pill" data-i18n="featAnnounce">📣 SNS案内文を自動作成</span>
+      <div class="feat-pills">
+        <span class="feat-pill" data-i18n="featCalendar">📆 Googleカレンダーに登録</span>
+        <span class="feat-pill" data-i18n="featAnnounce">📣 SNS案内文を自動作成</span>
+      </div>
     </div>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
     <p class="guide-link" id="guideLink">
