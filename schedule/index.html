@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PQPKYYYXKG"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-PQPKYYYXKG');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>予定表ドロッパー</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal:#06b6a4; --teal-d:#048b7f; --lime:#a3e635; --lime-d:#84cc16;
+      --yellow:#ffd23f; --ink:#0f3d3a; --sub:#4f7c78; --line:#cdeae6;
+      --paper:#ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;
+      font-weight:500; color:var(--ink); margin:0;
+      background:linear-gradient(135deg,#e6fbf7 0%,#f3ffe0 55%,#fffbe6 100%);
+      background-attachment:fixed; min-height:100vh; line-height:1.6;
+    }
+    header { padding:28px 22px 8px; max-width:1000px; }
+    h1 {
+      font-family:'Mochiy Pop One',sans-serif; font-weight:400;
+      font-size:34px; margin:0; line-height:1.15;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 55%,var(--yellow) 120%);
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .free-badge {
+      display:inline-block; margin:0 0 14px; padding:11px 26px;
+      font-size:18px; font-weight:700; color:#fff;
+      background:linear-gradient(100deg,#16a34a,#22c55e);
+      border-radius:999px; box-shadow:0 8px 22px rgba(34,197,94,.38);
+    }
+    .lead { color:var(--sub); font-size:15px; margin:10px 0 0; }
+    main { padding:8px 22px 48px; max-width:1000px; }
+
+    #login-area { text-align:center; padding:30px 10px 10px; }
+    .login-btn {
+      font-family:inherit; font-size:18px; font-weight:700;
+      padding:16px 36px; border-radius:16px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 10px 24px rgba(6,182,164,.34);
+    }
+    .note { color:var(--sub); font-size:12.5px; margin-top:12px; line-height:1.7; }
+
+    /* 読み取り方の選択 */
+    .mode-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 14px; }
+    .mode-btn {
+      font-family:inherit; font-size:14px; font-weight:700; padding:10px 16px; border-radius:14px;
+      cursor:pointer; color:var(--teal-d); background:#fff; border:2px solid var(--line);
+    }
+    .mode-btn.on { border-color:transparent; color:var(--ink);
+      background:linear-gradient(100deg,var(--yellow),var(--lime)); }
+    .fy-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; font-size:14px; }
+    .fy-row input { width:90px; padding:8px 10px; border:2px solid var(--line); border-radius:10px; font-family:inherit; font-size:14px; }
+    .fy-hint { color:var(--sub); font-size:12.5px; }
+
+    #drop {
+      border:3px dashed var(--teal); border-radius:24px; padding:34px 18px; text-align:center;
+      color:var(--teal-d); background:rgba(255,255,255,.65); cursor:pointer;
+    }
+    #drop.over { background:#eafff8; border-color:var(--lime-d); }
+    #drop b { font-size:20px; font-weight:700; display:inline-block; }
+    .sub { color:var(--sub); font-size:13px; margin-top:8px; }
+    .pick-btn {
+      font-family:inherit; font-size:16px; font-weight:700; margin-top:14px;
+      padding:12px 28px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+    }
+
+    #msg { margin-top:14px; color:var(--sub); font-size:14px; min-height:1.2em; }
+    #summary { margin:18px 0 8px; font-weight:700; color:var(--teal-d); }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; }
+    .tool-btn {
+      font-family:inherit; font-size:13px; font-weight:700; padding:7px 14px; border-radius:10px;
+      cursor:pointer; color:var(--teal-d); background:#fff; border:2px solid var(--line);
+    }
+    .tool-btn:hover { border-color:var(--teal); }
+
+    /* 予定の一覧 */
+    .tbl-wrap { overflow-x:auto; border:2px solid var(--line); border-radius:16px; background:var(--paper); }
+    /* 行事名がいちばん大事な列。幅が足りないと潰れてしまうので、表に最低幅を持たせて
+       狭い画面では横スクロールさせる（枠側が overflow-x:auto） */
+    table { border-collapse:collapse; width:100%; min-width:880px; font-size:13.5px; }
+    th, td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+    th { background:#f2fbf9; color:var(--teal-d); font-weight:700; white-space:nowrap; position:sticky; top:0; }
+    tr.off { opacity:.45; }
+    tr.warn td { background:#fff7e6; }
+    td input[type="text"] { width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px; }
+    td input[type="checkbox"] { width:18px; height:18px; accent-color:var(--teal); }
+    .col-date input { min-width:120px; }
+    .col-time input { min-width:74px; }
+    .flag { font-size:11px; font-weight:700; color:#b45309; white-space:nowrap; }
+
+    #bar { margin-top:16px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .reg-btn {
+      font-family:inherit; font-size:16px; font-weight:700;
+      padding:13px 26px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 8px 20px rgba(6,182,164,.32);
+    }
+    .reg-btn:disabled { opacity:.45; cursor:default; box-shadow:none; }
+
+    /* APIキー入力 */
+    #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); padding:18px; }
+    #key-modal.show { display:flex; }
+    .modal-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%; padding:26px 24px;
+      box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
+    .modal-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px; margin:0 0 8px; color:var(--teal-d); }
+    .key-field input { width:100%; font-size:15px; padding:12px 14px; border:2px solid var(--line); border-radius:12px; font-family:inherit; }
+    .key-warn { margin:14px 0; background:#fff8e6; border:1px solid #ffd591; border-radius:12px; padding:11px 13px; font-size:12px; color:#7a4f01; }
+    .modal-btns { display:flex; gap:10px; flex-wrap:wrap; }
+    .modal-btns button { flex:1 1 auto; font-family:inherit; font-size:15px; font-weight:700; padding:12px 18px; border-radius:12px; cursor:pointer; border:none; color:#fff;
+      background:linear-gradient(100deg,var(--teal),var(--lime-d)); }
+    .modal-btns .ghost { background:#fff; color:var(--teal-d); border:2px solid var(--teal); }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="free-badge">🎉 今なら無料公開中</p>
+    <h1>予定表ドロッパー</h1>
+    <p class="lead">年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録</p>
+  </header>
+
+  <main>
+    <div id="login-area">
+      <button id="loginBtn" class="login-btn">Googleでログイン</button>
+      <p class="note">予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
+    </div>
+
+    <div id="work" style="display:none">
+      <div class="mode-row">
+        <span style="font-weight:700;color:var(--teal-d)">読み取り方：</span>
+        <button type="button" class="mode-btn on" id="modeNormal">通常モード（AIなし）</button>
+        <button type="button" class="mode-btn" id="modeAi">AIモード（升目の予定表はこちら）</button>
+        <button type="button" class="tool-btn" id="keyBtn" style="display:none">APIキーを変更</button>
+      </div>
+
+      <div class="fy-row">
+        <label for="fy" style="font-weight:700;color:var(--teal-d)">年度：</label>
+        <input id="fy" type="text" inputmode="numeric" placeholder="例 2026">
+        <span class="fy-hint">空欄なら予定表の「◯◯年度」から自動で判断します。4〜12月はその年、1〜3月は翌年になります。</span>
+      </div>
+
+      <div id="drop">
+        <b>ここに予定表ファイルをドラッグ&amp;ドロップ</b>
+        <div class="sub">PDF・画像（JPEG/PNG）対応</div>
+        <button id="pickBtn" class="pick-btn" type="button">ファイルを選ぶ</button>
+        <input id="file" type="file" accept="image/*,application/pdf" style="display:none">
+      </div>
+      <p class="note">※通常モードはGoogleのOCRで文字を読み取ります。AIモードはファイルをそのままGeminiへ送るため、升目のカレンダーでも日付と行事名を対応付けられます。</p>
+
+      <div id="msg"></div>
+
+      <div id="result" style="display:none">
+        <p id="summary"></p>
+        <div class="toolbar">
+          <button type="button" class="tool-btn" id="selAll">すべて選ぶ</button>
+          <button type="button" class="tool-btn" id="selNone">すべて外す</button>
+          <button type="button" class="tool-btn" id="selWarn">⚠のみ外す</button>
+          <span class="fy-hint" id="countLabel"></span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:44px">登録</th>
+                <th style="width:132px">開催日</th>
+                <th style="width:132px">終了日</th>
+                <th style="width:86px">時刻</th>
+                <th>行事名</th>
+                <th style="width:200px">場所</th>
+                <th style="width:70px"></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div id="bar">
+          <button id="reg" class="reg-btn">Googleカレンダーにまとめて登録</button>
+          <span id="regMsg" class="fy-hint"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="key-modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h2>🔑 Gemini APIキーの設定</h2>
+      <p class="note">AIモードで読み取るには、ご自身のGemini APIキーが必要です。Googleアカウントがあれば無料で取得できます。</p>
+      <p><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--teal-d);font-weight:700">Google AI Studio を開く ↗</a></p>
+      <label class="key-field">
+        <input type="text" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
+      </label>
+      <p class="key-warn">⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。機密文書はドロップしないでください。</p>
+      <div class="modal-btns">
+        <button type="button" class="ghost" id="keyCancel">キャンセル</button>
+        <button type="button" id="keySave">保存して使う</button>
+      </div>
+      <p class="note">🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。</p>
+    </div>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script>window.LANG = 'ja';</script>
+  <script src="schedule-parser.js"></script>
+  <script src="schedule-ai.js"></script>
+  <script src="schedule-app.js"></script>
+</body>
+</html>
