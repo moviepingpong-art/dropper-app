@@ -41,7 +41,7 @@ function ensureTokenClient() {
         accessToken = resp.access_token;
         if (pendingAuth) { pendingAuth.resolve(accessToken); pendingAuth = null; }
       } else if (pendingAuth) {
-        pendingAuth.reject(new Error('ログインがキャンセルされました')); pendingAuth = null;
+        pendingAuth.reject(new Error(I18N.t('msgLoginCancelled'))); pendingAuth = null;
       }
     }
   });
@@ -50,19 +50,19 @@ function ensureTokenClient() {
 function ensureToken() {
   return new Promise(function (resolve, reject) {
     if (accessToken) { resolve(accessToken); return; }
-    if (!ensureTokenClient()) { reject(new Error('Googleログインの準備中です。数秒後にもう一度お試しください。')); return; }
+    if (!ensureTokenClient()) { reject(new Error(I18N.t('msgLoginPreparing'))); return; }
     pendingAuth = { resolve: resolve, reject: reject };
     tokenClient.requestAccessToken();
   });
 }
 el('loginBtn').addEventListener('click', async function () {
-  setMsg('Googleにログインしています…');
+  setMsg(I18N.t('msgLoggingIn'));
   try {
     await ensureToken();
     loginArea.style.display = 'none';
     workArea.style.display = 'block';
     setMsg('');
-  } catch (e) { setMsg(e.message || 'ログインに失敗しました'); }
+  } catch (e) { setMsg(e.message || I18N.t('msgLoginFailed')); }
 });
 
 /* ===== 予定表の形をえらぶ（＝読み取り方が決まる） =====
@@ -71,26 +71,17 @@ el('loginBtn').addEventListener('click', async function () {
    自動判定はしない。マス目の予定表をOCRで読むと、0件にならず「それらしい件数のまま
    日付と行事名の対応だけが狂った結果」が出るため、誤っても機械には気づけない。 */
 var SHAPE = {
-  table: {
-    label: '予定表の形：表形式',
-    note: '※Googleの文字認識で読み取ります。読み取れない予定があるときは「AIで読み直す」をお試しください。'
-  },
-  grid: {
-    label: '予定表の形：カレンダー形式',
-    note: '※マス目の予定表はAIが読み取ります。読み取りに数十秒かかることがあります。'
-  },
-  unknown: {
-    label: '予定表の形：わからない',
-    note: '※まず無料の方法で読み取ります。うまくいかないときは「AIで読み直す」か、「変更」からカレンダー形式を選び直してください。'
-  }
+  table: { labelKey: 'shapeTableLabel', noteKey: 'shapeTableNote' },
+  grid: { labelKey: 'shapeGridLabel', noteKey: 'shapeGridNoteFull' },
+  unknown: { labelKey: 'shapeUnknownLabel', noteKey: 'shapeUnknownNote' }
 };
 function setShape(v) {
   var s = SHAPE[v] || SHAPE.table;
   aiMode = (v === 'grid');
   el('shapeStep').style.display = 'none';
   el('shapeCurrent').style.display = 'flex';
-  el('shapeLabel').textContent = s.label;
-  el('ocrNote').textContent = s.note;
+  el('shapeLabel').textContent = I18N.t(s.labelKey);
+  el('ocrNote').textContent = I18N.t(s.noteKey);
   el('workBody').style.display = 'block';
   el('keyBtn').style.display = aiMode ? '' : 'none';
   el('retryAi').style.display = 'none';
@@ -139,9 +130,9 @@ el('keyBtn').addEventListener('click', function () { askKey(true); });
 
 // 表形式のつもりで読んだが取りこぼした、というときの逃げ道。形の選択は変えない。
 el('retryAiBtn').addEventListener('click', async function () {
-  if (!lastFile) { setMsg('先に予定表ファイルをドロップしてください。'); return; }
+  if (!lastFile) { setMsg(I18N.t('msgDropFirst')); return; }
   var key = await askKey(false);
-  if (!key) { setMsg('APIキーが未設定のため中止しました。'); return; }
+  if (!key) { setMsg(I18N.t('errNoKeyAborted')); return; }
   el('keyBtn').style.display = '';
   await handleFile(lastFile, true);
 });
@@ -169,14 +160,14 @@ function showDiag() {
   var box = el('diag'), pre = el('diagText');
   if (!box || !pre) return;
   if (!t) { box.style.display = 'none'; return; }
-  pre.textContent = t.slice(0, 3000) + (t.length > 3000 ? '\n…（以下略。全体は ' + t.length + ' 文字）' : '');
+  pre.textContent = t.slice(0, 3000) + (t.length > 3000 ? I18N.t('diagMore', { n: t.length }) : '');
   box.style.display = 'block';
 }
 if (el('diagCopy')) {
   el('diagCopy').addEventListener('click', function () {
     var t = window.lastOcrText || '';
     if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () {
-      el('diagCopied').textContent = ' コピーしました（' + t.length + '文字）';
+      el('diagCopied').textContent = I18N.t('diagCopied', { n: t.length });
     });
   });
 }
@@ -199,26 +190,27 @@ async function handleFile(file, forceAi) {
     var noYear = false;
     if (useAi) {
       var key = await askKey(false);
-      if (!key) { setMsg('APIキーが未設定のため中止しました。'); return; }
-      setMsg('AIで予定表を読み取っています…（数十秒かかることがあります）');
+      if (!key) { setMsg(I18N.t('errNoKeyAborted')); return; }
+      setMsg(I18N.t('msgAiReading'));
       items = await window.SchedAI.extract(file, {
         apiKey: key, fiscalYear: fy, lang: window.LANG,
         onStatus: function (s) {
-          if (s === 'queued') setMsg('AIの順番待ち中…');
-          else if (s === 'retry') setMsg('AIが混雑しています。別のモデルで再試行中…');
-          else setMsg('AIで予定表を読み取っています…');
+          if (s === 'queued') setMsg(I18N.t('msgAiQueued'));
+          else if (s === 'retry') setMsg(I18N.t('msgAiRetry'));
+          else setMsg(I18N.t('msgAiReadingShort'));
         }
       });
       // AIが年を返せなかった行に、年度から年を補う
       items.forEach(function (it) { it.outOfRange = false; });
     } else {
-      setMsg('予定表を読み取っています…（Googleで変換）');
+      setMsg(I18N.t('msgOcrReading'));
       var text = await ocrText(file);
       // 読み取れなかったときの調査用。ブラウザのコンソールで
       //   copy(window.lastOcrText)
       // とすると、OCRが実際に返した文字列を取り出せる。
       window.lastOcrText = text;
-      var r = window.SchedParser.parse(text, fy ? { fiscalYear: fy } : {});
+      // lang は必ず渡すこと。英語の日付・時刻はこれが無いと一切拾えない。
+      var r = window.SchedParser.parse(text, { fiscalYear: fy || null, lang: window.LANG });
       items = r.items;
       if (!fy && r.yearKnown) el('fy').value = String(r.fiscalYear);
       noYear = (!r.yearKnown && !fy);
@@ -229,31 +221,29 @@ async function handleFile(file, forceAi) {
     el('retryAi').style.display = useAi ? 'none' : 'block';
     // 案内は render のあとに出す（先に出すと render 後の setMsg で消えてしまう）
     if (!items.length) {
-      setMsg(useAi
-        ? 'この予定表からは予定を読み取れませんでした。年度を入れて、もう一度お試しください。'
-        : '予定を読み取れませんでした。下の「AIで読み直す」をお試しください。マス目のカレンダー形式なら、「変更」から選び直してください。');
+      setMsg(I18N.t(useAi ? 'msgNoneAi' : 'msgNoneOcr'));
       showDiag();   // 実際に読み取れた文字を見せる（原因が分かるように）
     } else if (noYear) {
-      setMsg('予定表から年度を読み取れませんでした。日付の年が違う場合は、上の「年度」欄に入力してもう一度ドロップしてください。');
+      setMsg(I18N.t('msgNoYear'));
     } else {
       setMsg('');
     }
   } catch (e) {
     var m = String(e && e.message || e);
-    if (m === 'no-key') setMsg('APIキーが未設定です。');
-    else if (m === 'too-large') setMsg('ファイルが大きすぎます。ページを分けてお試しください。');
-    else if (m === 'rate-minute') setMsg('AIへの送信が短時間に集中しました。1分ほどおいて、もう一度ドロップしてください。');
-    else if (m === 'rate-day') setMsg('AIの無料枠（1日あたり）を使い切ったようです。翌日（太平洋時間0時にリセット）以降にお試しください。通常モードなら今すぐ読み取れます。');
-    else if (m === 'busy') setMsg('AIが混み合っています。少し時間をおいてもう一度お試しください。');
-    else if (m === 'bad-json') setMsg('AIの返答を読み取れませんでした。もう一度お試しください。');
-    else setMsg('失敗: ' + m);
+    if (m === 'no-key') setMsg(I18N.t('errNoKey'));
+    else if (m === 'too-large') setMsg(I18N.t('errTooLarge'));
+    else if (m === 'rate-minute') setMsg(I18N.t('errRateMinute'));
+    else if (m === 'rate-day') setMsg(I18N.t('errRateDay'));
+    else if (m === 'busy') setMsg(I18N.t('errBusy'));
+    else if (m === 'bad-json') setMsg(I18N.t('errBadJson'));
+    else setMsg(I18N.t('errOther', { m: m }));
   }
 }
 
 /* ===== 通常モード：GoogleドライブのOCR ===== */
 async function ocrText(file) {
   var boundary = '----sched' + Date.now();
-  var metadata = { name: (file.name || 'yotei') + '_OCR一時', mimeType: 'application/vnd.google-apps.document' };
+  var metadata = { name: (file.name || 'yotei') + I18N.t('ocrTempSuffix'), mimeType: 'application/vnd.google-apps.document' };
   var head = '--' + boundary + '\r\n' +
     'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(metadata) + '\r\n' +
     '--' + boundary + '\r\n' + 'Content-Type: ' + (file.type || 'application/octet-stream') + '\r\n\r\n';
@@ -261,14 +251,14 @@ async function ocrText(file) {
   var up = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&ocrLanguage=' + OCR_LANG, {
     method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: body
   });
-  if (up.status === 401) { accessToken = null; throw new Error('ログインの期限切れです。ファイルを入れ直してください。'); }
-  if (!up.ok) throw new Error('Drive変換 ' + up.status);
+  if (up.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
+  if (!up.ok) throw new Error(I18N.t('errDriveConvert', { code: up.status }));
   var id = (await up.json()).id;
   try {
     var ex = await fetch('https://www.googleapis.com/drive/v3/files/' + id + '/export?mimeType=text/plain', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
-    if (!ex.ok) throw new Error('テキスト取得 ' + ex.status);
+    if (!ex.ok) throw new Error(I18N.t('errTextFetch', { code: ex.status }));
     return await ex.text();
   } finally {
     fetch('https://www.googleapis.com/drive/v3/files/' + id, {
@@ -288,11 +278,12 @@ function render() {
     tr.innerHTML =
       '<td><input type="checkbox" data-k="on"' + (it.on ? ' checked' : '') + '></td>' +
       '<td class="col-date"><input type="text" data-k="start" value="' + esc(it.start) + '" placeholder="YYYY-MM-DD"></td>' +
-      '<td class="col-date"><input type="text" data-k="end" value="' + esc(it.end) + '" placeholder="（任意）"></td>' +
+      '<td class="col-date"><input type="text" data-k="end" value="' + esc(it.end) + '" placeholder="' + esc(I18N.t('endPlaceholder')) + '"></td>' +
       '<td class="col-time"><input type="text" data-k="time" value="' + esc(it.time) + '" placeholder="--:--"></td>' +
       '<td><input type="text" data-k="title" value="' + esc(it.title) + '"></td>' +
       '<td><input type="text" data-k="place" value="' + esc(it.place || '') + '"></td>' +
-      '<td>' + (!it.start ? '<span class="flag">⚠日付なし</span>' : (it.outOfRange ? '<span class="flag">⚠年度外</span>' : '')) + '</td>';
+      '<td>' + (!it.start ? '<span class="flag">' + esc(I18N.t('flagNoDate')) + '</span>'
+        : (it.outOfRange ? '<span class="flag">' + esc(I18N.t('flagOutOfRange')) + '</span>' : '')) + '</td>';
     tr.querySelectorAll('input').forEach(function (inp) {
       inp.addEventListener('change', function () {
         var k = inp.getAttribute('data-k');
@@ -304,15 +295,15 @@ function render() {
     rowsEl.appendChild(tr);
   });
   var warn = items.filter(function (i) { return i.outOfRange || !i.start; }).length;
-  summaryEl.textContent = items.length + '件の予定を読み取りました。'
-    + (warn ? '（うち ' + warn + '件は要確認）' : '')
-    + ' 内容を確認し、登録するものだけチェックを残してください。';
+  summaryEl.textContent = I18N.t('summaryRead', { n: items.length })
+    + (warn ? I18N.t('summaryWarn', { n: warn }) : '')
+    + I18N.t('summaryTail');
   resultEl.style.display = items.length ? 'block' : 'none';
   updateCount();
 }
 function updateCount() {
   var n = items.filter(function (i) { return i.on; }).length;
-  countLabel.textContent = '選択中 ' + n + ' / ' + items.length + ' 件';
+  countLabel.textContent = I18N.t('countLabel', { n: n, total: items.length });
   regBtn.disabled = (n === 0);
 }
 function setAll(v) { items.forEach(function (i) { i.on = v; }); render(); }
@@ -349,26 +340,27 @@ function buildEvent(it) {
 }
 regBtn.addEventListener('click', async function () {
   var targets = items.filter(function (i) { return i.on && /^\d{4}-\d{2}-\d{2}$/.test(i.start) && i.title; });
-  if (!targets.length) { regMsg.textContent = '登録できる予定がありません（日付と行事名が必要です）。'; return; }
+  if (!targets.length) { regMsg.textContent = I18N.t('msgNoTargets'); return; }
   regBtn.disabled = true;
   var ok = 0, ng = 0;
   for (var i = 0; i < targets.length; i++) {
-    regMsg.textContent = '登録中… ' + (i + 1) + ' / ' + targets.length;
+    regMsg.textContent = I18N.t('msgRegistering', { i: i + 1, n: targets.length });
     try {
       var res = await fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) + '/events', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
         body: JSON.stringify(buildEvent(targets[i]))
       });
-      if (res.status === 401) { accessToken = null; throw new Error('ログインの期限切れ'); }
+      // 期限切れの判定は合言葉で行う。文言そのもので判定すると多言語化で壊れる。
+      if (res.status === 401) { accessToken = null; throw new Error('expired'); }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       ok++;
       targets[i].on = false;   // 二重登録を防ぐ
     } catch (e) {
       ng++;
-      if (String(e.message).indexOf('期限切れ') >= 0) { regMsg.textContent = 'ログインの期限切れです。再読み込みしてください。'; break; }
+      if (String(e && e.message) === 'expired') { regMsg.textContent = I18N.t('msgSessionExpiredReload'); break; }
     }
   }
   render();
-  regMsg.textContent = ok + '件を登録しました。' + (ng ? ' ' + ng + '件は失敗しました。' : '');
+  regMsg.textContent = I18N.t('msgRegistered', { n: ok }) + (ng ? I18N.t('msgRegisterFailed', { n: ng }) : '');
 });
