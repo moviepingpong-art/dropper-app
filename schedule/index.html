@@ -41,6 +41,27 @@
       background:linear-gradient(100deg,#16a34a,#22c55e);
       border-radius:999px; box-shadow:0 8px 22px rgba(34,197,94,.38);
     }
+    /* ===== ドロッパーの切り替えタブ（イベント / 予定表） =====
+       イベントドロッパー側（calendar/index.html）と同じ見た目にすること。
+       あちらは i18n 化されているが、こちらは日本語のみなので文言は直書き。 */
+    .tool-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 6px; }
+    .tool-tabs-label { font-size:13px; font-weight:700; color:var(--sub); }
+    .tool-tab {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700;
+      display:inline-block; padding:8px 16px; border-radius:999px;
+      color:var(--teal-d); background:#fff; border:2px solid var(--line); text-decoration:none;
+      transition:border-color .15s, background .15s, transform .12s;
+    }
+    .tool-tab:hover { transform:translateY(-1px); border-color:var(--teal); background:#f0fffb; }
+    /* 選択中のツール。押せないことが分かるよう、色を反転してカーソルも変えない */
+    .tool-tab.on {
+      border-color:transparent; color:#fff; cursor:default; transform:none;
+      background:linear-gradient(100deg,var(--teal),var(--teal-d));
+    }
+    .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
+    /* 狭い画面ではラベルを独立した行にして、タブ2つが並んで入るようにする */
+    @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
+
     .lead { color:var(--sub); font-size:15px; margin:10px 0 0; }
     main { padding:8px 22px 48px; max-width:1000px; }
 
@@ -129,6 +150,13 @@
 <body>
   <header>
     <p class="free-badge">🎉 今なら無料公開中</p>
+    <!-- どのドロッパーを使うかのタブ。選択中は .on（リンクにしない） -->
+    <nav class="tool-tabs">
+      <span class="tool-tabs-label">ドロッパーの選択</span>
+      <a class="tool-tab" href="/calendar/">🎪 イベント</a>
+      <span class="tool-tab on">📅 予定表</span>
+    </nav>
+    <p class="tool-hint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も</p>
     <h1>予定表ドロッパー</h1>
     <p class="lead">年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録</p>
   </header>

@@ -11,7 +11,7 @@
       appName: 'イベントドロッパー',
       // --- ヘッダー（種類セレクタ＝サブタイトル、リード文） ---
       // 種類ごとのサブタイトル・リード文は app.js の DROPPER_TYPES が辞書キーで参照する
-      // 一覧のボタンは type* の短い名称、選択後は「短い名称＋dropperSuffix」を表示する
+      // 一覧のボタンも選択後の表示も type* の短い名称。ドロッパー名は h1 とタブが持つので付けない
       // 種類ごとの言い換え語。{ev}=催しの呼び名 / {doc}=配布物の呼び名（t() が自動で差し替える）
       evSports: '大会', docSports: '要項',
       evMusic: '公演', docMusic: 'チラシ',
@@ -20,7 +20,10 @@
       evFestival: '催し', docFestival: 'チラシ',
       evGeneral: 'イベント', docGeneral: 'チラシ',
       typePrompt: 'ドロッパーの選択',
-      dropperSuffix: 'ドロッパー',
+      toolEvent: '🎪 イベント',
+      toolSchedule: '📅 予定表',
+      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も',
+      eventTypePrompt: 'イベントの種類',
       typeSports: 'スポーツ大会の要項',
       leadSports: '要項（PDF・画像）をドロップ → 内容を確認',
       typeMusic: 'コンサート・発表会・舞台',
@@ -214,7 +217,10 @@
       evFestival: 'event', docFestival: 'flyer',
       evGeneral: 'event', docGeneral: 'flyer',
       typePrompt: 'Choose a dropper',
-      dropperSuffix: ' dropper',
+      toolEvent: '🎪 Event',
+      toolSchedule: '📅 Schedule',
+      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries',
+      eventTypePrompt: 'Event type',
       typeSports: 'Sports event flyer',
       leadSports: 'Drop a flyer (PDF / image) → Review the details',
       typeMusic: 'Concert & stage flyer',
@@ -396,7 +402,10 @@
       evFestival: 'event', docFestival: 'flyer',
       evGeneral: 'event', docGeneral: 'flyer',
       typePrompt: 'Dropper chunein',
-      dropperSuffix: ' dropper',
+      toolEvent: '🎪 Event',
+      toolSchedule: '📅 Schedule',
+      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries',
+      eventTypePrompt: 'Event type',
       typeSports: 'Sports event ka flyer',
       leadSports: 'Flyer (PDF / image) drop karein → Details check karein',
       typeMusic: 'Concert & stage show flyer',
@@ -604,6 +613,13 @@
         a.href = 'https://dropper-tools.com/' + gp;
       }
     }
+    // ドロッパー切り替えタブ。予定表ドロッパーは日本語版のみで、通常モードの抽出も日本語専用のため、
+    // en/in では行ごと出さない（選ばせても飛ばす先が無い）。ja に戻したら自動で出る。
+    var showTools = (global.LANG !== 'en' && global.LANG !== 'in');
+    ['toolTabs', 'toolHint'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = showTools ? '' : 'none';
+    });
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');

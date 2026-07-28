@@ -218,6 +218,27 @@
       box-shadow:0 8px 20px rgba(6,182,164,.30); transition:transform .12s, box-shadow .2s;
     }
     .pick-btn:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.4); }
+    /* ===== ドロッパーの切り替えタブ（イベント / 予定表） =====
+       ドロッパーが2本になったので、h1 の上にタブを置いて行き来できるようにする。
+       予定表ドロッパーは日本語版のみのため、i18n.js が en/in では行ごと隠す。 */
+    .tool-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 6px; }
+    .tool-tabs-label { font-size:13px; font-weight:700; color:var(--sub); }
+    .tool-tab {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700;
+      display:inline-block; padding:8px 16px; border-radius:999px;
+      color:var(--teal-d); background:#fff; border:2px solid var(--line); text-decoration:none;
+      transition:border-color .15s, background .15s, transform .12s;
+    }
+    .tool-tab:hover { transform:translateY(-1px); border-color:var(--teal); background:#f0fffb; }
+    /* 選択中のツール。押せないことが分かるよう、色を反転してカーソルも変えない */
+    .tool-tab.on {
+      border-color:transparent; color:#fff; cursor:default; transform:none;
+      background:linear-gradient(100deg,var(--teal),var(--teal-d));
+    }
+    .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
+    /* 狭い画面ではラベルを独立した行にして、タブ2つが並んで入るようにする */
+    @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
+
     .subtitle-row { margin:12px 0 4px; }
     /* ドロッパーの種類選択（ボタン一覧 → 選択後は名称を表示） */
     .type-prompt { font-size:14px; font-weight:700; color:var(--teal-d); margin:0 0 8px; }
@@ -323,9 +344,16 @@
 <body>
   <header>
     <p class="free-badge" data-i18n="freeBadge">🎉 今なら無料公開中</p><p class="multi-badge" data-i18n="multiBadge">🎪 様々なイベントチラシに対応</p>
+    <!-- どのドロッパーを使うかのタブ。選択中は .on（リンクにしない）。en/in では i18n.js が隠す -->
+    <nav class="tool-tabs" id="toolTabs">
+      <span class="tool-tabs-label" data-i18n="typePrompt">ドロッパーの選択</span>
+      <span class="tool-tab on" data-i18n="toolEvent">🎪 イベント</span>
+      <a class="tool-tab" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
+    </nav>
+    <p class="tool-hint" id="toolHint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も</p>
     <h1 data-i18n="appName">イベントドロッパー</h1>
     <div class="subtitle-row">
-      <p class="type-prompt" id="typePrompt" data-i18n="typePrompt">ドロッパーの選択</p>
+      <p class="type-prompt" id="typePrompt" data-i18n="eventTypePrompt">イベントの種類</p>
       <div class="type-picker" id="typePicker"></div>
       <p class="type-current" id="typeCurrent" style="display:none"></p>
     </div>

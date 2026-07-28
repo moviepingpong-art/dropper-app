@@ -315,8 +315,8 @@ function updateAiRecheckVisibility_() {
 })();
 
 
-// 種類の一覧をボタンで並べる。一覧は「ドロッパー」を付けない短い名称、
-// 選択後は「◯◯ドロッパー」として選択中の名称を表示する。
+// 種類の一覧をボタンで並べる。一覧も選択後の表示も短い名称のみ。
+// 「◯◯ドロッパー」と付けると、ヘッダーのタブ・h1 と合わせて3重になるため付けない。
 (function buildTypePicker() {
   if (!typePicker) return;
   Object.keys(DROPPER_TYPES).forEach(function (key) {
@@ -349,7 +349,7 @@ function applyType(key) {
     }
   }
   if (typeCurrentEl) {
-    typeCurrentEl.textContent = t ? (I18N.t(t.subtitleKey) + I18N.t('dropperSuffix')) : '';
+    typeCurrentEl.textContent = t ? I18N.t(t.subtitleKey) : '';
     typeCurrentEl.style.display = t ? 'inline-block' : 'none';
   }
   if (typePromptEl) typePromptEl.style.display = t ? 'none' : '';
