@@ -13,15 +13,24 @@ var path = require('path');
 global.window = global;
 eval(fs.readFileSync(path.join(__dirname, '..', 'schedule-parser.js'), 'utf8'));
 
-// fiscalYear は画面の「年度」欄にあたる。expect は現在の結果（回帰に気付くための目安）。
+// fiscalYear は画面の「年度」欄にあたる。lang は画面の window.LANG。
+// expect は現在の結果（回帰に気付くための目安）。
 var FIXTURES = [
   {
-    name: 'tleague', file: 'ocr-tleague.txt', fiscalYear: 2026, expect: 17,
+    name: 'tleague', file: 'ocr-tleague.txt', fiscalYear: 2026, lang: 'ja', expect: 17,
     note: '都道府県と会場が別の列。チーム名が「静岡」「岡山」と県名に一致するのが厄介'
   },
   {
-    name: 'zenkoku-shikoku', file: 'ocr-zenkoku-shikoku.txt', fiscalYear: 2026, expect: 42,
+    name: 'zenkoku-shikoku', file: 'ocr-zenkoku-shikoku.txt', fiscalYear: 2026, lang: 'ja', expect: 42,
     note: '場所が「埼玉県 深谷市他」の1行の表と、「高知」＋会場の2行の表が1つの文書に混在'
+  },
+  {
+    name: 'icc-t20', file: 'ocr-icc-t20-2026.txt', fiscalYear: 2026, lang: 'en', expect: 55,
+    note: '英語。「7 Feb」＝年の記載が無い。年度で繰り上げると2027年になってしまう'
+  },
+  {
+    name: 'uk-term-dates', file: 'ocr-uk-term-dates-2026-27.txt', fiscalYear: 2026, lang: 'en', expect: 0,
+    note: '英語。月と年が見出し行「SEPTEMBER 2026」にあり、日付セルは日だけ（第2段階で対応予定）'
   }
 ];
 
@@ -34,7 +43,7 @@ if (!targets.length) {
 
 targets.forEach(function (f) {
   var text = fs.readFileSync(path.join(__dirname, f.file), 'utf8');
-  var r = window.SchedParser.parse(text, { fiscalYear: f.fiscalYear });
+  var r = window.SchedParser.parse(text, { fiscalYear: f.fiscalYear, lang: f.lang });
   console.log('===== ' + f.name + ' =====');
   console.log(f.note);
   console.log('件数: ' + r.items.length + '（目安 ' + f.expect + '）  除外: ' + r.skipped.length +

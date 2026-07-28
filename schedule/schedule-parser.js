@@ -69,6 +69,31 @@
   // 「★ ★」のような飾りだけの行。表の末尾に置かれ、直前の予定に吸い込まれてしまう。
   // ハイフンは入れないこと（「静岡 - KM東京」の対戦表記が壊れる）。
   var NOISE_RE = /^[\s★☆◆◇■□●○▲△▼▽※＊*＝=…・]+$/;
+
+  /* ===== 英語の予定表（en/in版） =====
+     英語でもGoogleのOCRは表を「1セル＝1行」で返す（実データで確認済み）。
+     行を集める仕組みは日本語と同じものを使い、日付・時刻・区切り語だけを差し替える。 */
+  var EN_MON = 'Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|' +
+    'Aug(?:ust)?|Sept(?:ember)?|Sep|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?';
+  var EN_ORD = '(?:st|nd|rd|th)?';
+  // 「7 Feb」「21st March 2024」「20 – 22 June」／「Feb 7」「Mar 15, 2026」「Jun 20 - 21」
+  // 日の直後の (?!\d) が肝心。無いと見出しの「MAY 2027」を 5月20日 と読んでしまう。
+  // 月名の直後の \b も要る。無いと「Term 1 marks」の "1 mar" を 3月1日 と読む（実データで発生）。
+  var EN_DATE_RE = new RegExp(
+    '(\\d{1,2})' + EN_ORD + '(?!\\d)(?:\\s*[-–—]\\s*(\\d{1,2})' + EN_ORD + '(?!\\d))?\\s*(' + EN_MON + ')\\b\\.?(?:,?\\s*(\\d{4})(?!\\d))?' +
+    '|' +
+    '(' + EN_MON + ')\\b\\.?\\s+(\\d{1,2})' + EN_ORD + '(?!\\d)(?:\\s*[-–—]\\s*(\\d{1,2})' + EN_ORD + '(?!\\d))?(?:,?\\s*(\\d{4})(?!\\d))?',
+    'gi');
+  // 「7:30 PM」「7 pm」。24時間制と取り違えると 19:30 が 07:30 になる。
+  var EN_TIME_RE = /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m\.?\b/i;
+  // 曜日だけの行。英語の予定表では日付とは別の列に置かれ、行事名に混ざる。
+  var EN_WD_RE = /^(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|sday|nesday|rsday|urday)?\.?$/i;
+  var EN_HEADER_RE = /^(?:date|day|time|match|fixture|opponent|versus|venue|location|place|activity|event|details|notes?|organiser|organizer|contact(?:\s+details)?)$/i;
+  var EN_TBC_RE = /^(?:tbc|tba|t\.b\.c\.?|to be confirmed|to be advised|n\/a)$/i;
+  // 注記の文。英語の日付を拾えるようにすると「Approved by Senate 21st March 2024」が予定になる。
+  var EN_PROSE_RE = /\b(?:will|shall|must|please|approved by|correct at|subject to change|notified|informed?|for more information)\b/i;
+  var EN_MON_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  function enMonth(name) { return EN_MON_NUM[String(name).slice(0, 3).toLowerCase()] || 0; }
   // 祝日・休業日の名前は「予定」ではないので、行事名から取り除く。
   // 「地域訪問 秋分の日」のように本来の予定と同じ欄に並ぶことがあるため、行ごと捨てずに語だけ消す。
   var HOLIDAY_RE = /(元日|成人の日|建国記念の日|建国記念日|天皇誕生日|春分の日|昭和の日|憲法記念日|みどりの日|こどもの日|子どもの日|海の日|山の日|敬老の日|秋分の日|スポーツの日|体育の日|文化の日|勤労感謝の日|振替休日|国民の休日|祝日|大晦日)/g;
@@ -93,6 +118,8 @@
   // 戻り値: { fiscalYear, yearKnown, items:[{start,end,time,title,place,raw}], skipped:[…] }
   function parse(rawText, opts) {
     opts = opts || {};
+    // 英語版（en/in）は日付・時刻・区切り語が別物。画面の window.LANG をそのまま渡してもらう。
+    var EN = (opts.lang === 'en' || opts.lang === 'in');
     var text = normalize(rawText);
     var fy = opts.fiscalYear || fiscalYearOf(rawText);
     var yearKnown = !!fy;
@@ -105,34 +132,43 @@
       .map(function (s) { return s.replace(/\t/g, ' ').trim(); })
       .filter(Boolean);
 
-    function hasDate(s) {
-      DATE_RE.lastIndex = 0;
-      var mm;
-      while ((mm = DATE_RE.exec(s)) !== null) {
-        var mo = mm[2] !== undefined ? mm[2] : mm[6];
-        var da = mm[3] !== undefined ? mm[3] : mm[7];
-        if (mo && valid(Number(mo), Number(da))) return true;
+    // 1行の中の日付をすべて拾う（1行に複数レコードが並ぶ表に対応）。
+    // 日本語と英語で正規表現が違うので、取り出した値をここで同じ形に揃える。
+    function dateHits(line) {
+      var re = EN ? EN_DATE_RE : DATE_RE, out = [], m;
+      re.lastIndex = 0;
+      while ((m = re.exec(line)) !== null) {
+        var g;
+        if (EN) {
+          // 日が先（1〜4）と月が先（5〜8）のどちらで当たったかを揃える。yyyy は西暦4桁。
+          g = (m[3] !== undefined)
+            ? { mo: enMonth(m[3]), da: m[1], ed: m[2], em: undefined, yyyy: m[4] }
+            : { mo: enMonth(m[5]), da: m[6], ed: m[7], em: undefined, yyyy: m[8] };
+        } else {
+          // スラッシュ表記（1〜5）と漢字表記（6〜9）のどちらで当たったかを揃える
+          g = (m[1] !== undefined || m[2] !== undefined)
+            ? { yy: m[1], mo: m[2], da: m[3], em: m[4], ed: m[5] }
+            : { yy: undefined, mo: m[6], da: m[7], em: m[8], ed: m[9] };
+        }
+        if (!g.mo || !valid(Number(g.mo), Number(g.da))) continue;
+        out.push({ i: m.index, len: m[0].length, g: g });
       }
-      return false;
+      return out;
     }
-    function isHeader(s) { return HEADER_RE.test(s.replace(/\s/g, '')); }
+    function hasDate(s) { return dateHits(s).length > 0; }
+    function isHeader(s) {
+      return HEADER_RE.test(s.replace(/\s/g, '')) || (EN && EN_HEADER_RE.test(s));
+    }
+    function isProse(s) { return EN ? EN_PROSE_RE.test(s) : PROSE_RE.test(s); }
 
     lines.forEach(function (line, li) {
       if (isHeader(line)) return;
 
-      // 行内のすべての日付位置を拾う（1行に複数レコードが並ぶ表に対応）
-      var hits = [], m;
-      DATE_RE.lastIndex = 0;
-      while ((m = DATE_RE.exec(line)) !== null) {
-        // スラッシュ表記（1〜5）と漢字表記（6〜9）のどちらで当たったかを揃える
-        var g = m[1] !== undefined || m[2] !== undefined
-          ? { yy: m[1], mo: m[2], da: m[3], em: m[4], ed: m[5] }
-          : { yy: undefined, mo: m[6], da: m[7], em: m[8], ed: m[9] };
-        if (!g.mo || !valid(Number(g.mo), Number(g.da))) continue;
-        hits.push({ i: m.index, len: m[0].length, g: g });
-      }
+      var hits = dateHits(line);
       if (!hits.length) {
-        if (/未\s*定/.test(line)) skipped.push({ reason: 'undecided', raw: tidy(line) });
+        if (/未\s*定/.test(line) || (EN && EN_TBC_RE.test(line))) {
+          skipped.push({ reason: 'undecided', raw: tidy(line) });
+        }
         return;
       }
 
@@ -149,7 +185,9 @@
             // 「未定」は日付の無い別の予定、「◯◯予定表」は次の表の見出し。
             // どちらもここで区切らないと、直前の予定の行事名に吸い込まれる。
             if (/未\s*定/.test(lines[j]) || /(?:予\s*定\s*表|日\s*程\s*表)/.test(lines[j])) break;
+            if (EN && EN_TBC_RE.test(lines[j])) break;
             if (NOISE_RE.test(lines[j])) continue;
+            if (EN && EN_WD_RE.test(lines[j])) continue;   // 曜日だけの行は行事名ではない
             buf.push(lines[j]);
           }
           // 場所は行の末尾に置かれる。後ろから2行以内だけを候補にする
@@ -166,11 +204,15 @@
           body = tidy(buf.join(' '));
         }
         // 日付の直後が説明文なら、それは予定ではなく注記
-        if (PROSE_RE.test(body)) { skipped.push({ reason: 'prose', raw: body.slice(0, 60) }); return; }
+        if (isProse(body)) { skipped.push({ reason: 'prose', raw: body.slice(0, 60) }); return; }
 
         var yy = h.g.yy, mo = Number(h.g.mo), da = Number(h.g.da);
         var em = h.g.em ? Number(h.g.em) : null, ed = h.g.ed ? Number(h.g.ed) : null;
-        var year = yy ? (2000 + Number(yy)) : yearFor(mo, fy);
+        // 年の決め方が言語で違う。英語には「年度」が無いので、入力された年をそのまま使う。
+        // 年度のつもりで 4月始まりに繰り上げると、ICC日程の「7 Feb」が翌年になってしまう。
+        var year = EN
+          ? (h.g.yyyy ? Number(h.g.yyyy) : fy)
+          : (yy ? (2000 + Number(yy)) : yearFor(mo, fy));
         var startD = iso(year, mo, da);
         var endD = '';
         if (ed && valid(em || mo, ed)) {
@@ -183,12 +225,20 @@
           if (endD <= startD) endD = '';   // 逆転・同日は範囲にしない
         }
 
-        // 時刻（19:00 / 13時30分）
+        // 時刻（19:00 / 13時30分 / 7:30 PM）
         var time = '';
+        // 午前午後つきを先に見る。24時間制と取り違えると「7:30 PM」が 07:30 になる。
+        var tp = EN ? body.match(EN_TIME_RE) : null;
         var t1 = body.match(/(\d{1,2}):(\d{2})/);
         // 「3時間授業」「約2時間」の "時間" は所要時間であって時刻ではないので拾わない
         var t2 = body.match(/(\d{1,2})\s*時(?!\s*間)\s*(?:(\d{1,2})\s*分)?/);
-        if (t1) { time = ('0' + t1[1]).slice(-2) + ':' + t1[2]; body = tidy(body.replace(t1[0], ' ')); }
+        if (tp) {
+          var ph = Number(tp[1]) % 12;
+          if (/p/i.test(tp[3])) ph += 12;
+          time = ('0' + ph).slice(-2) + ':' + (tp[2] || '00');
+          body = tidy(body.replace(tp[0], ' '));
+        }
+        else if (t1) { time = ('0' + t1[1]).slice(-2) + ':' + t1[2]; body = tidy(body.replace(t1[0], ' ')); }
         else if (t2) { time = ('0' + t2[1]).slice(-2) + ':' + ('0' + (t2[2] || '0')).slice(-2); body = tidy(body.replace(t2[0], ' ')); }
 
         // 祝日名を落とす。残りが無ければ祝日だけの行なので予定にしない。
@@ -202,7 +252,11 @@
         }
         // 年度（4月〜翌3月）の外に出た予定は、勝手に直さず印だけ付けて利用者に確認してもらう。
         // 「25/1/17」のように年が明記された行が混ざることがあるため。
-        var outOfRange = yearKnown && (startD < iso(fy, 4, 1) || startD > iso(fy + 1, 3, 31));
+        // 英語には年度が無いので、外れているかどうかは暦年で見る。
+        // 4月始まりの窓で見ると、2月・3月の予定がすべて⚠になってしまう。
+        var outOfRange = yearKnown && (EN
+          ? (startD < iso(fy, 1, 1) || startD > iso(fy, 12, 31))
+          : (startD < iso(fy, 4, 1) || startD > iso(fy + 1, 3, 31)));
         items.push({
           start: startD, end: endD, time: time,
           title: body, place: place, raw: body,
