@@ -19,6 +19,7 @@ var AI_KEY_STORE = 'dropper_ai_key';   // イベントドロッパーと同じ�
 var accessToken = null, tokenClient = null, pendingAuth = null;
 var aiMode = false;
 var items = [];        // 画面に出している予定（一覧の1行＝1件）
+var lastFile = null;   // 「AIで読み直す」で同じファイルをもう一度読むために覚えておく
 
 var el = function (id) { return document.getElementById(id); };
 var loginArea = el('login-area'), workArea = el('work'), dropEl = el('drop');
@@ -63,15 +64,48 @@ el('loginBtn').addEventListener('click', async function () {
   } catch (e) { setMsg(e.message || 'ログインに失敗しました'); }
 });
 
-/* ===== 読み取り方の切り替え ===== */
-function setMode(useAi) {
-  aiMode = useAi;
-  el('modeNormal').classList.toggle('on', !useAi);
-  el('modeAi').classList.toggle('on', useAi);
-  el('keyBtn').style.display = useAi ? '' : 'none';
+/* ===== 予定表の形をえらぶ（＝読み取り方が決まる） =====
+   「通常モード／AIモード」を選ばせると、利用者にOCRとAIの違いの理解を求めることになる。
+   手元の紙と見比べるだけで選べるよう、紙面の形を聞き、その結果として読み取り方を決める。
+   自動判定はしない。マス目の予定表をOCRで読むと、0件にならず「それらしい件数のまま
+   日付と行事名の対応だけが狂った結果」が出るため、誤っても機械には気づけない。 */
+var SHAPE = {
+  table: {
+    label: '予定表の形：表形式',
+    note: '※Googleの文字認識で読み取ります。読み取れない予定があるときは「AIで読み直す」をお試しください。'
+  },
+  grid: {
+    label: '予定表の形：カレンダー形式',
+    note: '※マス目の予定表はAIが読み取ります。読み取りに数十秒かかることがあります。'
+  },
+  unknown: {
+    label: '予定表の形：わからない',
+    note: '※まず無料の方法で読み取ります。うまくいかないときは「AIで読み直す」か、「変更」からカレンダー形式を選び直してください。'
+  }
+};
+function setShape(v) {
+  var s = SHAPE[v] || SHAPE.table;
+  aiMode = (v === 'grid');
+  el('shapeStep').style.display = 'none';
+  el('shapeCurrent').style.display = 'flex';
+  el('shapeLabel').textContent = s.label;
+  el('ocrNote').textContent = s.note;
+  el('workBody').style.display = 'block';
+  el('keyBtn').style.display = aiMode ? '' : 'none';
+  el('retryAi').style.display = 'none';
+  setMsg('');
+  // カレンダー形式はAIでしか読めない。キーが無いと必ず行き止まるので、この場で入れてもらう。
+  if (aiMode && !savedKey()) askKey(false);
 }
-el('modeNormal').addEventListener('click', function () { setMode(false); });
-el('modeAi').addEventListener('click', function () { setMode(true); });
+el('shapeTable').addEventListener('click', function () { setShape('table'); });
+el('shapeGrid').addEventListener('click', function () { setShape('grid'); });
+el('shapeUnknown').addEventListener('click', function () { setShape('unknown'); });
+el('shapeChange').addEventListener('click', function () {
+  el('shapeStep').style.display = '';
+  el('shapeCurrent').style.display = 'none';
+  el('workBody').style.display = 'none';
+  setMsg('');
+});
 
 /* ===== APIキー ===== */
 function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
@@ -101,6 +135,15 @@ function askKey(force) {
   });
 }
 el('keyBtn').addEventListener('click', function () { askKey(true); });
+
+// 表形式のつもりで読んだが取りこぼした、というときの逃げ道。形の選択は変えない。
+el('retryAiBtn').addEventListener('click', async function () {
+  if (!lastFile) { setMsg('先に予定表ファイルをドロップしてください。'); return; }
+  var key = await askKey(false);
+  if (!key) { setMsg('APIキーが未設定のため中止しました。'); return; }
+  el('keyBtn').style.display = '';
+  await handleFile(lastFile, true);
+});
 
 /* ===== ドロップ ===== */
 ['dragenter', 'dragover'].forEach(function (ev) {
@@ -137,10 +180,14 @@ if (el('diagCopy')) {
   });
 }
 
-async function handleFile(file) {
+// forceAi: 「AIで読み直す」から呼ばれたとき。形の選択は変えずに、この1回だけAIで読む。
+async function handleFile(file, forceAi) {
   if (!file) return;
+  var useAi = !!forceAi || aiMode;
+  lastFile = file;
   resultEl.style.display = 'none';
   el('diag').style.display = 'none';
+  el('retryAi').style.display = 'none';
   window.lastOcrText = '';
   try {
     await ensureToken();
@@ -149,7 +196,7 @@ async function handleFile(file) {
   try {
     var fy = fiscalYearInput();
     var noYear = false;
-    if (aiMode) {
+    if (useAi) {
       var key = await askKey(false);
       if (!key) { setMsg('APIキーが未設定のため中止しました。'); return; }
       setMsg('AIで予定表を読み取っています…（数十秒かかることがあります）');
@@ -177,11 +224,13 @@ async function handleFile(file) {
     }
     items.forEach(function (it) { it.on = !!it.start; });   // 日付が取れた行だけ最初から選択
     render();
+    // OCRで読んだあとは、取りこぼしても選び直さずに済むよう逃げ道を出す
+    el('retryAi').style.display = useAi ? 'none' : 'block';
     // 案内は render のあとに出す（先に出すと render 後の setMsg で消えてしまう）
     if (!items.length) {
-      setMsg(aiMode
+      setMsg(useAi
         ? 'この予定表からは予定を読み取れませんでした。年度を入れて、もう一度お試しください。'
-        : '予定を読み取れませんでした。AIモードに切り替えてお試しください。');
+        : '予定を読み取れませんでした。下の「AIで読み直す」をお試しください。マス目のカレンダー形式なら、「変更」から選び直してください。');
       showDiag();   // 実際に読み取れた文字を見せる（原因が分かるように）
     } else if (noYear) {
       setMsg('予定表から年度を読み取れませんでした。日付の年が違う場合は、上の「年度」欄に入力してもう一度ドロップしてください。');
