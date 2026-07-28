@@ -90,6 +90,10 @@
   var EN_WD_RE = /^(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|sday|nesday|rsday|urday)?\.?$/i;
   var EN_HEADER_RE = /^(?:date|day|time|match|fixture|opponent|versus|venue|location|place|activity|event|details|notes?|organiser|organizer|contact(?:\s+details)?)$/i;
   var EN_TBC_RE = /^(?:tbc|tba|t\.b\.c\.?|to be confirmed|to be advised|n\/a)$/i;
+  // 曜日・時刻・TBC・記号だけでできた行事名は予定ではない。ポスター体裁の予定表は
+  // OCRが列ごとに返すため、時刻の列や曜日の列がまるごと行事名になってしまう。
+  // ※行事名の途中の曜日は消さないこと。「University holiday - Easter Monday」が壊れる。
+  var EN_JUNK_RE = /(?:\b(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|sday|nesday|rsday|urday)?\b|\b\d{1,2}(?::\d{2})?\s*[ap]\.?\s*m\.?|\btbc\b|\btba\b|[\s,.;:()\-–—/]+)/gi;
   // 注記の文。英語の日付を拾えるようにすると「Approved by Senate 21st March 2024」が予定になる。
   var EN_PROSE_RE = /\b(?:will|shall|must|please|approved by|correct at|subject to change|notified|informed?|for more information)\b/i;
   var EN_MON_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
@@ -210,7 +214,12 @@
 
       hits.forEach(function (h, k) {
         var end = (k + 1 < hits.length) ? hits[k + 1].i : line.length;
+        // 日付より前の文字も本文に入れる。日付が行の途中にある予定表があるため
+        // （IPLは「Kolkata Knight Riders 1st Match Sun Mar 15, 2026 …」とチーム名が先）。
+        // 2件目以降の日付では、手前は前の予定の本文としてすでに使われているので足さない。
+        var head = (k === 0) ? tidy(line.slice(0, h.i)) : '';
         var body = tidy(line.slice(h.i + h.len, end));
+        if (head) body = tidy(head + ' ' + body);
         // 同じ行に本文が無いとき（＝1セル1行で返ってきたとき）は、
         // 次の日付が現れるまでの行をまとめて本文にする。
         var place = '';
@@ -287,6 +296,13 @@
         HOLIDAY_RE.lastIndex = 0;
         if (hadHoliday) body = tidy(body.replace(HOLIDAY_RE, ' '));
         if (!body) { skipped.push({ reason: hadHoliday ? 'holiday' : 'empty', raw: line.slice(0, 60) }); return; }
+        // 曜日や時刻だけが残った行事名は、列ごとに返ってきた表のかけら
+        if (EN) {
+          EN_JUNK_RE.lastIndex = 0;
+          if (!body.replace(EN_JUNK_RE, '').trim()) {
+            skipped.push({ reason: 'fragment', raw: body.slice(0, 40) }); return;
+          }
+        }
         // 記号や1文字だけの断片は予定名として意味をなさない
         if (body.replace(/[\s()（）「」『』・,，、.．:：;；\/\\|｜~〜～\-–—★☆＊*※]/g, '').length < 2) {
           skipped.push({ reason: 'fragment', raw: body.slice(0, 40) }); return;

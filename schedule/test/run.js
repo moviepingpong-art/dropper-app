@@ -31,6 +31,10 @@ var FIXTURES = [
   {
     name: 'uk-term-dates', file: 'ocr-uk-term-dates-2026-27.txt', fiscalYear: 2026, lang: 'en', expect: 0,
     note: '英語。月と年が見出し行「SEPTEMBER 2026」にあり、日付セルは日だけ（第2段階で対応予定）'
+  },
+  {
+    name: 'ipl-table', file: 'ocr-ipl-2026-table.txt', fiscalYear: 2026, lang: 'en', expect: 59,
+    note: '英語。1〜2ページは1試合＝1行で日付が行の途中。3ページは列ごとに返るため取れない（59/70試合）'
   }
 ];
 
