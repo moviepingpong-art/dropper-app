@@ -93,6 +93,10 @@
   // 注記の文。英語の日付を拾えるようにすると「Approved by Senate 21st March 2024」が予定になる。
   var EN_PROSE_RE = /\b(?:will|shall|must|please|approved by|correct at|subject to change|notified|informed?|for more information)\b/i;
   var EN_MON_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+  // 表の見出しのうち、場所を表す語。見出しの末尾に何列並んでいるかを数えて、
+  // 各行の後ろ何行が場所なのかを決める（Tリーグは「都道府県」＋「会場」の2列）。
+  var VENUE_HEAD_RE = /^(?:venue|location|place|ground|stadium|会場|場所|体育館|開催地|開催場所)$/i;
+  var REGION_HEAD_RE = /^(?:prefecture|state|region|country|area|都道府県|県名|開催県)$/i;
   function enMonth(name) { return EN_MON_NUM[String(name).slice(0, 3).toLowerCase()] || 0; }
   // 祝日・休業日の名前は「予定」ではないので、行事名から取り除く。
   // 「地域訪問 秋分の日」のように本来の予定と同じ欄に並ぶことがあるため、行ごと捨てずに語だけ消す。
@@ -160,6 +164,38 @@
       return HEADER_RE.test(s.replace(/\s/g, '')) || (EN && EN_HEADER_RE.test(s));
     }
     function isProse(s) { return EN ? EN_PROSE_RE.test(s) : PROSE_RE.test(s); }
+    // 英語には都道府県のような手がかりが無いので、「表の末尾が場所の列」という並びを使う。
+    function headWord(s, re) { return re.test(s.replace(/\s/g, '')) || re.test(s.trim()); }
+    // 見出しの末尾に場所の列が何本並んでいるかを数える。
+    // ICC「Date/Match/Venue」＝1、Tリーグ「…/都道府県/会場」＝2、
+    // ASA「…/Venue/Organiser/Contact」＝0（会場が最後でないので発動しない）。
+    function venueColsOf(head) {
+      var n = 0;
+      for (var i = head.length - 1; i >= 0; i--) {
+        if (n === 0 && headWord(head[i], VENUE_HEAD_RE)) { n = 1; continue; }
+        if (n > 0 && headWord(head[i], REGION_HEAD_RE)) { n++; continue; }
+        break;
+      }
+      return n;
+    }
+    // 行ごとに「直前の見出しでは後ろ何列が場所か」を持たせる。1つの文書に表が何枚も入り、
+    // 列構成が途中で変わるため（全国大会は「場所」1列、四国は「県名＋体育館」2列）。
+    var venueColsAt = [];
+    (function () {
+      var cur = 0, i = 0;
+      while (i < lines.length) {
+        if (isHeader(lines[i])) {
+          var j = i, head = [];
+          while (j < lines.length && isHeader(lines[j])) { head.push(lines[j]); j++; }
+          cur = venueColsOf(head);
+          for (var k = i; k < j; k++) venueColsAt[k] = cur;
+          i = j;
+        } else {
+          venueColsAt[i] = cur;
+          i++;
+        }
+      }
+    })();
 
     lines.forEach(function (line, li) {
       if (isHeader(line)) return;
@@ -197,6 +233,11 @@
           for (var q = Math.max(1, buf.length - 2); q < buf.length; q++) {
             if (PREF_HEAD_RE.test(buf[q]) || PREF_ONLY_RE.test(buf[q])) { pi = q; break; }
           }
+          // 都道府県で見つからないときの受け皿。見出しの末尾が場所の列なら、行の末尾が場所。
+          // 英語の予定表にはこれしか手がかりが無い。日本語でも「台湾新竹県」のように
+          // 47都道府県に当てはまらない場所を拾える。
+          var vc = venueColsAt[li] || 0;
+          if (pi < 0 && vc > 0 && buf.length > vc) pi = buf.length - vc;
           if (pi > 0) {
             place = tidy(buf.slice(pi).join(' '));
             buf = buf.slice(0, pi);
