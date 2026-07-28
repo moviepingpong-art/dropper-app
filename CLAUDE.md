@@ -46,7 +46,10 @@ GitHub Pages で公開している静的サイト。サーバーは無い。**�
 
 ## 3言語同期の鉄則
 
+**イベントドロッパー（`calendar*`）と予定表ドロッパー（`schedule*`）の両方に効く。**
+
 - `app.js` `parser.js` `i18n.js` は **3フォルダで完全同一**（バイト単位で同じ）。片方だけ直さない。
+  予定表側も同じで、`schedule-i18n.js` `schedule-parser.js` `schedule-ai.js` `schedule-app.js` の4本。
 - `index.html` は **`window.LANG` の値だけが違う**。丸ごとコピーすると壊れる。追加部分だけ差し込むこと。
 - 検証方法: `index.html` の `window.LANG` を置換して diff を取り、一致すればOK。
 - en/in を作り直すときは `cp` でバイト複製してから `window.LANG` の行だけ置換する。
@@ -60,11 +63,11 @@ GitHub Pages で公開している静的サイト。サーバーは無い。**�
 - **3言語同時**に触る。文言は `i18n.js` の
   `typePrompt`（上段ラベル）/ `toolEvent` / `toolSchedule` / `toolHint`。
   下段の「イベントの種類」は `eventTypePrompt`。
-- 予定表ドロッパーが ja のみのため、`i18n.js` の `applyDom` が
-  **en/in ではタブ行（`#toolTabs` `#toolHint`）ごと隠している**。
-  予定表を en/in へ展開したら、この分岐を外すこと。**外し忘れると非表示のまま**。
-- `schedule/index.html` にも同じタブがあるが、こちらは i18n 化前なので**文言は直書き**。
-  CSS も calendar 側と同じものを複製している。**片方だけ直さない**。
+- **リンク先は同じ言語の版へ送ること。** 両側とも `applyDom` が言語に合わせて `href` を張り替える
+  （calendar 側は `#tabSchedule`、schedule 側は `#tabEvent`）。HTMLに直書きの `href` は ja 用の既定値。
+  en の利用者を ja のページへ飛ばさないための仕組みなので、外さないこと。
+- `schedule/index.html` にも同じタブがある。CSS も calendar 側と同じものを複製している。
+  **片方だけ直さない**。
 - 種類選択後の表示に「ドロッパー」は付けない（タブ・h1 と合わせて3重になるため）。
   旧 `dropperSuffix` キーは削除済み。
 
@@ -75,19 +78,38 @@ GitHub Pages で公開している静的サイト。サーバーは無い。**�
 2026-07-27 に着手。**1枚の予定表から N件の予定を取り出し、カレンダーへ一括登録する**ツール。
 イベントドロッパーが「1枚＝1イベント」なのに対し、こちらは「1枚＝N件」。用途が重ならない。
 
-公開URL: https://app.dropper-tools.com/schedule/ （現状 ja のみ。en/in は未展開）
+公開URL: https://app.dropper-tools.com/schedule/ （en: /schedule-en/ 、Hinglish: /schedule-in/ ）
 
 ## 構成
 
-- `schedule/index.html` — 画面（一覧表・モード切替・年度入力・APIキー入力）
-- `schedule/schedule-parser.js` — 通常モードの抽出（`window.SchedParser.parse(text, opts)`）
+`schedule/` `schedule-en/` `schedule-in/` の3フォルダ。**イベントドロッパーと同じ同期の決まりが効く**
+（下の「3言語同期の鉄則」参照）。`deploy-check` の対象はこの3フォルダも含む。
+
+- `schedule/index.html` — 画面（一覧表・形の選択・年度入力・APIキー入力）
+- `schedule/schedule-i18n.js` — 多言語辞書（`window.I18N`）。**イベント側の `i18n.js` とは別物**。
+  あちらは3フォルダでバイト同一を保つ決まりで、予定表のキーを足すと2つのツールが結合するため。
+- `schedule/schedule-parser.js` — 通常モードの抽出（`window.SchedParser.parse(text, opts)`）。
+  **`opts.lang` を必ず渡すこと**。渡さないと英語の日付・時刻を一切拾わない。
 - `schedule/schedule-ai.js` — AIモード（`window.SchedAI.extract(file, opts)`）
 - `schedule/schedule-app.js` — 画面制御・OCR・カレンダー一括登録
+- `schedule/test/` — **実機のOCRテキストと確認用スクリプト**（後述）
+
+**エラーの判定に文言を使わないこと。** 401の期限切れは合言葉（`throw new Error('expired')`）で判定する。
+以前は日本語の文言を `indexOf('期限切れ')` で見ており、多言語化した時点で英語版だけ
+セッション切れを検出できなくなる状態だった。
 - `schedule/test/` — **実機のOCRテキストと確認用スクリプト**。`schedule-parser.js` を触ったら
   `node schedule/test/run.js` を修正の前後で流し、件数と中身を見比べる（詳細は同フォルダの README）
 
 **OAuthはイベントドロッパーと共有**（同じクライアントID・同じ生成元 `app.dropper-tools.com`）。
 スコープも同じ3つだけ。**新しいスコープは足さない**。APIキーの保存先も共通（`dropper_ai_key`）。
+
+## 多言語化の決まり（`schedule-i18n.js`）
+
+- キーは **ja / en / in の3言語すべてに足す**（現在91キー）。イベント側と同じ `data-i18n` 方式。
+- **年度欄の意味が言語で変わる。** ja は「年度」（4月始まり）、en/in は「年」（暦年）。
+  文言（`fyLabel` / `fyHint`）だけでなく、`schedule-parser.js` の扱いも分かれている。
+- 形の説明文の改行は**辞書側の `\n`**で表す（CSS は `white-space:pre-line`）。
+  `<br>` は辞書に入らないうえ、言語ごとに折り返し位置が違うため。
 
 ## 2つのモード（役割が違う）
 
@@ -215,11 +237,10 @@ IPLのPDFは1〜2ページが行ごと、3ページが列ごとで、同じ文�
 
 ## 残っている作業
 
-- **en/in のページを作る**（現状 ja のみ・文言はHTML直書き。i18n化を含む）。
-  **抽出側（`schedule-parser.js`）は英語対応済み**で、実データ4枚で確認してある。
-  ただし切り替えは `window.LANG` なので、**ページを作るまで画面から英語対応に到達できない**
-  （ja ページに英語の予定表を落としても0件のまま）。あわせて `#toolTabs` を en/in で隠している
-  分岐（`i18n.js` の `applyDom`）を外すこと。年度欄のラベルも英語では「年」にする。
+- **英語版の実機確認** — パーサはOCRテキストで検証済みだが、`/schedule-en/` に実際に
+  英語のPDFをドロップしての通し確認は未実施（ICCの日程表なら55件出るのが期待値）。
+- **周知サイトの記述が古い** — 「予定表ドロッパーは日本語のみ」という前提で作られている。
+  en/in を公開したので、周知サイト側の更新が要る。
 - （未確認）**「AIで読み直す」を実機で試す** — 画面の出し分けは確認済みだが、
   実際にOCRで読んだあとに押したときの動きは未検証。
 
