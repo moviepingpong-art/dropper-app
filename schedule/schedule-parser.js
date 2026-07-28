@@ -99,6 +99,8 @@
   // 月名だけの行。「JANUARY 2026」の月見出しと、日が決まっていない「January」の日付欄の
   // 両方がこの形。どちらも次の予定の始まりなので、ここで区切らないと前の予定が飲み込む。
   var EN_MONTH_ONLY_RE = new RegExp('^(?:' + EN_MON + ')\\b\\.?(?:\\s*\\d{4})?$', 'i');
+  // 月見出しから月と年を取り出す版。「SEPTEMBER 2026」の下に日だけが並ぶ予定表で使う。
+  var EN_MONTH_HEAD_RE = new RegExp('^(' + EN_MON + ')\\b\\.?(?:\\s*(\\d{4}))?$', 'i');
   // 曜日・時刻・TBC・記号だけでできた行事名は予定ではない。ポスター体裁の予定表は
   // OCRが列ごとに返すため、時刻の列や曜日の列がまるごと行事名になってしまう。
   // ※行事名の途中の曜日は消さないこと。「University holiday - Easter Monday」が壊れる。
@@ -210,10 +212,32 @@
       }
     })();
 
+    /* 月見出しから月・年を引き継ぐ（英語の学校暦など、日付欄が「07」と日だけの予定表）。
+       数字だけの行はどんな予定表にもあり得るので、歯止めを2つ掛ける。
+         ・月見出し（SEPTEMBER 2026）を見たあとであること
+         ・行全体がちょうど1〜2桁の数字であること
+       手持ちの実データではICC・IPL・ASAに該当行が無く、この2条件なら誤爆しない。 */
+    var enDayLine = [];
+    if (EN) {
+      var cm = 0, cy = 0;
+      for (var di = 0; di < lines.length; di++) {
+        var mh = lines[di].match(EN_MONTH_HEAD_RE);
+        if (mh) { cm = enMonth(mh[1]); cy = mh[2] ? Number(mh[2]) : 0; continue; }
+        if (cm && /^\d{1,2}$/.test(lines[di]) && valid(cm, Number(lines[di]))) {
+          enDayLine[di] = { mo: cm, yyyy: cy, da: Number(lines[di]) };
+        }
+      }
+    }
+
     lines.forEach(function (line, li) {
       if (isHeader(line)) return;
 
       var hits = dateHits(line);
+      // 日だけの行は、覚えておいた月見出しと組み合わせて日付にする
+      if (!hits.length && enDayLine[li]) {
+        var d = enDayLine[li];
+        hits = [{ i: 0, len: line.length, g: { mo: d.mo, da: d.da, ed: undefined, em: undefined, yyyy: d.yyyy || undefined } }];
+      }
       if (!hits.length) {
         if (/未\s*定/.test(line) || (EN && EN_TBC_RE.test(line))) {
           skipped.push({ reason: 'undecided', raw: tidy(line) });
@@ -235,7 +259,7 @@
         if (!body && k === hits.length - 1) {
           var buf = [];
           for (var j = li + 1; j < lines.length && buf.length < 8; j++) {
-            if (hasDate(lines[j]) || isHeader(lines[j])) break;
+            if (hasDate(lines[j]) || isHeader(lines[j]) || enDayLine[j]) break;
             // 「未定」は日付の無い別の予定、「◯◯予定表」は次の表の見出し。
             // どちらもここで区切らないと、直前の予定の行事名に吸い込まれる。
             if (/未\s*定/.test(lines[j]) || /(?:予\s*定\s*表|日\s*程\s*表)/.test(lines[j])) break;

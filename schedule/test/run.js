@@ -29,8 +29,8 @@ var FIXTURES = [
     note: '英語。「7 Feb」＝年の記載が無い。年度で繰り上げると2027年になってしまう'
   },
   {
-    name: 'uk-term-dates', file: 'ocr-uk-term-dates-2026-27.txt', fiscalYear: 2026, lang: 'en', expect: 0,
-    note: '英語。月と年が見出し行「SEPTEMBER 2026」にあり、日付セルは日だけ（第2段階で対応予定）'
+    name: 'uk-term-dates', file: 'ocr-uk-term-dates-2026-27.txt', fiscalYear: 2026, lang: 'en', expect: 40,
+    note: '英語。月と年が見出し行「SEPTEMBER 2026」にあり、日付セルは日だけ。見出しから引き継ぐ'
   },
   {
     name: 'ipl-table', file: 'ocr-ipl-2026-table.txt', fiscalYear: 2026, lang: 'en', expect: 59,
