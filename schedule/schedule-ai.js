@@ -57,7 +57,9 @@
       '・表の見出し行（「期日」「場所」「大会名」など）は含めないこと。\n' +
       '■ 各項目\n' +
       '・title は行事名。祝日名や日付・曜日は title に入れないこと。\n' +
-      '・place は会場・場所（書かれていなければ空文字）。\n' +
+      '・place は会場・場所（書かれていなければ空文字）。都道府県が会場と別の欄に分かれている場合は、' +
+      '「静岡県 三島市民体育館」「徳島 松茂町総合体育館」のように、都道府県と会場をつなげて place に入れること' +
+      '（同じ名前の体育館が各地にあるため、地図で場所を特定するのに要る）。\n' +
       '・time は開始時刻 HH:MM（書かれていなければ空文字）。\n' +
       '出力形式（この配列だけを返す）:\n' +
       '[{"date":"YYYY-MM-DD","end":"","time":"","title":"","place":""}]';
@@ -78,7 +80,10 @@
       '- Table header rows such as "date", "venue", "event name".\n' +
       'Fields:\n' +
       '- title is the event name (no holiday names, dates or weekdays inside it).\n' +
-      '- place is the venue (empty string if absent). time is the start time HH:MM (empty string if absent).\n' +
+      '- place is the venue (empty string if absent). If the prefecture or region sits in its own column, ' +
+      'join it with the venue in place (e.g. "Tokushima Matsushige Gymnasium") -- venues in different ' +
+      'places often share a name, so it is needed to pin the location on a map.\n' +
+      '- time is the start time HH:MM (empty string if absent).\n' +
       'Output exactly this shape:\n' +
       '[{"date":"YYYY-MM-DD","end":"","time":"","title":"","place":""}]';
   }
