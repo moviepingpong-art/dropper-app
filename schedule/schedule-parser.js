@@ -69,6 +69,9 @@
   // 「★ ★」のような飾りだけの行。表の末尾に置かれ、直前の予定に吸い込まれてしまう。
   // ハイフンは入れないこと（「静岡 - KM東京」の対戦表記が壊れる）。
   var NOISE_RE = /^[\s★☆◆◇■□●○▲△▼▽※＊*＝=…・]+$/;
+  // 連絡先だけの行。「連絡先」の列を持つ予定表があり、そのままだと行事名に流れ込む。
+  // 行事名がメールアドレスや電話番号だけ、ということはあり得ないので落として安全。
+  var CONTACT_RE = /^(?:[^\s@]+@[^\s@]+\.[A-Za-z]{2,}|(?:\+?\d[\d\s()\-]{6,}\d)|https?:\/\/\S+)$/;
 
   /* ===== 英語の予定表（en/in版） =====
      英語でもGoogleのOCRは表を「1セル＝1行」で返す（実データで確認済み）。
@@ -87,9 +90,15 @@
   // 「7:30 PM」「7 pm」。24時間制と取り違えると 19:30 が 07:30 になる。
   var EN_TIME_RE = /(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m\.?\b/i;
   // 曜日だけの行。英語の予定表では日付とは別の列に置かれ、行事名に混ざる。
-  var EN_WD_RE = /^(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|sday|nesday|rsday|urday)?\.?$/i;
+  var EN_WD = '(?:sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|sday|nesday|rsday|urday)?';
+  var EN_WD_RE = new RegExp('^' + EN_WD + '\\.?$', 'i');
+  // 「SAT – SUN」「THURS -」のように曜日の範囲で書かれる欄もある（改行で割れることもある）
+  var EN_WD_LINE_RE = new RegExp('^' + EN_WD + '(?:\\s*[-–—]\\s*(?:' + EN_WD + ')?)?\\.?$', 'i');
   var EN_HEADER_RE = /^(?:date|day|time|match|fixture|opponent|versus|venue|location|place|activity|event|details|notes?|organiser|organizer|contact(?:\s+details)?)$/i;
   var EN_TBC_RE = /^(?:tbc|tba|t\.b\.c\.?|to be confirmed|to be advised|n\/a)$/i;
+  // 月名だけの行。「JANUARY 2026」の月見出しと、日が決まっていない「January」の日付欄の
+  // 両方がこの形。どちらも次の予定の始まりなので、ここで区切らないと前の予定が飲み込む。
+  var EN_MONTH_ONLY_RE = new RegExp('^(?:' + EN_MON + ')\\b\\.?(?:\\s*\\d{4})?$', 'i');
   // 曜日・時刻・TBC・記号だけでできた行事名は予定ではない。ポスター体裁の予定表は
   // OCRが列ごとに返すため、時刻の列や曜日の列がまるごと行事名になってしまう。
   // ※行事名の途中の曜日は消さないこと。「University holiday - Easter Monday」が壊れる。
@@ -230,9 +239,10 @@
             // 「未定」は日付の無い別の予定、「◯◯予定表」は次の表の見出し。
             // どちらもここで区切らないと、直前の予定の行事名に吸い込まれる。
             if (/未\s*定/.test(lines[j]) || /(?:予\s*定\s*表|日\s*程\s*表)/.test(lines[j])) break;
-            if (EN && EN_TBC_RE.test(lines[j])) break;
+            if (EN && (EN_TBC_RE.test(lines[j]) || EN_MONTH_ONLY_RE.test(lines[j]))) break;
             if (NOISE_RE.test(lines[j])) continue;
-            if (EN && EN_WD_RE.test(lines[j])) continue;   // 曜日だけの行は行事名ではない
+            if (CONTACT_RE.test(lines[j])) continue;       // 電話・メールだけの行は行事名ではない
+            if (EN && EN_WD_LINE_RE.test(lines[j])) continue;   // 曜日だけの行は行事名ではない
             buf.push(lines[j]);
           }
           // 場所は行の末尾に置かれる。後ろから2行以内だけを候補にする
