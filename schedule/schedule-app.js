@@ -13,7 +13,8 @@ var SCOPES = [
 ].join(' ');
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';
-var OCR_LANG = 'ja';
+// GoogleドライブOCRの言語（en/in版は英語、日本語版はja）。イベントドロッパーと同じ決め方。
+var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';
 var AI_KEY_STORE = 'dropper_ai_key';   // イベントドロッパーと同じ保存先（入れ直しの手間を省く）
 
 var accessToken = null, tokenClient = null, pendingAuth = null;
