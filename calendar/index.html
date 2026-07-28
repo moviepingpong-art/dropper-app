@@ -344,11 +344,12 @@
 <body>
   <header>
     <p class="free-badge" data-i18n="freeBadge">🎉 今なら無料公開中</p><p class="multi-badge" data-i18n="multiBadge">🎪 様々なイベントチラシに対応</p>
-    <!-- どのドロッパーを使うかのタブ。選択中は .on（リンクにしない）。en/in では i18n.js が隠す -->
+    <!-- どのドロッパーを使うかのタブ。選択中は .on（リンクにしない）。
+         予定表側のリンク先は i18n.js が言語に合わせて張り替える。 -->
     <nav class="tool-tabs" id="toolTabs">
       <span class="tool-tabs-label" data-i18n="typePrompt">ドロッパーの選択</span>
       <span class="tool-tab on" data-i18n="toolEvent">🎪 イベント</span>
-      <a class="tool-tab" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
+      <a class="tool-tab" id="tabSchedule" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
     </nav>
     <p class="tool-hint" id="toolHint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も</p>
     <h1 data-i18n="appName">イベントドロッパー</h1>

@@ -613,13 +613,12 @@
         a.href = 'https://dropper-tools.com/' + gp;
       }
     }
-    // ドロッパー切り替えタブ。予定表ドロッパーは日本語版のみで、通常モードの抽出も日本語専用のため、
-    // en/in では行ごと出さない（選ばせても飛ばす先が無い）。ja に戻したら自動で出る。
-    var showTools = (global.LANG !== 'en' && global.LANG !== 'in');
-    ['toolTabs', 'toolHint'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.style.display = showTools ? '' : 'none';
-    });
+    // ドロッパー切り替えタブ。予定表ドロッパーは3言語そろったので、どの言語でも出す。
+    // リンク先は同じ言語の版へ送ること（en から ja の予定表へ飛ばさない）。
+    var ts = document.getElementById('tabSchedule');
+    if (ts) {
+      ts.href = (global.LANG === 'en') ? '/schedule-en/' : (global.LANG === 'in') ? '/schedule-in/' : '/schedule/';
+    }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');
