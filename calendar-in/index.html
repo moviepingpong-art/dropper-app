@@ -371,17 +371,10 @@
     <p class="guide-link" id="guideLink">
       <a href="https://dropper-tools.com/guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
     </p>
+    <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
     <p class="visitor-badge" id="visitorBadge">
       <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
     </p>
-    <script>
-      // 訪問者カウンター(hits.sh)を言語別に分ける。パスは window.LANG から決める。
-      (function(){
-        var seg = (window.LANG === 'en') ? 'calendar-en' : (window.LANG === 'in') ? 'calendar-in' : 'calendar';
-        var img = document.getElementById('visitorImg');
-        if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
-      })();
-    </script>
   </header>
   <main>
     <div id="login-area">
@@ -496,6 +489,16 @@
 
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>window.LANG = 'in';</script>
+  <script>
+    // 訪問者カウンター(hits.sh)を言語別に分ける。パスは window.LANG から決める。
+    // ※必ず window.LANG を設定したあとに置くこと。以前はヘッダー内にあり、LANG が未定義のまま
+    //   走っていたため、en/in の訪問がすべて ja の数に混ざっていた。
+    (function () {
+      var seg = (window.LANG === 'en') ? 'calendar-en' : (window.LANG === 'in') ? 'calendar-in' : 'calendar';
+      var img = document.getElementById('visitorImg');
+      if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
+    })();
+  </script>
   <script src="i18n.js"></script>
   <script src="parser.js"></script>
   <script src="app.js"></script>
