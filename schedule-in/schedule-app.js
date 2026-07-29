@@ -113,13 +113,15 @@ function askKey(force) {
 }
 el('keyBtn').addEventListener('click', function () { askKey(true); });
 
-// 表形式のつもりで読んだが取りこぼした、というときの逃げ道。形の選択は変えない。
+// 通常モードで読んだが取りこぼした、というときの逃げ道。
+// モードそのものをAIへ切り替える。切り替えずにAIで読むと、画面は「通常モード」を選択中と
+// 表示したままAIが動くことになり、何が起きているのか分からなくなる。
 el('retryAiBtn').addEventListener('click', async function () {
   if (!lastFile) { setMsg(I18N.t('msgDropFirst')); return; }
   var key = await askKey(false);
   if (!key) { setMsg(I18N.t('errNoKeyAborted')); return; }
-  el('keyBtn').style.display = '';
-  await handleFile(lastFile, true);
+  setMode(true);
+  await handleFile(lastFile);
 });
 
 /* ===== ドロップ ===== */
@@ -157,10 +159,9 @@ if (el('diagCopy')) {
   });
 }
 
-// forceAi: 「AIで読み直す」から呼ばれたとき。形の選択は変えずに、この1回だけAIで読む。
-async function handleFile(file, forceAi) {
+async function handleFile(file) {
   if (!file) return;
-  var useAi = !!forceAi || aiMode;
+  var useAi = aiMode;
   lastFile = file;
   resultEl.style.display = 'none';
   el('diag').style.display = 'none';
