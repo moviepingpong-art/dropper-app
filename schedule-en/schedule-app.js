@@ -65,39 +65,24 @@ el('loginBtn').addEventListener('click', async function () {
   } catch (e) { setMsg(e.message || I18N.t('msgLoginFailed')); }
 });
 
-/* ===== 予定表の形をえらぶ（＝読み取り方が決まる） =====
-   「通常モード／AIモード」を選ばせると、利用者にOCRとAIの違いの理解を求めることになる。
-   手元の紙と見比べるだけで選べるよう、紙面の形を聞き、その結果として読み取り方を決める。
-   自動判定はしない。マス目の予定表をOCRで読むと、0件にならず「それらしい件数のまま
-   日付と行事名の対応だけが狂った結果」が出るため、誤っても機械には気づけない。 */
-var SHAPE = {
-  table: { labelKey: 'shapeTableLabel', noteKey: 'shapeTableNote' },
-  grid: { labelKey: 'shapeGridLabel', noteKey: 'shapeGridNoteFull' },
-  unknown: { labelKey: 'shapeUnknownLabel', noteKey: 'shapeUnknownNote' }
-};
-function setShape(v) {
-  var s = SHAPE[v] || SHAPE.table;
-  aiMode = (v === 'grid');
-  el('shapeStep').style.display = 'none';
-  el('shapeCurrent').style.display = 'flex';
-  el('shapeLabel').textContent = I18N.t(s.labelKey);
-  el('ocrNote').textContent = I18N.t(s.noteKey);
-  el('workBody').style.display = 'block';
-  el('keyBtn').style.display = aiMode ? '' : 'none';
-  el('retryAi').style.display = 'none';
-  setMsg('');
-  // カレンダー形式はAIでしか読めない。キーが無いと必ず行き止まるので、この場で入れてもらう。
-  if (aiMode && !savedKey()) askKey(false);
+/* ===== 読み取り方の切り替え =====
+   イベントドロッパーと同じ「AIを使うか使わないか」の2択。
+   以前は「予定表の形（表かマス目か）」を利用者に選ばせていたが、
+   マス目を通常モードで読むと0件にはならず「それらしい件数のまま日付と行事名の対応だけが
+   狂った結果」が出るため、選び間違えた人は気づけなかった。
+   いまは読んだあとに looksLikeGrid で見分けて警告する（判定は schedule-parser.js）。 */
+function setMode(useAi) {
+  aiMode = useAi;
+  el('modeNormal').classList.toggle('on', !useAi);
+  el('modeAi').classList.toggle('on', useAi);
+  el('keyBtn').style.display = useAi ? '' : 'none';
+  el('ocrNote').textContent = I18N.t(useAi ? 'modeAiNote' : 'modeNormalNote');
+  // AIモードはキーが無いと必ず行き止まるので、この場で入れてもらう。
+  if (useAi && !savedKey()) askKey(false);
 }
-el('shapeTable').addEventListener('click', function () { setShape('table'); });
-el('shapeGrid').addEventListener('click', function () { setShape('grid'); });
-el('shapeUnknown').addEventListener('click', function () { setShape('unknown'); });
-el('shapeChange').addEventListener('click', function () {
-  el('shapeStep').style.display = '';
-  el('shapeCurrent').style.display = 'none';
-  el('workBody').style.display = 'none';
-  setMsg('');
-});
+el('modeNormal').addEventListener('click', function () { setMode(false); });
+el('modeAi').addEventListener('click', function () { setMode(true); });
+setMode(false);   // 既定は通常モード。案内文もここで入る
 
 /* ===== APIキー ===== */
 function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
@@ -180,6 +165,7 @@ async function handleFile(file, forceAi) {
   resultEl.style.display = 'none';
   el('diag').style.display = 'none';
   el('retryAi').style.display = 'none';
+  el('gridWarn').style.display = 'none';
   window.lastOcrText = '';
   try {
     await ensureToken();
@@ -217,8 +203,11 @@ async function handleFile(file, forceAi) {
     }
     items.forEach(function (it) { it.on = !!it.start; });   // 日付が取れた行だけ最初から選択
     render();
-    // OCRで読んだあとは、取りこぼしても選び直さずに済むよう逃げ道を出す
+    // OCRで読んだあとは、取りこぼしてもモードを切り替えずに済むよう逃げ道を出す
     el('retryAi').style.display = useAi ? 'none' : 'block';
+    // マス目を通常モードで読んでしまった場合の警告。件数が出ていても対応が狂っているので、
+    // 利用者が自力で気づくのは難しい。勝手にAIへ切り替えはせず、押すかどうかは委ねる。
+    el('gridWarn').style.display = (!useAi && window.SchedParser.looksLikeGrid(window.lastOcrText || '')) ? 'block' : 'none';
     // 案内は render のあとに出す（先に出すと render 後の setMsg で消えてしまう）
     if (!items.length) {
       setMsg(I18N.t(useAi ? 'msgNoneAi' : 'msgNoneOcr'));

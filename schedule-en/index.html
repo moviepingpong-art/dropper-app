@@ -73,29 +73,23 @@
     }
     .note { color:var(--sub); font-size:12.5px; margin-top:12px; line-height:1.7; }
 
-    /* ===== 予定表の形の選択 =====
-       「通常モード／AIモード」を選ばせると、利用者に仕組みの理解を求めることになる。
-       手元の紙と見比べるだけで選べるよう、図で「表形式か、マス目か」を聞く。 */
-    .shape-prompt { font-size:15px; font-weight:700; color:var(--teal-d); margin:0 0 12px; }
-    .shape-row { display:flex; flex-wrap:wrap; gap:14px; margin:0 0 12px; }
-    .shape-card {
-      font-family:inherit; text-align:center; cursor:pointer;
-      flex:1 1 210px; max-width:270px; padding:16px 14px 14px;
-      background:#fff; border:2px solid var(--line); border-radius:20px;
-      display:flex; flex-direction:column; align-items:center; gap:8px;
-      transition:border-color .15s, transform .12s, box-shadow .2s;
+    /* ===== 読み取り方の選択 =====
+       イベントドロッパーと同じ「AIを使うか使わないか」の2択。
+       マス目かどうかは利用者に判断させず、読んだあとに機械が見分けて知らせる
+       （schedule-parser.js の looksLikeGrid）。 */
+    .mode-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 6px; }
+    .mode-btn {
+      font-family:inherit; font-size:14px; font-weight:700; padding:10px 16px; border-radius:14px;
+      cursor:pointer; color:var(--teal-d); background:#fff; border:2px solid var(--line);
     }
-    .shape-card:hover { border-color:var(--teal); transform:translateY(-2px); box-shadow:0 10px 24px rgba(6,182,164,.18); }
-    .shape-card svg { width:100%; max-width:154px; height:auto; display:block; }
-    .shape-card b { font-size:16px; color:var(--ink); }
-    /* 説明文の改行は辞書側の \n で表す（言語ごとに折り返し位置が変わるため） */
-    .shape-card span { font-size:12.5px; color:var(--sub); line-height:1.55; white-space:pre-line; }
-    .shape-card .shape-note { font-size:11.5px; color:#b45309; line-height:1.5; }
-    /* 選んだあとの表示。いつでも選び直せるように「変更」を隣に置く */
-    #shapeCurrent { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; }
-    .shape-badge {
-      display:inline-block; padding:9px 16px; border-radius:12px; font-weight:700; font-size:14px;
-      background:linear-gradient(100deg,var(--yellow),var(--lime)); color:var(--ink);
+    .mode-btn:hover { border-color:var(--teal); }
+    .mode-btn.on { border-color:transparent; color:var(--ink);
+      background:linear-gradient(100deg,var(--yellow),var(--lime)); }
+    /* マス目を通常モードで読んでしまったときの警告。見落とされると困るので強めに出す */
+    #gridWarn {
+      display:none; margin:12px 0 0; padding:12px 14px; border-radius:14px;
+      background:#fff7e6; border:2px solid #ffd591; color:#7a4f01;
+      font-size:13.5px; font-weight:700; line-height:1.7;
     }
     .fy-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 14px; font-size:14px; }
     .fy-row input { width:90px; padding:8px 10px; border:2px solid var(--line); border-radius:10px; font-family:inherit; font-size:14px; }
@@ -184,72 +178,16 @@
     </div>
 
     <div id="work" style="display:none">
-      <!-- 予定表の形をえらぶ。ここで読み取り方（OCR／AI）が決まる。
-           マス目の予定表をOCRで読むと、0件にならず「日付と行事名の対応だけが狂った結果」が
-           出てしまい、自動では気づけない。だから選ぶのは利用者。 -->
-      <div id="shapeStep">
-        <p class="shape-prompt" data-i18n="shapePrompt">予定表の形をえらんでください</p>
-        <div class="shape-row">
-          <button type="button" class="shape-card" id="shapeTable">
-            <svg viewBox="0 0 154 84" aria-hidden="true">
-              <rect x="1" y="1" width="152" height="82" rx="8" fill="#fff" stroke="#cdeae6" stroke-width="2"/>
-              <line x1="52" y1="1" x2="52" y2="83" stroke="#cdeae6" stroke-width="2"/>
-              <line x1="1" y1="22" x2="153" y2="22" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="1" y1="43" x2="153" y2="43" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="1" y1="64" x2="153" y2="64" stroke="#e3f5f2" stroke-width="2"/>
-              <rect x="10" y="8" width="32" height="7" rx="3.5" fill="#06b6a4"/>
-              <rect x="62" y="8" width="78" height="7" rx="3.5" fill="#a3e635"/>
-              <rect x="10" y="29" width="32" height="7" rx="3.5" fill="#06b6a4"/>
-              <rect x="62" y="29" width="62" height="7" rx="3.5" fill="#a3e635"/>
-              <rect x="10" y="50" width="32" height="7" rx="3.5" fill="#06b6a4"/>
-              <rect x="62" y="50" width="70" height="7" rx="3.5" fill="#a3e635"/>
-              <rect x="10" y="71" width="32" height="7" rx="3.5" fill="#06b6a4"/>
-              <rect x="62" y="71" width="54" height="7" rx="3.5" fill="#a3e635"/>
-            </svg>
-            <b data-i18n="shapeTableName">表形式</b>
-            <span data-i18n="shapeTableDesc">予定が1行に1つずつ
-上から並んでいる</span>
-          </button>
-          <button type="button" class="shape-card" id="shapeGrid">
-            <svg viewBox="0 0 154 84" aria-hidden="true">
-              <rect x="1" y="1" width="152" height="82" rx="8" fill="#fff" stroke="#cdeae6" stroke-width="2"/>
-              <rect x="1" y="1" width="152" height="16" rx="8" fill="#eafaf7"/>
-              <line x1="1" y1="17" x2="153" y2="17" stroke="#cdeae6" stroke-width="2"/>
-              <line x1="31" y1="1" x2="31" y2="83" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="62" y1="1" x2="62" y2="83" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="92" y1="1" x2="92" y2="83" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="123" y1="1" x2="123" y2="83" stroke="#e3f5f2" stroke-width="2"/>
-              <line x1="1" y1="50" x2="153" y2="50" stroke="#e3f5f2" stroke-width="2"/>
-              <rect x="8" y="23" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="39" y="23" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="69" y="23" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="100" y="23" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="130" y="23" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="36" y="33" width="22" height="6" rx="3" fill="#a3e635"/>
-              <rect x="97" y="33" width="24" height="6" rx="3" fill="#a3e635"/>
-              <rect x="8" y="56" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="39" y="56" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="69" y="56" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="100" y="56" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="130" y="56" width="10" height="5" rx="2.5" fill="#06b6a4"/>
-              <rect x="66" y="66" width="24" height="6" rx="3" fill="#a3e635"/>
-            </svg>
-            <b data-i18n="shapeGridName">カレンダー形式</b>
-            <span data-i18n="shapeGridDesc">マス目の中に
-行事名が書いてある</span>
-            <span class="shape-note" data-i18n="shapeGridNote">AIで読み取ります（APIキーが必要）</span>
-          </button>
-        </div>
-        <button type="button" class="tool-btn" id="shapeUnknown" data-i18n="shapeUnknown">わからない</button>
-      </div>
-
-      <div id="shapeCurrent" style="display:none">
-        <span class="shape-badge" id="shapeLabel"></span>
-        <button type="button" class="tool-btn" id="shapeChange" data-i18n="shapeChange">変更</button>
+      <!-- 読み取り方の選択。イベントドロッパーと同じ2択。
+           マス目かどうかは読んだあとに looksLikeGrid が見分けて知らせる。 -->
+      <div class="mode-row">
+        <span style="font-weight:700;color:var(--teal-d)" data-i18n="modeLabel">読み取り方：</span>
+        <button type="button" class="mode-btn on" id="modeNormal" data-i18n="modeNormal">通常モード（AIなし）</button>
+        <button type="button" class="mode-btn" id="modeAi" data-i18n="modeAi">AIモード</button>
         <button type="button" class="tool-btn" id="keyBtn" style="display:none" data-i18n="keyBtn">APIキーを変更</button>
       </div>
 
-      <div id="workBody" style="display:none">
+      <div>
       <div class="fy-row">
         <label for="fy" style="font-weight:700;color:var(--teal-d)" data-i18n="fyLabel">年度：</label>
         <input id="fy" type="text" inputmode="numeric" placeholder="例 2026" data-i18n="fyPlaceholder" data-i18n-attr="placeholder">
@@ -267,7 +205,11 @@
 
       <div id="msg"></div>
 
-      <!-- 表形式で読んだあとの逃げ道。取りこぼしても、選び直さずここからAIで読み直せる。 -->
+      <!-- 通常モードでマス目を読んでしまったときに出す。読み取れた件数がそれらしくても
+           日付と行事名の対応が狂っているので、件数だけでは利用者が気づけない。 -->
+      <p id="gridWarn" data-i18n="gridWarn">⚠ この予定表はカレンダー形式（マス目）のようです。日付と行事名の対応が正しく取れていない可能性があります。下の「AIで読み直す」をお試しください。</p>
+
+      <!-- 通常モードで読んだあとの逃げ道。取りこぼしても、モードを切り替えずここからAIで読み直せる。 -->
       <div id="retryAi" style="display:none; margin-top:10px">
         <button type="button" class="tool-btn" id="retryAiBtn" data-i18n="retryAiBtn">🤖 AIで読み直す</button>
         <span class="fy-hint" data-i18n="retryAiHint">読み取れていない予定があるときに使います（APIキーが必要）。</span>
@@ -311,7 +253,7 @@
           <span id="regMsg" class="fy-hint"></span>
         </div>
       </div>
-      </div><!-- /workBody -->
+      </div>
     </div>
   </main>
 

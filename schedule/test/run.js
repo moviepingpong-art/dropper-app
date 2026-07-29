@@ -35,6 +35,15 @@ var FIXTURES = [
   {
     name: 'ipl-table', file: 'ocr-ipl-2026-table.txt', fiscalYear: 2026, lang: 'en', expect: 59,
     note: '英語。1〜2ページは1試合＝1行で日付が行の途中。3ページは列ごとに返るため取れない（59/70試合）'
+  },
+  // マス目のカレンダー。通常モードでは読めない形で、looksLikeGrid が true になるのが正しい。
+  {
+    name: 'school-grid', file: 'ocr-school-grid-2026.txt', fiscalYear: 2026, lang: 'ja', grid: true,
+    note: 'マス目（年間マトリクス型）。12か月×31日。日付と曜日が交互に来る'
+  },
+  {
+    name: 'school-grid2', file: 'ocr-school-grid2-2026.txt', fiscalYear: 2026, lang: 'ja', grid: true,
+    note: 'マス目（日/曜/行事の列が6か月分）。曜日と行事名が同じ行に来ることがある'
   }
 ];
 
@@ -50,6 +59,12 @@ targets.forEach(function (f) {
   var r = window.SchedParser.parse(text, { fiscalYear: f.fiscalYear, lang: f.lang });
   console.log('===== ' + f.name + ' =====');
   console.log(f.note);
+  // マス目の判定。表形式で true になったら誤検出、マス目で false になったら取りこぼし。
+  var grid = window.SchedParser.looksLikeGrid(text);
+  var want = !!f.grid;
+  console.log('マス目判定: ' + (grid ? 'マス目' : '表') + '（期待 ' + (want ? 'マス目' : '表') + '）' +
+    (grid === want ? '' : '   ← 判定がずれている'));
+  if (f.grid) { console.log(''); return; }   // マス目は通常モードで読めないので件数は見ない
   console.log('件数: ' + r.items.length + '（目安 ' + f.expect + '）  除外: ' + r.skipped.length +
     (r.items.length === f.expect ? '' : '   ← 件数が変わっている'));
   console.log('');

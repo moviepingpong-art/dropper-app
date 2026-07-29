@@ -1,6 +1,6 @@
 // schedule-parser.js — 予定表ドロッパーの抽出エンジン
 // 1枚の予定表（年間行事予定・大会日程表・リーグ戦日程など）から、N件の予定を取り出す。
-// window.SchedParser = { parse(text, opts), fiscalYearOf(text) } を公開する。
+// window.SchedParser = { parse(text, opts), fiscalYearOf(text), looksLikeGrid(text) } を公開する。
 //
 // イベントドロッパー（parser.js）との違い：
 //   あちらは「1枚 = 1イベント」、こちらは「1枚 = N件の別々の予定」。
@@ -130,6 +130,37 @@
       .replace(/[\s|｜:：・･,，、\-–—]+$/, '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  /* ===== マス目のカレンダーかどうかを見分ける =====
+     通常モードで読むと0件にはならず「それらしい件数のまま日付と行事名の対応だけが狂った結果」が
+     出るため、読んだあとに知らせてAIへ誘導するのに使う。判定を間違えても勝手にAIへ切り替えたり
+     はしない（利用者のAPIキーの無料枠を消費するため）。
+
+     実データ8枚で測った信号。表形式はどれも最大1、マス目は最小6で、境界に余裕がある。
+       ・月名だけの行が連続（`4月 5月 6月 …` のマトリクス型の見出し）
+       ・「数字だけの行 → 曜日だけの行」の組（マス目の中身）
+       ・曜日だけの行が連続、または1行に曜日が並ぶ（`日 月 火 水 木 金 土` の見出し）
+     ※曜日は日付と交互に来ることがあり「曜日だけが5つ以上連続」だけでは取りこぼす。
+       実物のOCRを見るまでその形に気づけなかったので、3つとも残すこと。 */
+  var GRID_WD_LINE = new RegExp('^(?:[日月火水木金土]|' + EN_WD + ')(?:曜日?)?$', 'i');
+  var GRID_MON_LINE = new RegExp('^(?:\\d{1,2}\\s*月|' + EN_MON + ')\\b\\.?(?:\\s*\\d{4})?$', 'i');
+  var GRID_WD_TOKEN = new RegExp('\\b' + EN_WD + '\\b', 'gi');
+  function looksLikeGrid(rawText) {
+    var lines = normalize(rawText).split(/\r?\n/)
+      .map(function (s) { return s.replace(/\t/g, ' ').trim(); })
+      .filter(Boolean);
+    var monRun = 0, monBest = 0, wdRun = 0, wdBest = 0, pairs = 0, inline = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (GRID_MON_LINE.test(l)) { monRun++; if (monRun > monBest) monBest = monRun; } else monRun = 0;
+      if (GRID_WD_LINE.test(l)) { wdRun++; if (wdRun > wdBest) wdBest = wdRun; } else wdRun = 0;
+      if (/^\d{1,2}$/.test(l) && i + 1 < lines.length && GRID_WD_LINE.test(lines[i + 1])) pairs++;
+      GRID_WD_TOKEN.lastIndex = 0;
+      var m = l.match(GRID_WD_TOKEN);
+      if (m && m.length > inline) inline = m.length;
+    }
+    return (monBest >= 4 || pairs >= 20 || wdBest >= 5 || inline >= 5);
   }
 
   // ===== 本体 =====
@@ -359,5 +390,7 @@
     return { fiscalYear: fy, yearKnown: yearKnown, items: items, skipped: skipped };
   }
 
-  global.SchedParser = { parse: parse, fiscalYearOf: fiscalYearOf, normalize: normalize };
+  global.SchedParser = {
+    parse: parse, fiscalYearOf: fiscalYearOf, normalize: normalize, looksLikeGrid: looksLikeGrid
+  };
 })(typeof window !== 'undefined' ? window : this);
