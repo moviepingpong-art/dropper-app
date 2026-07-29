@@ -75,13 +75,26 @@ function setMode(useAi) {
   aiMode = useAi;
   el('modeNormal').classList.toggle('on', !useAi);
   el('modeAi').classList.toggle('on', useAi);
-  el('keyBtn').style.display = useAi ? '' : 'none';
   el('ocrNote').textContent = I18N.t(useAi ? 'modeAiNote' : 'modeNormalNote');
-  // AIモードはキーが無いと必ず行き止まるので、この場で入れてもらう。
-  if (useAi && !savedKey()) askKey(false);
 }
+
+/* AIを使うかどうかのポップアップ。イベントドロッパーと同じ流れにそろえてある。
+   キーを求める前に「端末内にしか保存しない」「無料枠がある」を必ず見せたいので、
+   AIモードへの入口はここ1つに統一する（「APIキーを変更」の専用ボタンは置かない）。
+   すでにAIモードでも、もう一度押せばキーを入れ直せる。 */
+function openAiModal() { el('ai-modal').classList.add('show'); }
+function closeAiModal() { el('ai-modal').classList.remove('show'); }
+el('aiSkipBtn').addEventListener('click', function () { closeAiModal(); setMode(false); });
+el('aiUseBtn').addEventListener('click', async function () {
+  // キーを入れ直せるよう、保存済みでも必ず入力欄を出す
+  var key = await askKey(true);
+  if (!key) return;   // キャンセル＝選び直しを促すため、ポップアップは閉じない
+  closeAiModal();
+  setMode(true);
+});
+
 el('modeNormal').addEventListener('click', function () { setMode(false); });
-el('modeAi').addEventListener('click', function () { setMode(true); });
+el('modeAi').addEventListener('click', function () { openAiModal(); });
 setMode(false);   // 既定は通常モード。案内文もここで入る
 
 /* ===== APIキー ===== */
@@ -111,15 +124,14 @@ function askKey(force) {
     setTimeout(function () { input.focus(); }, 50);
   });
 }
-el('keyBtn').addEventListener('click', function () { askKey(true); });
-
 // 通常モードで読んだが取りこぼした、というときの逃げ道。
 // モードそのものをAIへ切り替える。切り替えずにAIで読むと、画面は「通常モード」を選択中と
 // 表示したままAIが動くことになり、何が起きているのか分からなくなる。
 el('retryAiBtn').addEventListener('click', async function () {
   if (!lastFile) { setMsg(I18N.t('msgDropFirst')); return; }
-  var key = await askKey(false);
-  if (!key) { setMsg(I18N.t('errNoKeyAborted')); return; }
+  // キーがまだ無い人に、いきなりキーだけ求めない。先に説明のポップアップを見せる。
+  // 入力を終えたらAIモードになるので、もう一度このボタンを押せば読み直せる。
+  if (!savedKey()) { openAiModal(); return; }
   setMode(true);
   await handleFile(lastFile);
 });
