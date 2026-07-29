@@ -62,6 +62,8 @@
     @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
 
     .lead { color:var(--sub); font-size:15px; margin:10px 0 0; }
+    .visitor-badge { margin:10px 0 0; }
+    .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
     main { padding:8px 22px 48px; max-width:1000px; }
 
     #login-area { text-align:center; padding:30px 10px 10px; }
@@ -180,6 +182,10 @@
     <p class="tool-hint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も</p>
     <h1 data-i18n="appName">予定表ドロッパー</h1>
     <p class="lead" data-i18n="lead">年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録</p>
+    <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
+    <p class="visitor-badge" id="visitorBadge">
+      <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+    </p>
   </header>
 
   <main>
@@ -316,6 +322,16 @@
 
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>window.LANG = 'in';</script>
+  <script>
+    // 訪問者カウンター(hits.sh)を言語別に分ける。パスは window.LANG から決める。
+    // ※必ず window.LANG を設定したあとに置くこと。ヘッダー内に置くと LANG が未定義のまま走り、
+    //   en/in の訪問が ja の数に混ざる。
+    (function () {
+      var seg = (window.LANG === 'en') ? 'schedule-en' : (window.LANG === 'in') ? 'schedule-in' : 'schedule';
+      var img = document.getElementById('visitorImg');
+      if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
+    })();
+  </script>
   <script src="schedule-i18n.js"></script>
   <script src="schedule-parser.js"></script>
   <script src="schedule-ai.js"></script>
