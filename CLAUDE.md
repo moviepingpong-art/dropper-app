@@ -347,6 +347,13 @@ Googleに登録済み: アプリ名「ドロッパー」／ホームページ `h
 ## AI（Gemini BYOK）
 
 - APIキーはユーザー自身のもの。`localStorage` の `dropper_ai_key` に端末内保持し、サーバーへ送らない。
+- **APIキーを求める前に「クレカ不要・無料枠内なら0円・取得は約3分」を必ず見せる**（`aiBadge*` の3バッジ）。
+  入力欄の下には「入力したキーの扱い」（`key-trust`）で保存先・当方がサーバーを持たないこと・
+  送信先・やめ方を並べる。**ここを削ると「キーを入れさせられる」印象に戻る。**
+  両ドロッパー・3言語で同じ内容にそろえてある。
+- 取得ガイドのリンク先は周知サイトの `https://dropper-tools.com/apikey.html`（AI Studio 直リンクではない）。
+  **`href` は `applyDom` が `window.LANG` を見て張り替える**（`aiKeyGuideLink` と `keyMoreLink`）。
+  HTMLに直書きの値は ja 用の既定値。en の利用者を ja のページへ送らないための仕組みなので外さないこと。
 - 抽出プロンプトは `promptJa` / `promptEn` を `window.LANG` で選択する。
   **en/in 版で日本語プロンプトを使わないこと**（英語要項が日本語に翻訳されてしまう）。
 - レート制限対策で約5秒のスロットルを入れている（`AI_MIN_INTERVAL_MS`）。外さない。
