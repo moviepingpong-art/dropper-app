@@ -101,21 +101,37 @@
       aiModalSkipDesc: '追加設定なしで、いますぐ無料で使えます。読み取り結果はご自身で確認・修正できます。',
       aiModalUseTitle: 'AIを使う（AIモード）',
       aiModalUseDesc: 'ご自身の Google Gemini APIキー を使って、予定表をAIで読み取ります。',
-      aiModalUse1: '🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。',
-      aiModalUse2: '💰 Gemini APIには無料枠があり、1日およそ1,500件まで無料で使えます（個人利用なら十分）。',
+      // 「クレカ不要・0円・3分」の3バッジ。AI利用ポップアップとAPIキー入力の両方で使う。
+      aiBadgeCard: '💳 クレカ登録なし',
+      aiBadgeFree: '🆓 無料枠内なら0円',
+      aiBadgeTime: '⏱ 取得は約3分',
+      aiModalWhy1: '📥 1枚の予定表から何十件・何百件の予定をまとめて読み取ります（実データで157件・211件を確認）。',
+      aiModalUse1: '🔒 キーはお使いの端末内だけに保存されます。当方はサーバーを持っていないため、受け取ることができません。',
+      aiModalUse2: '💳 クレジットカードの登録は不要。無料枠は1日およそ1,500回で、超えても課金されず止まるだけです。',
       aiModalUse3: '🔑 キーの取得方法は',
       aiModalGuideLink: 'こちら（取得ガイド）',
-      aiModalUse3b: 'をご覧ください（Google AI Studio で数分・無料）。',
+      aiModalUse3b: 'をご覧ください（クレカ不要・3分・0円の理由も説明しています）。',
       aiModalSkipBtn: 'AIを使わない',
       aiModalUseBtn: 'AIを使う（キーを入力）',
       aiModalFoot: '※あとから「AIモード」を押せば、いつでもキーを入れ直せます。',
       // --- APIキー ---
       keyModalTitle: '🔑 Gemini APIキーの設定',
-      keyModalNote: 'AIで読み取るには、ご自身のGemini APIキーが必要です。Googleアカウントがあれば無料で取得できます。',
+      keyModalNote: 'AIで読み取るには、ご自身のGemini APIキーが必要です。Googleアカウントがあれば無料で取得できます（3分ほど）。クレジットカードの登録は求められません。',
       keyStudioLink: 'Google AI Studio を開く ↗',
       keyWarn: '⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。機密文書はドロップしないでください。',
       keyCancel: 'キャンセル',
       keySave: '保存して使う',
+      keyStepsTitle: '取得のしかた',
+      keyStep1: '下のリンクから Google AI Studio を開く',
+      keyStep2: 'Googleアカウントでログインする',
+      keyStep3: '「APIキーを作成」をクリックする',
+      keyStep4: 'できたキーをコピーして、下の欄に貼り付ける',
+      // キー入力欄の下に出す「キーの行き先」。周知サイトの apikey.html と同じ内容にそろえている。
+      keyTrustTitle: '🔒 入力したキーの扱い',
+      keyTrust1: '保存先は、お使いの端末の中（ブラウザ）だけです。他の端末には同期されません。',
+      keyTrust2: '当方はサーバーを持っていないため、キーも読み取った内容も受け取れません。',
+      keyTrust3: '送信先は Google の Gemini API だけです。やめたいときは Google AI Studio でキーを削除すれば、その場で無効になります。',
+      keyMoreLink: 'クレカ不要で0円な理由・安全性の詳しい説明 ↗',
       keyPrivacy: '🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。'
     },
 
@@ -201,20 +217,34 @@
       aiModalSkipDesc: 'Free to use right now, with nothing to set up. You can check and correct the results yourself.',
       aiModalUseTitle: 'With AI (AI mode)',
       aiModalUseDesc: 'Uses your own Google Gemini API key to read the schedule with AI.',
-      aiModalUse1: '🔒 The key is stored only on your device and is never sent to or stored on our servers.',
-      aiModalUse2: '💰 The Gemini API has a free tier of roughly 1,500 requests a day (plenty for personal use).',
+      aiBadgeCard: '💳 No card needed',
+      aiBadgeFree: '🆓 Free inside the free tier',
+      aiBadgeTime: '⏱ About 3 minutes',
+      aiModalWhy1: '📥 Reads dozens or hundreds of events from a single schedule at once (157 and 211 confirmed on real files).',
+      aiModalUse1: '🔒 Your key is stored only on your own device. We have no server, so we cannot receive it.',
+      aiModalUse2: '💳 No credit card required. The free tier is about 1,500 reads a day, and going over stops the requests rather than charging you.',
       aiModalUse3: '🔑 To get a key, see',
       aiModalGuideLink: 'this guide',
-      aiModalUse3b: '(a few minutes on Google AI Studio, free).',
+      aiModalUse3b: '(it also explains why there is no card and no cost).',
       aiModalSkipBtn: 'Without AI',
       aiModalUseBtn: 'With AI (enter key)',
       aiModalFoot: 'You can press "AI" again at any time to enter a different key.',
       keyModalTitle: '🔑 Gemini API key',
-      keyModalNote: 'Reading with AI needs your own Gemini API key. It is free to obtain with a Google account.',
+      keyModalNote: 'Reading with AI needs your own Gemini API key. It is free to obtain with a Google account (about 3 minutes). You are never asked for a credit card.',
       keyStudioLink: 'Open Google AI Studio ↗',
       keyWarn: '⚠️ On the free tier, what you send may be used to improve Google services. Do not drop confidential documents.',
       keyCancel: 'Cancel',
       keySave: 'Save and use',
+      keyStepsTitle: 'How to get one',
+      keyStep1: 'Open Google AI Studio from the link below',
+      keyStep2: 'Sign in with your Google account',
+      keyStep3: 'Click "Create API key"',
+      keyStep4: 'Copy the key and paste it in the field below',
+      keyTrustTitle: '🔒 What happens to the key you enter',
+      keyTrust1: 'It is stored only on your own device (in your browser). It is not synced to your other devices.',
+      keyTrust2: 'We have no server, so we can receive neither your key nor anything read from your file.',
+      keyTrust3: 'It is sent only to Google\'s Gemini API. To stop, delete the key in Google AI Studio and it is disabled immediately.',
+      keyMoreLink: 'Why there is no card and no cost, and how your key is kept safe ↗',
       keyPrivacy: '🔒 The key is stored only on your device and is never sent to or stored on our servers.'
     },
 
@@ -300,20 +330,34 @@
       aiModalSkipDesc: 'Bina kuch set kiye, abhi free mein use karein. Result aap khud check aur theek kar sakte hain.',
       aiModalUseTitle: 'AI ke saath (AI mode)',
       aiModalUseDesc: 'Aapki apni Google Gemini API key se schedule AI padhta hai.',
-      aiModalUse1: '🔒 Key sirf aapke device par rehti hai; hamare server par na bheji jaati hai na store hoti hai.',
-      aiModalUse2: '💰 Gemini API mein free tier hai — roz lagbhag 1,500 requests (personal use ke liye kaafi).',
+      aiBadgeCard: '💳 Card ki zaroorat nahi',
+      aiBadgeFree: '🆓 Free tier ke andar 0 rupaye',
+      aiBadgeTime: '⏱ Lagbhag 3 minute',
+      aiModalWhy1: '📥 Ek hi schedule se dozens ya hundreds events ek saath padhta hai (real files par 157 aur 211 confirm hue).',
+      aiModalUse1: '🔒 Aapki key sirf aapke device par store hoti hai. Hamara server hi nahi hai, to hum use receive nahi kar sakte.',
+      aiModalUse2: '💳 Credit card ki zaroorat nahi. Free tier roughly 1,500 reads/din hai, aur limit paar hone par charge nahi hota, requests ruk jaati hain.',
       aiModalUse3: '🔑 Key lene ke liye dekhein',
       aiModalGuideLink: 'yeh guide',
-      aiModalUse3b: '(Google AI Studio par kuch minute, free).',
+      aiModalUse3b: '(wahan yeh bhi likha hai ki card kyun nahi chahiye aur kharch kyun nahi hota).',
       aiModalSkipBtn: 'AI ke bina',
       aiModalUseBtn: 'AI ke saath (key daalein)',
       aiModalFoot: 'Baad mein kabhi bhi "AI" dabaakar doosri key daal sakte hain.',
       keyModalTitle: '🔑 Gemini API key',
-      keyModalNote: 'AI se padhne ke liye aapki apni Gemini API key chahiye. Google account ho to free mil jaati hai.',
+      keyModalNote: 'AI se padhne ke liye aapki apni Gemini API key chahiye. Google account ho to free mil jaati hai (lagbhag 3 minute). Credit card kabhi nahi maanga jaata.',
       keyStudioLink: 'Google AI Studio kholein ↗',
       keyWarn: '⚠️ Free tier par bheja gaya content Google ki services behtar karne mein use ho sakta hai. Confidential documents drop na karein.',
       keyCancel: 'Cancel',
       keySave: 'Save karke use karein',
+      keyStepsTitle: 'Kaise lein',
+      keyStep1: 'Niche di gayi link se Google AI Studio kholein',
+      keyStep2: 'Apne Google account se sign in karein',
+      keyStep3: '"Create API key" par click karein',
+      keyStep4: 'Key copy karke niche wale field mein paste karein',
+      keyTrustTitle: '🔒 Jo key aap daalte hain, uska kya hota hai',
+      keyTrust1: 'Wo sirf aapke device par (browser mein) store hoti hai. Doosre devices par sync nahi hoti.',
+      keyTrust2: 'Hamara server hi nahi hai, to na key na file se padha content — hum kuch receive nahi kar sakte.',
+      keyTrust3: 'Sirf Google ke Gemini API par bheji jaati hai. Band karna ho to Google AI Studio mein key delete kar dein — turant invalid ho jaati hai.',
+      keyMoreLink: 'Card kyun nahi chahiye, kharch kyun nahi, aur key safe kaise rehti hai ↗',
       keyPrivacy: '🔒 Key sirf aapke device par rehti hai; hamare server par na bheji jaati hai na store hoti hai.'
     }
   };
@@ -339,6 +383,14 @@
     var ev = document.getElementById('tabEvent');
     if (ev) {
       ev.href = (global.LANG === 'en') ? '/calendar-en/' : (global.LANG === 'in') ? '/calendar-in/' : '/calendar/';
+    }
+    // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、
+    // 同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。
+    var akPath = (global.LANG === 'en') ? 'en/apikey.html' : (global.LANG === 'in') ? 'in/apikey.html' : 'apikey.html';
+    var akIds = ['aiKeyGuideLink', 'keyMoreLink'];
+    for (var ak = 0; ak < akIds.length; ak++) {
+      var akEl = document.getElementById(akIds[ak]);
+      if (akEl) { akEl.href = 'https://dropper-tools.com/' + akPath; }
     }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {

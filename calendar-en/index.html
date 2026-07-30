@@ -281,6 +281,20 @@
     .ai-modal-btns button { flex:1 1 auto; font-size:15px; padding:13px 18px; }
     .ai-btn-skip { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
     .ai-modal-foot { margin:14px 0 0; font-size:11.5px; color:var(--sub); line-height:1.6; }
+    /* 「クレカ不要・0円・3分」を先に見せるバッジ。APIキー入力のハードルはお金の不安が大きいため、
+       キーを求める前にここで打ち消す。文言は i18n の aiBadge*（3言語）。 */
+    .ai-badges { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
+    .ai-badge { font-size:11.5px; font-weight:700; color:var(--teal-d); background:#e6fffb;
+      border:1px solid var(--teal); border-radius:999px; padding:4px 10px; white-space:nowrap; }
+    /* キーの行き先を並べて見せる箱（安全性の可視化）。キー入力欄のすぐ下に置く。 */
+    .key-trust { margin:14px 0 0; border:2px solid var(--teal); border-radius:14px;
+      background:linear-gradient(180deg,#f0fffb,#ffffff); padding:12px 14px; }
+    .key-trust h3 { margin:0 0 6px; font-size:14px; font-weight:700; color:var(--teal-d); }
+    .key-trust ul { margin:0; padding-left:0; list-style:none; font-size:12.5px; color:var(--sub); line-height:1.85; }
+    .key-trust li { padding-left:16px; position:relative; }
+    .key-trust li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
+    .key-more { margin:10px 0 0; font-size:12.5px; }
+    .key-more a { color:var(--teal-d); font-weight:700; }
     /* ===== APIキー入力モーダル ===== */
     #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
       background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
@@ -438,11 +452,19 @@
 
       <div class="ai-opt aiuse">
         <h3 data-i18n="aiModalUseTitle">AIを使う（AIモード）</h3>
+        <!-- お金の不安を先に打ち消す3点。ここを削ると「キーを入れさせられる」印象に戻る。 -->
+        <div class="ai-badges">
+          <span class="ai-badge" data-i18n="aiBadgeCard">💳 クレカ登録なし</span>
+          <span class="ai-badge" data-i18n="aiBadgeFree">🆓 無料枠内なら0円</span>
+          <span class="ai-badge" data-i18n="aiBadgeTime">⏱ 取得は約3分</span>
+        </div>
         <p data-i18n="aiModalUseDesc">ご自身の Google Gemini APIキー を使って、最初から全項目をAIで読み取ります。</p>
         <ul>
-          <li data-i18n="aiModalUse1">🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。</li>
-          <li data-i18n="aiModalUse2">💰 Gemini APIには無料枠があり、1日およそ1,500件まで無料で使えます（個人利用なら十分）。</li>
-          <li><span data-i18n="aiModalUse3">🔑 キーの取得方法は</span> <a id="aiKeyGuideLink" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="aiModalGuideLink">こちら（取得ガイド）</a> <span data-i18n="aiModalUse3b">をご覧ください（Google AI Studio で数分・無料）。</span></li>
+          <li data-i18n="aiModalWhy1">📥 大会名・日付・会場・締切をまとめて読み取るので、手入力とコピペがほぼ無くなります。</li>
+          <li data-i18n="aiModalUse1">🔒 キーはお使いの端末内だけに保存されます。当方はサーバーを持っていないため、受け取ることができません。</li>
+          <li data-i18n="aiModalUse2">💳 クレジットカードの登録は不要。無料枠は1日およそ1,500回で、超えても課金されず止まるだけです。</li>
+          <!-- リンク先は周知サイトのAPIキー案内ページ。href は i18n.js が言語別に張り替える（HTMLの値は ja 用の既定値）。 -->
+          <li><span data-i18n="aiModalUse3">🔑 キーの取得方法は</span> <a id="aiKeyGuideLink" href="https://dropper-tools.com/apikey.html" target="_blank" rel="noopener" data-i18n="aiModalGuideLink">こちら（取得ガイド）</a> <span data-i18n="aiModalUse3b">をご覧ください（クレカ不要・3分・0円の理由も説明しています）。</span></li>
         </ul>
       </div>
 
@@ -458,7 +480,13 @@
   <div id="key-modal" role="dialog" aria-modal="true" aria-labelledby="keyModalTitle">
     <div class="ai-modal-card">
       <h2 id="keyModalTitle" data-i18n="keyModalTitle">🔑 Gemini APIキーの設定</h2>
-      <p class="ai-intro" data-i18n="keyModalIntro">AIで読み取るには、Gemini APIキーが必要です。Googleアカウントがあれば無料で取得できます（3分ほど）。</p>
+      <p class="ai-intro" data-i18n="keyModalIntro">AIで読み取るには、Gemini APIキーが必要です。Googleアカウントがあれば無料で取得できます（3分ほど）。クレジットカードの登録は求められません。</p>
+
+      <div class="ai-badges">
+        <span class="ai-badge" data-i18n="aiBadgeCard">💳 クレカ登録なし</span>
+        <span class="ai-badge" data-i18n="aiBadgeFree">🆓 無料枠内なら0円</span>
+        <span class="ai-badge" data-i18n="aiBadgeTime">⏱ 取得は約3分</span>
+      </div>
 
       <div class="ai-opt aiuse">
         <h3 data-i18n="keyModalStepsTitle">取得のしかた</h3>
@@ -476,6 +504,18 @@
         <input type="text" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
       </label>
       <p class="key-error" id="keyError" style="display:none"></p>
+
+      <!-- 入力欄のすぐ下で「このキーがどこへ行くのか」を言い切る（安全性の可視化）。
+           詳しい説明は周知サイトの apikey.html へ。href は i18n.js が言語別に張り替える。 -->
+      <div class="key-trust">
+        <h3 data-i18n="keyModalTrustTitle">🔒 入力したキーの扱い</h3>
+        <ul>
+          <li data-i18n="keyModalTrust1">保存先は、お使いの端末の中（ブラウザ）だけです。他の端末には同期されません。</li>
+          <li data-i18n="keyModalTrust2">当方はサーバーを持っていないため、キーも読み取った内容も受け取れません。</li>
+          <li data-i18n="keyModalTrust3">送信先は Google の Gemini API だけです。やめたいときは Google AI Studio でキーを削除すれば、その場で無効になります。</li>
+        </ul>
+        <p class="key-more"><a id="keyMoreLink" href="https://dropper-tools.com/apikey.html" target="_blank" rel="noopener" data-i18n="keyModalMoreLink">クレカ不要で0円な理由・安全性の詳しい説明 ↗</a></p>
+      </div>
 
       <p class="key-warn" data-i18n="keyModalWarn">⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。機密文書はドロップしないでください。</p>
 
