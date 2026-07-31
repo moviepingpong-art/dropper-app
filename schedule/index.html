@@ -182,6 +182,24 @@
       box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
     .modal-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px; margin:0 0 8px; color:var(--teal-d); }
     .key-field input { width:100%; font-size:15px; padding:12px 14px; border:2px solid var(--line); border-radius:12px; font-family:inherit; }
+    .key-field input:focus { outline:none; border-color:var(--teal); }
+    .key-field > label { display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+    /* 入力欄の右端に重ねる「目」ボタン。キーはマスク（type=password）で伏せるが、
+       貼り付けた内容を目視できないと逆に不安になるため、表示切り替えとは必ずセットで置く。
+       イベントドロッパー（calendar/index.html）と同じ作りにそろえている。 */
+    .key-input-wrap { position:relative; }
+    .key-input-wrap input { padding-right:50px; }
+    .key-eye { position:absolute; top:50%; right:6px; transform:translateY(-50%);
+      width:38px; height:38px; padding:0; border:none; border-radius:10px; cursor:pointer;
+      background:none; box-shadow:none; color:var(--sub); font-size:18px; line-height:1; }
+    .key-eye:hover { background:#e6fffb; transform:translateY(-50%); }
+    .key-eye:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
+    /* 入力直後の接続テスト結果。成功/失敗のどちらも同じ位置に出す（視線を動かさない）。 */
+    .key-check { margin:8px 0 0; font-size:12.5px; font-weight:700; line-height:1.7; display:none; }
+    .key-check.show { display:block; }
+    .key-check.testing { color:var(--sub); }
+    .key-check.ok { color:var(--teal-d); }
+    .key-check.ng { color:#d4380d; }
     .key-warn { margin:14px 0; background:#fff8e6; border:1px solid #ffd591; border-radius:12px; padding:11px 13px; font-size:12px; color:#7a4f01; }
     .modal-btns { display:flex; gap:10px; flex-wrap:wrap; }
     .modal-btns button { flex:1 1 auto; font-family:inherit; font-size:15px; font-weight:700; padding:12px 18px; border-radius:12px; cursor:pointer; border:none; color:#fff;
@@ -351,9 +369,18 @@
         </ol>
         <a class="key-studio-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="keyStudioLink">Google AI Studio を開く ↗</a>
       </div>
-      <label class="key-field">
-        <input type="text" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
-      </label>
+      <!-- キーはマスク表示（type=password）。目のボタンで表示を切り替える。
+           label で input を包まないこと（目のボタンのクリックが label に吸われるため）。 -->
+      <div class="key-field">
+        <label for="keyInput" data-i18n="keyLabel">🔑 APIキー</label>
+        <div class="key-input-wrap">
+          <input type="password" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
+          <button type="button" id="keyEyeBtn" class="key-eye" aria-pressed="false"
+                  data-i18n="keyShow" data-i18n-attr="aria-label">👁</button>
+        </div>
+      </div>
+      <!-- 貼り付け直後の接続テスト結果（schedule-app.js が書き込む） -->
+      <p class="key-check" id="keyCheck"></p>
       <!-- 入力欄のすぐ下で「このキーがどこへ行くのか」を言い切る（安全性の可視化）。
            詳しい説明は周知サイトの apikey.html へ。href は schedule-i18n.js が言語別に張り替える。 -->
       <div class="key-trust">

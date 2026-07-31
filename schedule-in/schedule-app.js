@@ -99,27 +99,116 @@ setMode(false);   // 既定は通常モード。案内文もここで入る
 
 /* ===== APIキー ===== */
 function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
+
+// 貼り付けた直後に「このキーで本当に使えるか」を返す。実際にドロップするまで間違いに気づけないと、
+// キーを入れること自体が不安な操作になるため。イベントドロッパー（app.js の testAiKey_）と同じ作り。
+// 叩くのは ListModels（GET /v1beta/models）。generateContent でダミー送信すると、
+// 無料枠の1日あたり回数（RPD）を検証だけで消費してしまうので使わない。ListModels はこの枠を消費しない。
+// 戻り値: { ok:true, model:'…' } または { ok:false, reason:'invalid|forbidden|quota|network|other' }
+function testKey(key) {
+  var models = (window.SchedAI && window.SchedAI.MODELS) || ['gemini-flash-latest'];
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key);
+  return fetch(url).then(function (res) {
+    if (res.ok) {
+      return res.json().then(function (data) {
+        // 返るのは "models/gemini-flash-latest" の形。接頭辞を落として突き合わせる。
+        var names = [], list = (data && data.models) || [];
+        for (var i = 0; i < list.length; i++) {
+          names.push(String(list[i].name || '').replace(/^models\//, ''));
+        }
+        // 表示するモデル名は文言に直書きせず、実際に使う MODELS から採る。
+        // 一覧に出ないことがあっても弾かない（キーは有効なのに失敗表示になる方が害が大きい）。
+        var model = models[0];
+        for (var m = 0; m < models.length; m++) {
+          if (names.indexOf(models[m]) >= 0) { model = models[m]; break; }
+        }
+        return { ok: true, model: model };
+      }).catch(function () { return { ok: true, model: models[0] }; });
+    }
+    if (res.status === 400 || res.status === 401) return { ok: false, reason: 'invalid' };
+    if (res.status === 403) return { ok: false, reason: 'forbidden' };
+    if (res.status === 429) return { ok: false, reason: 'quota' };
+    return { ok: false, reason: 'other' };
+  }).catch(function () { return { ok: false, reason: 'network' }; });
+}
+
 function askKey(force) {
   var have = savedKey();
   if (have && !force) return Promise.resolve(have);
   var modal = el('key-modal'), input = el('keyInput');
+  var eyeBtn = el('keyEyeBtn'), checkEl = el('keyCheck');
   return new Promise(function (resolve) {
+    var checkTimer = null;   // デバウンス用
+    var checkSeq = 0;        // 入力が進んだら古い結果を捨てるための通し番号
+
+    function setCheck(cls, text) {
+      if (!checkEl) return;
+      checkEl.className = 'key-check show ' + cls;
+      checkEl.textContent = text;
+    }
+    function clearCheck() {
+      if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
+      checkSeq++;
+      if (checkEl) { checkEl.className = 'key-check'; checkEl.textContent = ''; }
+    }
     function close(v) {
       modal.classList.remove('show');
       el('keySave').removeEventListener('click', onSave);
       el('keyCancel').removeEventListener('click', onCancel);
+      input.removeEventListener('input', onInput);
+      if (eyeBtn) eyeBtn.removeEventListener('click', onEye);
+      clearCheck();
+      input.type = 'password';   // 次に開いたときも伏せた状態から始める
       resolve(v);
+    }
+    // 接続テストは、キーの形（AIza + 英数）が整ってから1回だけ。1文字ごとには叩かない。
+    var KEY_SHAPE = /^AIza[\w-]{30,}$/;
+    function onInput() {
+      var k = (input.value || '').trim();
+      clearCheck();
+      if (!KEY_SHAPE.test(k)) return;
+      setCheck('testing', I18N.t('keyTestRunning'));
+      var seq = checkSeq;
+      checkTimer = setTimeout(function () {
+        testKey(k).then(function (r) {
+          if (seq !== checkSeq) return;   // その後に入力が変わっていたら捨てる
+          if (r.ok) { setCheck('ok', I18N.t('keyTestOk', { model: r.model })); return; }
+          var keys = { invalid: 'keyTestInvalid', forbidden: 'keyTestForbidden', quota: 'keyTestQuota', network: 'keyTestNetwork' };
+          setCheck('ng', I18N.t(keys[r.reason] || 'keyTestOther'));
+        });
+      }, 600);
+    }
+    function onEye() {
+      var toShow = (input.type === 'password');
+      input.type = toShow ? 'text' : 'password';
+      eyeBtn.textContent = toShow ? '🙈' : '👁';
+      eyeBtn.setAttribute('aria-pressed', toShow ? 'true' : 'false');
+      eyeBtn.setAttribute('aria-label', I18N.t(toShow ? 'keyHide' : 'keyShow'));
+      input.focus();
     }
     function onSave() {
       var k = (input.value || '').trim();
       if (!k) { input.focus(); return; }
+      // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまうため。
       try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
       close(k);
     }
     function onCancel() { close(''); }
     input.value = have || '';
+    input.type = 'password';
+    if (eyeBtn) {
+      eyeBtn.textContent = '👁';
+      eyeBtn.setAttribute('aria-pressed', 'false');
+      eyeBtn.setAttribute('aria-label', I18N.t('keyShow'));
+      eyeBtn.addEventListener('click', onEye);
+    }
+    clearCheck();
     el('keySave').addEventListener('click', onSave);
     el('keyCancel').addEventListener('click', onCancel);
+    input.addEventListener('input', onInput);
+    // 「AI設定を変更」から開いたときは保存済みのキーが入っている。そのキーがまだ生きているかを
+    // その場で確かめられるよう、開いた時点で1回テストする（ListModels は無料枠を消費しない）。
+    if (have) onInput();
     modal.classList.add('show');
     setTimeout(function () { input.focus(); }, 50);
   });
