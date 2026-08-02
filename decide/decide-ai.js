@@ -1,12 +1,13 @@
-// talk-ai.js — やりとりドロッパーのAI抽出
+// decide-ai.js — 決めごとドロッパーのAI抽出
 //
-// 入力は「会話のスクリーンショット」。文書ではなく会話なので、既存2本と前提が3つ違う。
+// 入力は「話し合いの記録」。会話のスクショと、手書きメモ・ホワイトボード・FAXの両方を受ける。
+// できあがった文書ではなく話し合いの途中なので、既存2本と前提が3つ違う。
 //   1. 話者がいる（誰が言ったか）
 //   2. 話が二転三転する（「やっぱり15日で」で前の発言が無効になる）
 //   3. 決まっていないことがある（文書は決まったことしか書かれない）
 // このうち 3 を出すのがこのツールの中心。日付の書き写しは第1弾・第2弾がやる。
 //
-// window.TalkAI = { extract(files, opts) } を公開する。
+// window.DecideAI = { extract(files, opts) } を公開する。
 //   opts.apiKey    : Gemini APIキー（端末内のみ。サーバーへは送らない）
 //   opts.baseDate  : 基準日 'YYYY-MM-DD'（「来週の火曜」を絶対日付に直すのに使う）
 //   opts.lang      : 'ja' | 'en'
@@ -42,10 +43,12 @@
   }
 
   function promptJa(baseDate) {
-    return '添付は、チャットアプリ（LINE・Slack・メール・X など）のやりとりのスクリーンショットです。' +
-      '**渡した順に会話が続いています。** 複数枚は同じ会話の連続した部分で、' +
-      '上下が重なって同じ発言が2枚に写っていることがあります。重なった発言は1件として扱ってください。\n' +
-      '会話全体を読んで、JSONのオブジェクトだけを返してください（前置き・説明・コードフェンスは不要）。\n' +
+    return '添付は「話し合いの記録」です。次のどちらか、または両方が混ざっています。\n' +
+      '　A: チャットアプリ（LINE・Slack・メール・X など）のやりとりのスクリーンショット\n' +
+      '　B: 手書きのメモ、打ち合わせのノート、ホワイトボードの写真、FAXなどの紙の記録\n' +
+      '**渡した順に記録が続いています。** 複数枚は同じ記録の連続した部分で、' +
+      '上下が重なって同じ内容が2枚に写っていることがあります。重なった部分は1件として扱ってください。\n' +
+      '全体を読んで、JSONのオブジェクトだけを返してください（前置き・説明・コードフェンスは不要）。\n' +
       '■ いちばん大事なこと\n' +
       '・**決まったこと（decided）と、まだ決まっていないこと（undecided）を分けること。** これがこの作業の目的です。\n' +
       '・会話では話が二転三転します。**後の発言が前の発言を打ち消している場合、最終的な結論だけを decided に入れ、' +
@@ -54,8 +57,18 @@
       '「候補は2つある」のように選択肢が残っている、返事待ちで止まっている——これらは undecided です。\n' +
       '・**推測で決定事項を作らないこと。** 会話に書かれていないことは出さない。決まっていなければ undecided に置く。\n' +
       '■ 話者\n' +
-      '・吹き出しが右側（自分の発言）の話者は「自分」としてください。左側は表示されている名前を使ってください。\n' +
-      '・名前が読み取れないときは空文字にしてください。\n' +
+      '・A（スクショ）の場合: 吹き出しが右側（自分の発言）の話者は「自分」としてください。' +
+      '左側は表示されている名前を使ってください。\n' +
+      '・B（紙の記録）の場合: 発言者や担当者の名前が書かれていればそれを使ってください。' +
+      '**書かれていなければ空文字にし、誰の発言か推測しないこと。**\n' +
+      '・どちらの場合も、名前が読み取れないときは空文字にしてください。\n' +
+      '■ 手書きの読み取り（Bの場合）\n' +
+      '・崩し字や略記があっても、文脈から素直に読める範囲で読み取ってください。' +
+      '**読めない箇所を推測で埋めないこと。**\n' +
+      '・矢印・囲み・チェック印などの記号は、その意味（つながり・強調・済み）を汲んで内容に反映し、' +
+      '記号そのものは出力しないでください。\n' +
+      '・**二重線や取り消し線で消された項目は、打ち消されたものとして扱ってください**（decided に入れない）。' +
+      'これは会話でいう「やっぱり15日で」と同じ意味を持ちます。\n' +
       '■ 日付\n' +
       '・会話は「来週の火曜」「明日まで」のように相対的に書かれます。' +
       (baseDate ? ('この会話の基準日は ' + baseDate + ' です。これを起点に西暦の絶対日付へ直してください。\n')
@@ -75,10 +88,12 @@
   }
 
   function promptEn(baseDate) {
-    return 'The attachments are screenshots of a conversation in a messaging app (LINE, Slack, email, X and so on). ' +
-      '**They are in order and the conversation runs across them.** Consecutive screenshots often overlap, ' +
-      'so the same message can appear twice. Treat an overlapping message as a single message.\n' +
-      'Read the whole conversation and return ONLY a JSON object (no preamble, explanation, or code fences).\n' +
+    return 'The attachments are a record of a discussion. They are either, or a mix of:\n' +
+      '  A: screenshots of a conversation in a messaging app (LINE, Slack, email, X and so on)\n' +
+      '  B: handwritten notes, meeting notes, a photo of a whiteboard, a fax or other paper record\n' +
+      '**They are in order and the record runs across them.** Consecutive images often overlap, ' +
+      'so the same content can appear twice. Treat an overlapping part as a single item.\n' +
+      'Read the whole thing and return ONLY a JSON object (no preamble, explanation, or code fences).\n' +
       'The most important thing:\n' +
       '- **Separate what was decided (decided) from what is still open (undecided).** That is the point of this task.\n' +
       '- Conversations change course. **If a later message overrides an earlier one, put only the final conclusion ' +
@@ -86,8 +101,17 @@
       '- A question left unanswered, a choice still open between options, or anything waiting on a reply belongs in undecided.\n' +
       '- **Do not invent decisions.** If it is not in the conversation, leave it out; if it is not settled, put it in undecided.\n' +
       'Speakers:\n' +
-      '- Messages in bubbles on the right are the screenshot owner: use "me" as the speaker. On the left, use the displayed name.\n' +
-      '- Use an empty string when the name cannot be read.\n' +
+      '- For A (screenshots): messages in bubbles on the right are the screenshot owner, so use "me" as the speaker. ' +
+      'On the left, use the displayed name.\n' +
+      '- For B (paper records): use the name of the speaker or owner if it is written. ' +
+      '**If it is not written, use an empty string and do not guess who said it.**\n' +
+      '- In either case, use an empty string when the name cannot be read.\n' +
+      'Reading handwriting (for B):\n' +
+      '- Read cursive or shorthand as far as it can be read plainly from context. **Do not fill in unreadable parts by guessing.**\n' +
+      '- Arrows, circles and check marks carry meaning (connection, emphasis, done): reflect that meaning in the content ' +
+      'and do not output the marks themselves.\n' +
+      '- **Anything struck through or crossed out is overridden: leave it out of decided.** ' +
+      'It means the same as "actually, let us do the 15th" in a chat.\n' +
       'Dates:\n' +
       '- Conversations use relative wording such as "next Tuesday" or "by tomorrow". ' +
       (baseDate ? ('The reference date for this conversation is ' + baseDate + '. Resolve relative dates from it.\n')
@@ -167,7 +191,9 @@
     var parts = [{ text: (opts.lang === 'en' || opts.lang === 'in') ? promptEn(opts.baseDate) : promptJa(opts.baseDate) }];
     for (var n = 0; n < list.length; n++) {
       var b64 = await toBase64(list[n]);
-      parts.push({ inline_data: { mime_type: list[n].type || 'image/jpeg', data: b64 } });
+      // 拡張子だけが .pdf でMIMEが空のことがある（端末による）。その場合も PDF として送る。
+      var mime = list[n].type || (/\.pdf$/i.test(list[n].name || '') ? 'application/pdf' : 'image/jpeg');
+      parts.push({ inline_data: { mime_type: mime, data: b64 } });
     }
 
     var resp = null, busy = false, rate = false;
@@ -209,7 +235,7 @@
     return normalize(json);
   }
 
-  global.TalkAI = {
+  global.DecideAI = {
     extract: extract, normalize: normalize, extractJson: extractJson,
     MODELS: MODELS, MAX_FILES: MAX_FILES
   };

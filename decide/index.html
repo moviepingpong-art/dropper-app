@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>やりとりドロッパー</title>
-  <meta name="description" content="会話のスクリーンショットから、決まったこと・まだ決まっていないこと・やることを取り出します。ログイン不要。">
+  <title>決めごとドロッパー</title>
+  <meta name="description" content="会話のスクリーンショットや打ち合わせメモから、決まったこと・まだ決まっていないこと・やることを取り出します。手書きメモ・ホワイトボード・FAXにも対応。ログイン不要。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
@@ -145,23 +145,23 @@
 </head>
 <body>
   <div class="wrap">
-    <!-- ドロッパー切り替え。リンク先は同じ言語の版へ送ること（talk-i18n.js が張り替える）。 -->
+    <!-- ドロッパー切り替え。リンク先は同じ言語の版へ送ること（decide-i18n.js が張り替える）。 -->
     <nav class="tool-tabs">
       <span class="tt-label" data-i18n="typePrompt">ドロッパーを選ぶ</span>
       <div class="tt-row">
         <a id="tabEvent" href="/calendar/" data-i18n="toolEvent">イベント</a>
         <a id="tabSchedule" href="/schedule/" data-i18n="toolSchedule">予定表</a>
-        <span class="on" data-i18n="toolTalk">やりとり</span>
+        <span class="on" data-i18n="toolDecide">決めごと</span>
       </div>
       <p class="tt-hint" data-i18n="toolHint">入れるものが違います。</p>
     </nav>
 
-    <h1 data-i18n="appName">やりとりドロッパー</h1>
-    <p class="lead" data-i18n="lead">グループのやりとりを読み返す時間をなくします。</p>
+    <h1 data-i18n="appName">決めごとドロッパー</h1>
+    <p class="lead" data-i18n="lead">「結局これ決まったんだっけ？」を探す時間をなくします。</p>
 
     <!-- 投げ込むもの自体が私的な会話なので、扱いを正面から出す -->
     <div class="priv">
-      <h2 data-i18n="privTitle">入れた画像の扱い</h2>
+      <h2 data-i18n="privTitle">入れたものの扱い</h2>
       <ul>
         <li data-i18n="priv1">当方はサーバーを持っていないため、こちらには残りません。</li>
         <li data-i18n="priv2">送信先はあなたのキーで動く Gemini API だけです。</li>
@@ -171,22 +171,22 @@
 
     <div class="card">
       <div id="drop">
-        <div class="dt" data-i18n="dropTitle">会話のスクショを入れる</div>
+        <div class="dt" data-i18n="dropTitle">会話のスクショ・打ち合わせメモを入れる</div>
         <div class="ds" data-i18n="dropSub">ここにドラッグ、またはタップして選ぶ</div>
       </div>
-      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+      <input type="file" id="fileInput" accept="image/*,application/pdf,.pdf" multiple hidden>
       <p class="drop-note" data-i18n="dropNote">複数枚をまとめて入れられます。</p>
       <p id="picked"></p>
 
       <div class="field">
-        <label for="baseDate" data-i18n="baseDateLabel">この会話の基準日</label>
+        <label for="baseDate" data-i18n="baseDateLabel">この記録の基準日</label>
         <input type="date" id="baseDate">
         <p class="hint" data-i18n="baseDateHint">相対的な書き方を西暦に直すのに使います。</p>
       </div>
 
       <div class="btns">
         <button type="button" id="runBtn" data-i18n="runBtn">読み取る</button>
-        <button type="button" id="pickBtn" class="btn-sub" data-i18n="pickBtn">画像を選ぶ</button>
+        <button type="button" id="pickBtn" class="btn-sub" data-i18n="pickBtn">ファイルを選ぶ</button>
         <button type="button" id="resetBtn" class="btn-sub" data-i18n="resetBtn">入れ直す</button>
       </div>
       <p class="msg" id="msg"></p>
@@ -260,8 +260,8 @@
 
   <!-- window.LANG を読むスクリプトは、必ず window.LANG を設定したあとに置くこと -->
   <script>window.LANG = 'ja';</script>
-  <script src="talk-i18n.js"></script>
-  <script src="talk-ai.js"></script>
-  <script src="talk-app.js"></script>
+  <script src="decide-i18n.js"></script>
+  <script src="decide-ai.js"></script>
+  <script src="decide-app.js"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// talk-app.js — やりとりドロッパーの画面制御
+// decide-app.js — 決めごとドロッパーの画面制御
 //
 // このツールはAI専用。会話は意味を解釈しないと決定/未決が分けられないため、
 // 正規表現モード（既存2本の「通常モード」）は成立しない。
@@ -19,7 +19,7 @@ function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } c
 // 貼り付けた直後に「このキーで本当に使えるか」を返す。イベント／予定表と同じ作り。
 // 叩くのは ListModels。generateContent でダミー送信すると無料枠の1日あたり回数を検証だけで消費する。
 function testKey(key) {
-  var models = (window.TalkAI && window.TalkAI.MODELS) || ['gemini-flash-latest'];
+  var models = (window.DecideAI && window.DecideAI.MODELS) || ['gemini-flash-latest'];
   var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key);
   return fetch(url).then(function (res) {
     if (res.ok) {
@@ -127,9 +127,14 @@ function setMsg(t, cls) {
   m.className = 'msg' + (cls ? ' ' + cls : '');
 }
 
+// 受け取るのは画像（スクショ・ノートやホワイトボードの写真）とPDF（FAXやスキャンした議事録）。
+// Gemini は PDF をそのまま読めるので、変換は要らない。
+function acceptable_(f) {
+  return /^image\//.test(f.type) || f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+}
+
 function setFiles(list) {
-  // 画像だけ受け取る。会話のスクショが対象なのでPDFは想定しない。
-  pickedFiles = Array.prototype.slice.call(list || []).filter(function (f) { return /^image\//.test(f.type); });
+  pickedFiles = Array.prototype.slice.call(list || []).filter(acceptable_);
   el('picked').textContent = pickedFiles.length ? I18N.t('filesPicked', { n: pickedFiles.length }) : '';
   el('runBtn').disabled = !pickedFiles.length;
 }
@@ -233,7 +238,7 @@ async function run() {
   el('runBtn').disabled = true;
   el('result').style.display = 'none';
   try {
-    var r = await window.TalkAI.extract(pickedFiles, {
+    var r = await window.DecideAI.extract(pickedFiles, {
       apiKey: key,
       baseDate: el('baseDate').value || '',
       lang: window.LANG,
