@@ -8,10 +8,49 @@
 
 var AI_KEY_STORE = 'dropper_ai_key';   // イベント／予定表ドロッパーと同じ保存先（入れ直しの手間を省く）
 
+// OAuthはイベント／予定表ドロッパーと同じクライアントID。
+// ただし **要求するスコープは calendar.events だけ**。このツールはドライブを使わないので、
+// drive.file も appdata も要らない。既存2本より小さい同意で済む。新しいスコープは足さないこと。
+var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
+var SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+var CALENDAR_ID = 'primary';
+var EVENT_COLOR_ID = '11';   // 赤。シリーズで揃えている
+
 function el(id) { return document.getElementById(id); }
 
 var pickedFiles = [];
 var lastResult = null;
+var accessToken = null, tokenClient = null, pendingAuth = null;
+
+/* ===== Googleログイン =====
+   読み取り・コピーまではログイン不要。カレンダーに登録するときだけ、ここで初めて求める。
+   「ログインの壁」を入口に置かないための作り。 */
+function ensureTokenClient() {
+  if (tokenClient) return true;
+  if (!(window.google && google.accounts && google.accounts.oauth2)) return false;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: function (resp) {
+      if (resp && resp.access_token) {
+        accessToken = resp.access_token;
+        if (pendingAuth) { pendingAuth.resolve(accessToken); pendingAuth = null; }
+      } else {
+        if (pendingAuth) { pendingAuth.reject(new Error('cancelled')); pendingAuth = null; }
+      }
+    }
+  });
+  return true;
+}
+function ensureToken() {
+  return new Promise(function (resolve, reject) {
+    if (accessToken) { resolve(accessToken); return; }
+    // GSIスクリプトは async 読み込みなので、間に合っていないことがある
+    if (!ensureTokenClient()) { reject(new Error('preparing')); return; }
+    pendingAuth = { resolve: resolve, reject: reject };
+    tokenClient.requestAccessToken();
+  });
+}
 
 /* ===== APIキー ===== */
 function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
@@ -178,10 +217,22 @@ function render(r) {
   });
   renderList_('listTodos', 'emptyTodos', r.todos, function (it) {
     var li = document.createElement('li');
+    var head = document.createElement('div');
+    head.className = 'row-head';
+    // カレンダーに入れられるのは期限のあるものだけ。日付が無い項目にはチェックを出さない。
+    if (it.due) {
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'reg-chk';
+      cb.checked = true;
+      li.__item = it;
+      head.appendChild(cb);
+    }
     var p = document.createElement('p');
     p.className = 'row-main';
     p.textContent = it.text;
-    li.appendChild(p);
+    head.appendChild(p);
+    li.appendChild(head);
     if (it.who) {
       var w = document.createElement('p');
       w.className = 'row-sub';
@@ -198,6 +249,85 @@ function render(r) {
     return li;
   });
   el('result').style.display = '';
+  // 登録ボタンは、期限のある「やること」が1件でもあるときだけ出す
+  var hasDated = r.todos.some(function (it) { return !!it.due; });
+  el('regWrap').style.display = hasDated ? '' : 'none';
+  el('regMsg').textContent = '';
+}
+
+/* ===== カレンダー登録 ===== */
+function addDay_(ymd) {
+  var d = new Date(ymd + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
+function buildEvent_(it) {
+  // 期限は時刻を伴わないので終日予定にする。終了日は+1（Google側が排他的に扱うため）。
+  var ev = {
+    summary: it.text,
+    colorId: EVENT_COLOR_ID,
+    start: { date: it.due },
+    end: { date: addDay_(it.due) }
+  };
+  var desc = [];
+  if (it.who) desc.push(I18N.t('labOwner') + ': ' + it.who);
+  // 相対的な書き方から直した日付なので、元の言い方も残しておく（後から検証できるように）
+  if (it.dueRaw) desc.push(I18N.t('dueFromText', { raw: it.dueRaw }));
+  desc.push(I18N.t('evFrom'));
+  ev.description = desc.join('\n');
+  return ev;
+}
+
+function regTargets_() {
+  var out = [];
+  var lis = el('listTodos').querySelectorAll('li');
+  for (var i = 0; i < lis.length; i++) {
+    var cb = lis[i].querySelector('.reg-chk');
+    if (cb && cb.checked && lis[i].__item) out.push({ cb: cb, it: lis[i].__item });
+  }
+  return out;
+}
+
+async function register() {
+  var targets = regTargets_();
+  if (!targets.length) { el('regMsg').textContent = I18N.t('msgRegNoTarget'); return; }
+
+  el('regBtn').disabled = true;
+  el('regMsg').textContent = I18N.t('msgSigningIn');
+  try {
+    await ensureToken();
+  } catch (e) {
+    var c = String(e && e.message);
+    el('regMsg').textContent = I18N.t(c === 'preparing' ? 'msgLoginPreparing' : c === 'cancelled' ? 'msgLoginCancelled' : 'msgLoginFailed');
+    el('regBtn').disabled = false;
+    return;
+  }
+
+  var ok = 0, ng = 0;
+  for (var i = 0; i < targets.length; i++) {
+    el('regMsg').textContent = I18N.t('msgRegistering', { i: i + 1, n: targets.length });
+    try {
+      var res = await fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) + '/events', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildEvent_(targets[i].it))
+      });
+      // 期限切れの判定は合言葉で行う。文言そのもので判定すると多言語化で壊れる。
+      if (res.status === 401) { accessToken = null; throw new Error('expired'); }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      ok++;
+      targets[i].cb.checked = false;   // 二重登録を防ぐ
+      targets[i].cb.disabled = true;
+    } catch (e2) {
+      ng++;
+      if (String(e2 && e2.message) === 'expired') { el('regMsg').textContent = I18N.t('msgSessionExpired'); break; }
+    }
+  }
+  if (String(el('regMsg').textContent) !== I18N.t('msgSessionExpired')) {
+    el('regMsg').textContent = I18N.t('msgRegDone', { ok: ok }) + (ng ? I18N.t('msgRegFail', { ng: ng }) : '');
+  }
+  el('regBtn').disabled = false;
 }
 
 // コピー用のテキスト。画面の3セクションをそのまま平文にする。
@@ -278,6 +408,7 @@ async function run() {
     setMsg('');
   });
   el('keyChangeBtn').addEventListener('click', function () { askKey(true); });
+  el('regBtn').addEventListener('click', register);
 
   el('copyBtn').addEventListener('click', function () {
     if (!lastResult) return;

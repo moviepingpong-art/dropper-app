@@ -88,11 +88,16 @@
     .sec ul { list-style:none; margin:0; padding:0; }
     .sec li { border:2px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:8px; background:#fff; }
     .sec li.empty { border-style:dashed; color:var(--sub); font-size:13px; text-align:center; }
+    .row-head { display:flex; align-items:flex-start; gap:9px; }
+    .row-head .reg-chk { width:19px; height:19px; margin:3px 0 0; flex:0 0 auto; accent-color:var(--teal); cursor:pointer; }
+    .row-head .reg-chk:disabled { cursor:default; }
     .row-main { margin:0; font-size:14.5px; line-height:1.7; }
     .row-sub { margin:5px 0 0; font-size:12.5px; color:var(--sub); }
     .row-sub.weak { color:#b08900; }
     .check-hint { margin:0 0 14px; font-size:12.5px; color:#7a4f01; background:#fff8e6;
       border:1px solid #ffd591; border-radius:10px; padding:10px 12px; line-height:1.7; }
+    #regWrap { margin-top:18px; padding-top:16px; border-top:2px dashed var(--line); }
+    .reg-note { margin:0; font-size:12.5px; color:var(--sub); line-height:1.7; }
 
     /* ===== APIキー入力モーダル ===== */
     #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
@@ -210,6 +215,14 @@
       <div class="btns">
         <button type="button" id="copyBtn" data-i18n="copyBtn">まとめをコピー</button>
       </div>
+      <!-- 期限のある「やること」があるときだけ出す。ここで初めてログインを求める。 -->
+      <div id="regWrap" style="display:none">
+        <p class="reg-note" data-i18n="regNote">期限のある項目をカレンダーに入れられます。ここで初めてGoogleログインを求めます。</p>
+        <div class="btns">
+          <button type="button" id="regBtn" data-i18n="regBtn">カレンダーに登録</button>
+        </div>
+        <p class="msg" id="regMsg"></p>
+      </div>
     </div>
   </div>
 
@@ -258,6 +271,8 @@
     </div>
   </div>
 
+  <!-- カレンダー登録のときだけ使う。読み取り・コピーはこれが無くても動く。 -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <!-- window.LANG を読むスクリプトは、必ず window.LANG を設定したあとに置くこと -->
   <script>window.LANG = 'ja';</script>
   <script src="decide-i18n.js"></script>
