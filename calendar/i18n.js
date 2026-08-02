@@ -22,7 +22,8 @@
       typePrompt: 'ドロッパーの選択',
       toolEvent: '🎪 イベント',
       toolSchedule: '📅 予定表',
-      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も',
+      toolDecide: '✅ 決めごと',
+      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと',
       eventTypePrompt: 'イベントの種類',
       typeSports: 'スポーツ大会の要項',
       leadSports: '要項（PDF・画像）をドロップ → 内容を確認',
@@ -257,7 +258,8 @@
       typePrompt: 'Choose a dropper',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries',
+      toolDecide: '✅ Decide',
+      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries / Decide = what was settled, from chats and notes',
       eventTypePrompt: 'Event type',
       typeSports: 'Sports event flyer',
       leadSports: 'Drop a flyer (PDF / image) → Review the details',
@@ -473,7 +475,8 @@
       typePrompt: 'Dropper chunein',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries',
+      toolDecide: '✅ Decide',
+      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries / Decide = chat ya notes se jo tay hua',
       eventTypePrompt: 'Event type',
       typeSports: 'Sports event ka flyer',
       leadSports: 'Flyer (PDF / image) drop karein → Details check karein',
@@ -733,6 +736,10 @@
     var ts = document.getElementById('tabSchedule');
     if (ts) {
       ts.href = (global.LANG === 'en') ? '/schedule-en/' : (global.LANG === 'in') ? '/schedule-in/' : '/schedule/';
+    }
+    var td = document.getElementById('tabDecide');
+    if (td) {
+      td.href = (global.LANG === 'en') ? '/decide-en/' : (global.LANG === 'in') ? '/decide-in/' : '/decide/';
     }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {

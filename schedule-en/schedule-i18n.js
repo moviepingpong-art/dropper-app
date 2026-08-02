@@ -17,7 +17,8 @@
       toolTabsLabel: 'ドロッパーの選択',
       toolEvent: '🎪 イベント',
       toolSchedule: '📅 予定表',
-      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も',
+      toolDecide: '✅ 決めごと',
+      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと',
       // --- ログイン ---
       loginBtn: 'Googleでログイン',
       loginNote: '予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
@@ -161,7 +162,8 @@
       toolTabsLabel: 'Choose a dropper',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries',
+      toolDecide: '✅ Decide',
+      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries / Decide = what was settled, from chats and notes',
       loginBtn: 'Sign in with Google',
       loginNote: 'To add entries to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
       msgLoggingIn: 'Signing in to Google…',
@@ -288,7 +290,8 @@
       toolTabsLabel: 'Dropper chunein',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries',
+      toolDecide: '✅ Decide',
+      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries / Decide = chat ya notes se jo tay hua',
       loginBtn: 'Google se sign in karein',
       loginNote: 'Entries Google Calendar mein add karne ke liye, pehle Google sign in aur Calendar/Drive ki permission chahiye.',
       msgLoggingIn: 'Google mein sign in ho raha hai…',
@@ -425,10 +428,14 @@
   // data-i18n 属性を持つ要素に文言を流し込む。data-i18n-attr があればその属性に、なければテキストに。
   function applyDom() {
     document.title = t('pageTitle');
-    // イベントドロッパーへのリンクは、同じ言語の版へ送る
+    // 他のドロッパーへのリンクは、同じ言語の版へ送る（en の利用者を ja のページへ飛ばさない）
     var ev = document.getElementById('tabEvent');
     if (ev) {
       ev.href = (global.LANG === 'en') ? '/calendar-en/' : (global.LANG === 'in') ? '/calendar-in/' : '/calendar/';
+    }
+    var td = document.getElementById('tabDecide');
+    if (td) {
+      td.href = (global.LANG === 'en') ? '/decide-en/' : (global.LANG === 'in') ? '/decide-in/' : '/decide/';
     }
     // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、
     // 同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。
