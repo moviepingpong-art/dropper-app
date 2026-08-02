@@ -55,7 +55,7 @@
       '・**判定の軸は「これからのことか」×「確定しているか」の2つです。誰が決めたかではありません。**\n' +
       '　　これから × 確定している　→ decided（決まったこと）\n' +
       '　　これから × まだ確定していない → undecided（まだ決まっていないこと）\n' +
-      '　　すでに済んだこと　　　　→ **どちらにも入れない**\n' +
+      '　　すでに済んだこと　　　　→ **records（記録）**。decided にも undecided にも入れない\n' +
       '・decided に入るのは次のようなものです。\n' +
       '　・話し合いで合意されたこと（例:「9/15に開催で決まり」）\n' +
       '　・文書で「決定した」「承認された」「可決された」「了承された」「一任された」' +
@@ -63,11 +63,14 @@
       '　・**「〜する予定」「〜が開催される」のように、日程や実施が確定している事柄。**' +
       'その記録の中で誰かが決めたものでなくても構いません。予定として確定していれば decided です' +
       '（例:「2027年1月1日に合併し発足予定」「3月19日〜9月26日に開催予定」）。\n' +
-      '・**すでに済んだ出来事の報告は、decided にも undecided にも入れないこと。** これがいちばん多い誤りです。\n' +
-      '　例:「7月25日で特別国会が終了しました」「1月23日解散」「2月8日投開票」は、' +
-      '起きたことの振り返りであって、これから確定している事柄ではありません。\n' +
-      '　見分け方: 文末が「〜しました」「〜だった」のように**済んだ言い方**なら入れない。' +
-      '「〜予定」「〜する」「〜と決定した」のように**これから効く言い方**なら入れる。\n' +
+      '・**すでに済んだ出来事は decided にも undecided にも入れず、records に入れてください。**\n' +
+      '　例:「7月25日で特別国会が終了しました」「1月23日解散」「2月8日投開票」' +
+      '「エンジンオイル入れ替へ（H.10.6）」「北国銀行へ行く（H.10.12.28）」は、' +
+      'これから確定している事柄ではありません。**捨てずに records へ残してください。**\n' +
+      '　見分け方: 文末が「〜しました」「〜だった」「〜した」のように**済んだ言い方**なら records。' +
+      '「〜予定」「〜する」「〜と決定した」のように**これから効く言い方**なら decided。\n' +
+      '　records は「あとから見返すための控え」です。**日付・金額・電話番号・連絡先・型番など、' +
+      '書かれている手がかりは text に残してください。**\n' +
       '・会話では話が二転三転します。**後の発言が前の発言を打ち消している場合、最終的な結論だけを decided に入れ、' +
       '打ち消された方は入れないこと**（例:「12日で」→「やっぱり15日で」なら、決定は15日のみ）。\n' +
       '・「どうする？」「誰か分かる人いますか」のように問いかけたまま返事が無い、' +
@@ -114,11 +117,17 @@
       '　日付が書かれていない決定は date も dateRaw も空文字にしてください。**勝手に日付を作らないこと。**\n' +
       '・undecided … {"text":"何が決まっていないか","waiting":"何待ちか・誰の返事待ちか（不明なら空文字）"}\n' +
       '・todos … {"text":"やること","who":"担当（不明なら空文字）","due":"YYYY-MM-DD または空文字","dueRaw":"原文の表現"}\n' +
+      '・records … {"text":"済んだこと（日付・金額・連絡先などの手がかりも含める）","date":"YYYY-MM-DD または空文字","dateRaw":"原文の表現"}\n' +
       '・decided に入れた内容のうち、誰かがやる作業になっているものは todos にも入れてください（重複してよい）。\n' +
+      '・**日付が書かれていなくても、これからやることは todos に入れてください。**' +
+      '例:「次回 12,000km でオイル交換」は期限の日付がありませんが、これからやることです。' +
+      'due を空文字にして todos に入れます。\n' +
+      '・和暦（H＝平成、S＝昭和、R＝令和）は西暦に直してください（H.10.12.28 → 1998-12-28）。' +
+      '**元号が読み取れないときは date を空文字にし、原文を dateRaw に残すこと。推測で年を決めないこと。**\n' +
       '・該当が無い項目は空配列にしてください。\n' +
       '出力形式（このオブジェクトだけを返す）:\n' +
       '{"decided":[{"text":"","who":"","date":"","dateRaw":""}],"undecided":[{"text":"","waiting":""}],' +
-      '"todos":[{"text":"","who":"","due":"","dueRaw":""}]}';
+      '"todos":[{"text":"","who":"","due":"","dueRaw":""}],"records":[{"text":"","date":"","dateRaw":""}]}';
   }
 
   function promptEn(baseDate) {
@@ -134,7 +143,7 @@
       '- **Judge on two axes: is it still ahead, and is it settled? Not on who decided it.**\n' +
       '    ahead + settled     -> decided\n' +
       '    ahead + not settled -> undecided\n' +
-      '    already happened    -> **neither**\n' +
+      '    already happened    -> **records**, never decided or undecided\n' +
       '- decided covers:\n' +
       '  - what was agreed in the conversation (e.g. "the 15th it is")\n' +
       '  - what a document states as "was decided", "was approved", "was carried", "was endorsed", ' +
@@ -142,11 +151,13 @@
       '  - **anything whose date or execution is settled, such as "is scheduled for" or "will be held".** ' +
       'It does not have to be something decided by anyone in this record. If it is a settled plan, it is decided ' +
       '(e.g. "the merger takes effect on 1 January 2027", "runs from 19 March to 26 September").\n' +
-      '- **Do not put already-completed events in decided or undecided. This is the most common mistake.**\n' +
-      '  "The special session closed on 25 July", "dissolved on 23 January", "polling day 8 February" all look back ' +
-      'at what happened; none of them is settled and ahead.\n' +
-      '  Test: past-tense narration ("closed", "was held") stays out; forward-looking wording ("is scheduled", ' +
-      '"will run", "was decided") goes in.\n' +
+      '- **Put already-completed events in records, never in decided or undecided.**\n' +
+      '  "The special session closed on 25 July", "dissolved on 23 January", "polling day 8 February", ' +
+      '"engine oil changed (Jun 1998)" all look back at what happened. **Do not discard them: keep them in records.**\n' +
+      '  Test: past-tense narration ("closed", "was held", "changed") goes to records; forward-looking wording ' +
+      '("is scheduled", "will run", "was decided") goes to decided.\n' +
+      '  records is a reference log to look back at. **Keep the details written down — dates, amounts, ' +
+      'phone numbers, contacts, model numbers — inside text.**\n' +
       '- Conversations change course. **If a later message overrides an earlier one, put only the final conclusion ' +
       'in decided and leave the overridden one out** (e.g. "let us do the 12th" then "actually the 15th" — only the 15th is decided).\n' +
       '- A question left unanswered, a choice still open between options, or anything waiting on a reply belongs in undecided.\n' +
@@ -191,11 +202,17 @@
       '  Leave date and dateRaw empty when no date is written. **Never invent a date.**\n' +
       '- undecided: {"text":"what is still open","waiting":"what or whose reply it waits on (empty if unknown)"}\n' +
       '- todos: {"text":"the task","who":"owner (empty if unknown)","due":"YYYY-MM-DD or empty","dueRaw":"original wording"}\n' +
+      '- records: {"text":"what already happened, keeping dates, amounts and contacts","date":"YYYY-MM-DD or empty","dateRaw":"the original wording"}\n' +
       '- If something in decided is work someone will do, also put it in todos (duplication is fine).\n' +
+      '- **Put things still to be done in todos even when no date is written.** ' +
+      '"Next oil change at 12,000 km" has no date but is still ahead: leave due empty and put it in todos.\n' +
+      '- Convert Japanese era years (H = Heisei, S = Showa, R = Reiwa) to the Gregorian calendar ' +
+      '(H.10.12.28 -> 1998-12-28). **If the era cannot be read, leave date empty and keep the original in dateRaw. ' +
+      'Never guess the year.**\n' +
       '- Use an empty array when there is nothing for a field.\n' +
       'Output exactly this shape:\n' +
       '{"decided":[{"text":"","who":"","date":"","dateRaw":""}],"undecided":[{"text":"","waiting":""}],' +
-      '"todos":[{"text":"","who":"","due":"","dueRaw":""}]}';
+      '"todos":[{"text":"","who":"","due":"","dueRaw":""}],"records":[{"text":"","date":"","dateRaw":""}]}';
   }
 
   function str(v) { return String(v == null ? '' : v).trim(); }
@@ -215,7 +232,7 @@
   function normalize(raw) {
     var o = raw || {};
     if (Array.isArray(o)) o = { decided: o };   // 配列だけで返ってくることがある
-    var out = { decided: [], undecided: [], todos: [] };
+    var out = { decided: [], undecided: [], todos: [], records: [] };
 
     (Array.isArray(o.decided) ? o.decided : []).forEach(function (it) {
       if (!it || typeof it !== 'object') return;
@@ -233,6 +250,12 @@
       if (!it || typeof it !== 'object') return;
       var t = str(it.text); if (!t) return;
       out.todos.push({ text: t, who: str(it.who), due: ymd(it.due), dueRaw: str(it.dueRaw) });
+    });
+    // 済んだこと。あとから見返すための控えなので、カレンダー登録の対象にはしない。
+    (Array.isArray(o.records) ? o.records : []).forEach(function (it) {
+      if (!it || typeof it !== 'object') return;
+      var t = str(it.text); if (!t) return;
+      out.records.push({ text: t, date: ymd(it.date), dateRaw: str(it.dateRaw) });
     });
     return out;
   }

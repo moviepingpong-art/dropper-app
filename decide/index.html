@@ -103,6 +103,7 @@
     .row-main { margin:0; font-size:14.5px; line-height:1.7; }
     .row-sub { margin:5px 0 0; font-size:12.5px; color:var(--sub); }
     .row-sub.weak { color:#b08900; }
+    .sec-note { margin:0 0 8px; font-size:12px; color:var(--sub); }
     .check-hint { margin:0 0 14px; font-size:12.5px; color:#7a4f01; background:#fff8e6;
       border:1px solid #ffd591; border-radius:10px; padding:10px 12px; line-height:1.7; }
     #regWrap { margin-top:18px; padding-top:16px; border-top:2px dashed var(--line); }
@@ -217,6 +218,12 @@
       <div class="sec">
         <h2 data-i18n="secTodos">📌 やること</h2>
         <ul id="listTodos"></ul>
+      </div>
+      <!-- 済んだこと。あとから見返すための控えなので、チェックを出さずカレンダー登録の対象にしない。 -->
+      <div class="sec">
+        <h2 data-i18n="secRecords">🗒️ 記録（済んだこと）</h2>
+        <p class="sec-note" data-i18n="recordsNote">見返すための控えです。カレンダーには登録されません。</p>
+        <ul id="listRecords"></ul>
       </div>
       <div class="btns">
         <button type="button" id="copyBtn" data-i18n="copyBtn">まとめをコピー</button>

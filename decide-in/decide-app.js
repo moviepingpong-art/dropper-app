@@ -251,6 +251,22 @@ function render(r) {
   renderList_('listTodos', 'emptyTodos', r.todos, function (it) {
     return datedRow_(it, 'due', 'dueRaw', 'labDue', 'labOwner', it.who);
   });
+  // 済んだことは控えとして出すだけ。チェックを付けないので、カレンダー登録の対象に入らない。
+  renderList_('listRecords', 'emptyRecords', r.records, function (it) {
+    var li = document.createElement('li');
+    var p = document.createElement('p');
+    p.className = 'row-main';
+    p.textContent = it.text;
+    li.appendChild(p);
+    if (it.date || it.dateRaw) {
+      var d = document.createElement('p');
+      d.className = 'row-sub';
+      d.textContent = I18N.t('labDate') + ': ' + (it.date || I18N.t('dateUnknown'));
+      if (it.dateRaw) d.textContent += '　' + I18N.t('dueFromText', { raw: it.dateRaw });
+      li.appendChild(d);
+    }
+    return li;
+  });
   el('result').style.display = '';
   // 登録ボタンは、日付のある項目が「決まったこと」「やること」のどちらかに1件でもあるときだけ出す
   var hasDated = r.decided.some(function (it) { return !!it.date; })
@@ -363,6 +379,16 @@ function summaryText(r) {
     if (it.dueRaw) s += '（' + I18N.t('dueFromText', { raw: it.dueRaw }) + '）';
     L.push(s);
   });
+  if (r.records.length) {
+    L.push('');
+    L.push(I18N.t('secRecords'));
+    r.records.forEach(function (it) {
+      var s = '・' + it.text;
+      if (it.date) s += ' ／ ' + I18N.t('labDate') + ': ' + it.date;
+      else if (it.dateRaw) s += ' ／ ' + I18N.t('dueFromText', { raw: it.dateRaw });
+      L.push(s);
+    });
+  }
   return L.join('\n');
 }
 
