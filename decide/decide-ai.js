@@ -43,25 +43,39 @@
   }
 
   function promptJa(baseDate) {
-    return '添付は「話し合いの記録」です。次のどちらか、または両方が混ざっています。\n' +
+    return '添付は「決めごとの記録」です。次のいずれか、または複数が混ざっています。\n' +
       '　A: チャットアプリ（LINE・Slack・メール・X など）のやりとりのスクリーンショット\n' +
       '　B: 手書きのメモ、打ち合わせのノート、ホワイトボードの写真、FAXなどの紙の記録\n' +
+      '　C: 議事録・総会報告・委員会報告・お知らせなど、清書された文書\n' +
       '**渡した順に記録が続いています。** 複数枚は同じ記録の連続した部分で、' +
       '上下が重なって同じ内容が2枚に写っていることがあります。重なった部分は1件として扱ってください。\n' +
       '全体を読んで、JSONのオブジェクトだけを返してください（前置き・説明・コードフェンスは不要）。\n' +
       '■ いちばん大事なこと\n' +
       '・**決まったこと（decided）と、まだ決まっていないこと（undecided）を分けること。** これがこの作業の目的です。\n' +
+      '・**decided は「誰かが決めた・合意した・承認した」ことに限ります。**\n' +
+      '　C（文書）では「決定した」「承認された」「可決された」「了承された」「一任された」' +
+      '「〜することとなった」のように、決まったと明示されているものを拾ってください。\n' +
+      '・**起きた出来事や経緯の説明を decided に入れないこと。** これがいちばん多い誤りです。\n' +
+      '　例:「7月25日で特別国会が終了しました」は事実の報告であって、誰かが決めたことではありません。' +
+      'こうした文は decided に入れないでください。\n' +
       '・会話では話が二転三転します。**後の発言が前の発言を打ち消している場合、最終的な結論だけを decided に入れ、' +
       '打ち消された方は入れないこと**（例:「12日で」→「やっぱり15日で」なら、決定は15日のみ）。\n' +
       '・「どうする？」「誰か分かる人いますか」のように問いかけたまま返事が無い、' +
       '「候補は2つある」のように選択肢が残っている、返事待ちで止まっている——これらは undecided です。\n' +
-      '・**推測で決定事項を作らないこと。** 会話に書かれていないことは出さない。決まっていなければ undecided に置く。\n' +
+      '　C（文書）では「継続審議」「保留」「次回に持ち越し」「今後の課題」「検討中」が undecided にあたります。\n' +
+      '・**推測で決定事項を作らないこと。** 記録に書かれていないことは出さない。決まっていなければ undecided に置く。\n' +
+      '・**決まったことが何も無ければ、decided を空配列にしてください。** 3項目すべてが空でも構いません。' +
+      '随筆・お知らせ・報道のように、そもそも何も決めていない文書があります。' +
+      '**無理に項目を作らないこと。空で返すことは正しい答えです。**\n' +
       '■ 話者\n' +
       '・A（スクショ）の場合: 吹き出しが右側（自分の発言）の話者は「自分」としてください。' +
       '左側は表示されている名前を使ってください。\n' +
       '・B（紙の記録）の場合: 発言者や担当者の名前が書かれていればそれを使ってください。' +
       '**書かれていなければ空文字にし、誰の発言か推測しないこと。**\n' +
-      '・どちらの場合も、名前が読み取れないときは空文字にしてください。\n' +
+      '・C（文書）の場合: 決めた主体が会議体なら、その名前（理事会・総会・委員会など）を入れてください。\n' +
+      '・**文責者・著者・署名・発行元を who に入れないこと。**「文責：〇〇」と書かれていても、' +
+      'その人がその件を決めたとは限りません。書いた人と決めた人は別です。\n' +
+      '・いずれの場合も、名前が読み取れないときは空文字にしてください。\n' +
       '■ 手書きの読み取り（Bの場合）\n' +
       '・崩し字や略記があっても、文脈から素直に読める範囲で読み取ってください。' +
       '**読めない箇所を推測で埋めないこと。**\n' +
@@ -74,8 +88,11 @@
       (baseDate ? ('この会話の基準日は ' + baseDate + ' です。これを起点に西暦の絶対日付へ直してください。\n')
                 : 'スクリーンショットに日付の区切り（「2026年8月2日」など）が写っていればそれを起点にしてください。\n') +
       '・due は YYYY-MM-DD。**判断できないときは空文字にし、勝手に決めないこと。**\n' +
-      '・dueRaw には会話に書かれていた表現をそのまま入れてください（例:「来週の火曜」「8/15まで」）。' +
+      '・dueRaw には記録に書かれていた表現をそのまま入れてください（例:「来週の火曜」「8/15まで」）。' +
       '利用者がこれを見て、直した日付が正しいか確かめます。期限の記述が無ければ空文字。\n' +
+      '・**拾うのは、これからやることの期限だけです。** 報告書には「1月23日解散」「2月8日投開票」のように' +
+      '**過去の経緯を並べた日付**が出てきますが、これは済んだ出来事であって期限ではありません。' +
+      'todos にも decided にも入れないでください。\n' +
       '■ 各項目\n' +
       '・decided … {"text":"決まった内容","who":"決めた人・言い出した人（不明なら空文字）"}\n' +
       '・undecided … {"text":"何が決まっていないか","waiting":"何待ちか・誰の返事待ちか（不明なら空文字）"}\n' +
@@ -88,24 +105,38 @@
   }
 
   function promptEn(baseDate) {
-    return 'The attachments are a record of a discussion. They are either, or a mix of:\n' +
+    return 'The attachments are a record of things being decided. They are one of, or a mix of:\n' +
       '  A: screenshots of a conversation in a messaging app (LINE, Slack, email, X and so on)\n' +
       '  B: handwritten notes, meeting notes, a photo of a whiteboard, a fax or other paper record\n' +
+      '  C: a written-up document such as minutes, a committee or general-meeting report, or an announcement\n' +
       '**They are in order and the record runs across them.** Consecutive images often overlap, ' +
       'so the same content can appear twice. Treat an overlapping part as a single item.\n' +
       'Read the whole thing and return ONLY a JSON object (no preamble, explanation, or code fences).\n' +
       'The most important thing:\n' +
       '- **Separate what was decided (decided) from what is still open (undecided).** That is the point of this task.\n' +
+      '- **decided is only for what someone decided, agreed or approved.**\n' +
+      '  In C (documents), pick up what is explicitly settled: "was decided", "was approved", "was carried", ' +
+      '"was endorsed", "was delegated to", "it was agreed that".\n' +
+      '- **Do not put events or background narration in decided. This is the most common mistake.**\n' +
+      '  For example "the special session closed on 25 July" reports something that happened; nobody decided it. ' +
+      'Leave such sentences out of decided.\n' +
       '- Conversations change course. **If a later message overrides an earlier one, put only the final conclusion ' +
       'in decided and leave the overridden one out** (e.g. "let us do the 12th" then "actually the 15th" — only the 15th is decided).\n' +
       '- A question left unanswered, a choice still open between options, or anything waiting on a reply belongs in undecided.\n' +
-      '- **Do not invent decisions.** If it is not in the conversation, leave it out; if it is not settled, put it in undecided.\n' +
+      '  In C, "held over", "deferred", "carried to the next meeting", "under consideration" belong in undecided.\n' +
+      '- **Do not invent decisions.** If it is not in the record, leave it out; if it is not settled, put it in undecided.\n' +
+      '- **If nothing was decided, return an empty decided array. All three may be empty.** ' +
+      'Essays, announcements and news reports often settle nothing. ' +
+      '**Do not manufacture entries. Returning empty is a correct answer.**\n' +
       'Speakers:\n' +
       '- For A (screenshots): messages in bubbles on the right are the screenshot owner, so use "me" as the speaker. ' +
       'On the left, use the displayed name.\n' +
       '- For B (paper records): use the name of the speaker or owner if it is written. ' +
       '**If it is not written, use an empty string and do not guess who said it.**\n' +
-      '- In either case, use an empty string when the name cannot be read.\n' +
+      '- For C (documents): when a body made the decision, use its name (board, general meeting, committee).\n' +
+      '- **Never put the author, byline, signature or publisher in who.** Even when a document says ' +
+      '"written by X", that does not mean X decided it. The writer and the decider are different people.\n' +
+      '- In every case, use an empty string when the name cannot be read.\n' +
       'Reading handwriting (for B):\n' +
       '- Read cursive or shorthand as far as it can be read plainly from context. **Do not fill in unreadable parts by guessing.**\n' +
       '- Arrows, circles and check marks carry meaning (connection, emphasis, done): reflect that meaning in the content ' +
@@ -117,8 +148,11 @@
       (baseDate ? ('The reference date for this conversation is ' + baseDate + '. Resolve relative dates from it.\n')
                 : 'If a date separator appears in the screenshots, use it as the reference point.\n') +
       '- due is YYYY-MM-DD. **Leave it empty when you cannot tell; never guess.**\n' +
-      '- dueRaw holds the wording used in the conversation (e.g. "next Tuesday", "by 8/15") so the reader can check ' +
+      '- dueRaw holds the wording used in the record (e.g. "next Tuesday", "by 8/15") so the reader can check ' +
       'the resolved date. Empty string if no deadline was mentioned.\n' +
+      '- **Only pick up deadlines for things still to be done.** Reports often list past events by date ' +
+      '("dissolved on 23 January", "polling day 8 February"). Those already happened and are not deadlines. ' +
+      'Put them in neither todos nor decided.\n' +
       'Fields:\n' +
       '- decided: {"text":"what was decided","who":"who decided or proposed it (empty if unknown)"}\n' +
       '- undecided: {"text":"what is still open","waiting":"what or whose reply it waits on (empty if unknown)"}\n' +
