@@ -974,6 +974,97 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   if (tag) L.push(tag);
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
+// ===== 案内文の画像書き出し =====
+// LINE・WhatsApp・Instagram はテキストより画像の方が回る。画像なら貼り付け先で折り返しが崩れず、
+// クレジットも焼き込まれるので消せない。ライブラリは足さない（Canvasだけで描く）。
+var ANN_IMG_W = 1080;      // SNSで扱いやすい幅
+var ANN_IMG_PAD = 72;
+var ANN_IMG_FS = 34;       // 本文の文字サイズ
+var ANN_IMG_LH = 60;       // 行送り
+var ANN_IMG_FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+
+// 画像の中のURLはタップできない。237字の中継リンクが画面を占領するだけなので落とす。
+// リンクは共有時のテキスト側が担う（navigator.share に files と text を両方渡す）。
+// 「▼ カレンダーに追加」のような、次行のURLを指す見出しも一緒に落とす（残すと空約束になる）。
+function annStripUrls_(text) {
+  var lines = String(text || '').split('\n');
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    if (/https?:\/\//.test(lines[i])) continue;
+    if (/^\s*▼/.test(lines[i]) && i + 1 < lines.length && /https?:\/\//.test(lines[i + 1])) continue;
+    out.push(lines[i]);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+}
+
+// 1行を幅に収まるよう折り返す。日本語は空白が無いので、語で入らなければ1文字ずつ詰める。
+// 絵文字はサロゲートペアなので Array.from で分ける（[j] で切ると壊れる）。
+function annWrap_(ctx, line, maxW) {
+  if (!line) return [''];
+  var out = [], cur = '';
+  var tokens = line.match(/\s+|\S+/g) || [];
+  for (var i = 0; i < tokens.length; i++) {
+    var tk = tokens[i];
+    if (ctx.measureText(cur + tk).width <= maxW) { cur += tk; continue; }
+    if (cur.replace(/\s+$/, '')) { out.push(cur.replace(/\s+$/, '')); cur = ''; }
+    if (/^\s+$/.test(tk)) continue;
+    var chars = Array.from(tk);
+    for (var j = 0; j < chars.length; j++) {
+      if (cur && ctx.measureText(cur + chars[j]).width > maxW) { out.push(cur); cur = ''; }
+      cur += chars[j];
+    }
+  }
+  out.push(cur.replace(/\s+$/, ''));
+  return out;
+}
+
+// 案内文テキスト → PNG の Blob。Webフォントの読み込みを待ってから描く
+// （待たずに描くと、画面と違う既定フォントで焼き付いてしまう）。
+function annRenderImage_(text) {
+  var body = annStripUrls_(text);
+  // 末尾のクレジット行は下部の帯に焼き込むので、本文からは外す（同じ文が2回出てしまうため）。
+  [I18N.t('annCredit'), I18N.t('annCreditShort')].forEach(function (c) {
+    if (c && body.slice(-c.length) === c) body = body.slice(0, -c.length).replace(/\s+$/, '');
+  });
+  var credit = I18N.t('annCredit').replace(/^—\s*/, '');
+  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  return ready.catch(function () {}).then(function () {
+    var maxW = ANN_IMG_W - ANN_IMG_PAD * 2;
+    var probe = document.createElement('canvas').getContext('2d');
+    probe.font = '500 ' + ANN_IMG_FS + 'px ' + ANN_IMG_FONT;
+    var rows = [];
+    body.split('\n').forEach(function (ln) { rows = rows.concat(annWrap_(probe, ln, maxW)); });
+
+    var footH = 132;                       // 下部のクレジット帯
+    var topBar = 14;                       // 上端のアクセント線
+    var h = topBar + ANN_IMG_PAD + rows.length * ANN_IMG_LH + ANN_IMG_PAD + footH;
+    var cv = document.createElement('canvas');
+    cv.width = ANN_IMG_W; cv.height = Math.max(h, 640);
+    var ctx = cv.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';                       // --paper
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#06b6a4';                       // --teal
+    ctx.fillRect(0, 0, cv.width, topBar);
+
+    ctx.fillStyle = '#0f3d3a';                       // --ink
+    ctx.font = '500 ' + ANN_IMG_FS + 'px ' + ANN_IMG_FONT;
+    ctx.textBaseline = 'top';
+    var y = topBar + ANN_IMG_PAD;
+    rows.forEach(function (r) { ctx.fillText(r, ANN_IMG_PAD, y); y += ANN_IMG_LH; });
+
+    // クレジット帯。画像に焼き込むので、本文と違って消せない。
+    var fy = cv.height - footH;
+    ctx.fillStyle = '#06b6a4';
+    ctx.fillRect(0, fy, cv.width, footH);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 30px ' + ANN_IMG_FONT;
+    ctx.fillText(credit, ANN_IMG_PAD, fy + 46);
+
+    return new Promise(function (resolve) { cv.toBlob(resolve, 'image/png'); });
+  });
+}
+
 // 案内文パネルの配線（カード生成後に呼ぶ）
 function wireAnnouncement_(li, cardApi) {
   var panel = li.querySelector('.ann-panel');
@@ -986,6 +1077,7 @@ function wireAnnouncement_(li, cardApi) {
   var creditChk = panel.querySelector('.ann-credit-chk');
   var waBtn = panel.querySelector('.ann-wa');
   var lineBtn = panel.querySelector('.ann-line');
+  var imgBtn = panel.querySelector('.ann-img');
   var current = 'line';
   function regen() {
     ta.value = buildAnnouncement_(cardApi.read(), current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
@@ -1048,6 +1140,42 @@ function wireAnnouncement_(li, cardApi) {
       });
     }
   }
+  // 画像で書き出す。共有できる端末は「画像＋本文テキスト」を一緒に渡す
+  // （画像からURLを落としているため、リンクはテキスト側が担う）。
+  // 共有に対応していない端末では PNG をダウンロードする。どちらも通らないときだけ失敗表示。
+  if (imgBtn) {
+    imgBtn.addEventListener('click', function () {
+      var old = imgBtn.textContent;
+      var restore = function (key) {
+        imgBtn.textContent = I18N.t(key);
+        setTimeout(function () { imgBtn.textContent = old; imgBtn.disabled = false; }, 1800);
+      };
+      imgBtn.disabled = true;
+      imgBtn.textContent = I18N.t('annImgMaking');
+      annRenderImage_(ta.value).then(function (blob) {
+        if (!blob) { restore('annImgFail'); return; }
+        var name = 'dropper-' + Date.now() + '.png';
+        var file = null;
+        try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+        if (file && navigator.share && navigator.canShare) {
+          if (navigator.canShare({ files: [file], text: ta.value })) {
+            navigator.share({ files: [file], text: ta.value }).catch(function () {});
+            restore('annImgDone'); return;
+          }
+          if (navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file] }).catch(function () {});
+            restore('annImgDone'); return;
+          }
+        }
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        restore('annImgDone');
+      }, function () { restore('annImgFail'); });
+    });
+  }
 }
 
 function addCard(name) {
@@ -1106,6 +1234,7 @@ function addCard(name) {
             '<button type="button" class="ann-share">' + I18N.t('annShare') + '</button>' +
             '<button type="button" class="ann-wa">' + I18N.t('annWaBtn') + '</button>' +
             '<button type="button" class="ann-line">' + I18N.t('annLineBtn') + '</button>' +
+            '<button type="button" class="ann-img">' + I18N.t('annImgBtn') + '</button>' +
           '</div>' +
         '</div>' +
       '</div>' +

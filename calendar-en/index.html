@@ -395,6 +395,11 @@
     .ann-wa { background:#25d366; }
     .ann-line { background:#06c755; }
     .ann-wa:hover, .ann-line:hover { filter:brightness(0.96); }
+    /* 画像で書き出す。コピー／共有と同じ扱いなので、そちらの見た目にそろえる。 */
+    .ann-img { font-size:13px; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer;
+      border:1px solid var(--teal); background:#fff; color:var(--teal-d); box-shadow:none; }
+    .ann-img:hover { filter:brightness(0.98); }
+    .ann-img:disabled { opacity:.6; cursor:default; }
   </style>
 </head>
 <body>
