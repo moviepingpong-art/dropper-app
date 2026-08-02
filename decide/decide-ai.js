@@ -94,13 +94,19 @@
       '**過去の経緯を並べた日付**が出てきますが、これは済んだ出来事であって期限ではありません。' +
       'todos にも decided にも入れないでください。\n' +
       '■ 各項目\n' +
-      '・decided … {"text":"決まった内容","who":"決めた人・言い出した人（不明なら空文字）"}\n' +
+      '・decided … {"text":"決まった内容","who":"決めた人・言い出した人（不明なら空文字）",' +
+      '"date":"YYYY-MM-DD または空文字","dateRaw":"原文の表現"}\n' +
+      '　date は**その決定が指している日付**（開催日・実施日・発足日など）です。' +
+      '**決定した日・会議が開かれた日ではありません。**\n' +
+      '　「3月19日〜9月26日」のように期間で書かれているときは、**初日**を date に入れてください。' +
+      'dateRaw には「3月19日〜9月26日」のように原文のまま入れます。\n' +
+      '　日付が書かれていない決定は date も dateRaw も空文字にしてください。**勝手に日付を作らないこと。**\n' +
       '・undecided … {"text":"何が決まっていないか","waiting":"何待ちか・誰の返事待ちか（不明なら空文字）"}\n' +
       '・todos … {"text":"やること","who":"担当（不明なら空文字）","due":"YYYY-MM-DD または空文字","dueRaw":"原文の表現"}\n' +
       '・decided に入れた内容のうち、誰かがやる作業になっているものは todos にも入れてください（重複してよい）。\n' +
       '・該当が無い項目は空配列にしてください。\n' +
       '出力形式（このオブジェクトだけを返す）:\n' +
-      '{"decided":[{"text":"","who":""}],"undecided":[{"text":"","waiting":""}],' +
+      '{"decided":[{"text":"","who":"","date":"","dateRaw":""}],"undecided":[{"text":"","waiting":""}],' +
       '"todos":[{"text":"","who":"","due":"","dueRaw":""}]}';
   }
 
@@ -154,17 +160,33 @@
       '("dissolved on 23 January", "polling day 8 February"). Those already happened and are not deadlines. ' +
       'Put them in neither todos nor decided.\n' +
       'Fields:\n' +
-      '- decided: {"text":"what was decided","who":"who decided or proposed it (empty if unknown)"}\n' +
+      '- decided: {"text":"what was decided","who":"who decided or proposed it (empty if unknown)",' +
+      '"date":"YYYY-MM-DD or empty","dateRaw":"the original wording"}\n' +
+      '  date is **the date the decision refers to** (when it is held, starts, takes effect). ' +
+      '**It is not the date the decision was made or the meeting was held.**\n' +
+      '  For a range such as "19 March to 26 September", put the **first day** in date and keep the ' +
+      'whole range in dateRaw.\n' +
+      '  Leave date and dateRaw empty when no date is written. **Never invent a date.**\n' +
       '- undecided: {"text":"what is still open","waiting":"what or whose reply it waits on (empty if unknown)"}\n' +
       '- todos: {"text":"the task","who":"owner (empty if unknown)","due":"YYYY-MM-DD or empty","dueRaw":"original wording"}\n' +
       '- If something in decided is work someone will do, also put it in todos (duplication is fine).\n' +
       '- Use an empty array when there is nothing for a field.\n' +
       'Output exactly this shape:\n' +
-      '{"decided":[{"text":"","who":""}],"undecided":[{"text":"","waiting":""}],' +
+      '{"decided":[{"text":"","who":"","date":"","dateRaw":""}],"undecided":[{"text":"","waiting":""}],' +
       '"todos":[{"text":"","who":"","due":"","dueRaw":""}]}';
   }
 
   function str(v) { return String(v == null ? '' : v).trim(); }
+
+  // 形が合っていても値が壊れていることがある（AIは 2026-13-45 のような日付を返す）。
+  // 実在する日付かどうかまで見て、駄目なら空文字にする。
+  function ymd(v) {
+    var d = str(v);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
+    var p = d.split('-'), dt = new Date(d + 'T00:00:00');
+    if (isNaN(dt.getTime()) || dt.getMonth() + 1 !== Number(p[1]) || dt.getDate() !== Number(p[2])) return '';
+    return d;
+  }
 
   // AIの返答を、UIが扱いやすい形に整える。
   // 形も値も信用しない（AIは 2026-13-45 のような日付や、空の要素を返すことがある）。
@@ -176,7 +198,9 @@
     (Array.isArray(o.decided) ? o.decided : []).forEach(function (it) {
       if (!it || typeof it !== 'object') return;
       var t = str(it.text); if (!t) return;
-      out.decided.push({ text: t, who: str(it.who) });
+      // 決まったことにも日付を持たせる。「9/15に開催」のような予定は、
+      // やることの期限より先にカレンダーへ入れたいことが多い。
+      out.decided.push({ text: t, who: str(it.who), date: ymd(it.date), dateRaw: str(it.dateRaw) });
     });
     (Array.isArray(o.undecided) ? o.undecided : []).forEach(function (it) {
       if (!it || typeof it !== 'object') return;
@@ -186,14 +210,7 @@
     (Array.isArray(o.todos) ? o.todos : []).forEach(function (it) {
       if (!it || typeof it !== 'object') return;
       var t = str(it.text); if (!t) return;
-      var d = str(it.due);
-      // 形が合っていても値が壊れていることがあるので、実在する日付かまで見る
-      if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) d = '';
-      if (d) {
-        var p = d.split('-'), dt = new Date(d + 'T00:00:00');
-        if (isNaN(dt.getTime()) || dt.getMonth() + 1 !== Number(p[1]) || dt.getDate() !== Number(p[2])) d = '';
-      }
-      out.todos.push({ text: t, who: str(it.who), due: d, dueRaw: str(it.dueRaw) });
+      out.todos.push({ text: t, who: str(it.who), due: ymd(it.due), dueRaw: str(it.dueRaw) });
     });
     return out;
   }

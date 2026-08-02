@@ -207,50 +207,54 @@ function renderList_(ulId, emptyKey, items, build) {
   items.forEach(function (it) { ul.appendChild(build(it)); });
 }
 
+// 日付のある行を作る。チェックを出してカレンダー登録の対象にする。
+// 直した日付と原文の言い方を並べて出す（相対的な書き方から直した結果を確かめられるように）。
+function datedRow_(it, dateKey, rawKey, labelKey, subLabelKey, subValue) {
+  var li = document.createElement('li');
+  var head = document.createElement('div');
+  head.className = 'row-head';
+  if (it[dateKey]) {
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'reg-chk';
+    cb.checked = true;
+    li.__item = { text: it.text, who: it.who, date: it[dateKey], raw: it[rawKey] };
+    head.appendChild(cb);
+  }
+  var p = document.createElement('p');
+  p.className = 'row-main';
+  p.textContent = it.text;
+  head.appendChild(p);
+  li.appendChild(head);
+  if (subValue) {
+    var s = document.createElement('p');
+    s.className = 'row-sub';
+    s.textContent = I18N.t(subLabelKey) + ': ' + subValue;
+    li.appendChild(s);
+  }
+  var d = document.createElement('p');
+  d.className = 'row-sub' + (it[dateKey] ? '' : ' weak');
+  d.textContent = I18N.t(labelKey) + ': ' + (it[dateKey] || I18N.t(dateKey === 'due' ? 'dueUnknown' : 'dateUnknown'));
+  if (it[rawKey]) d.textContent += '　' + I18N.t('dueFromText', { raw: it[rawKey] });
+  li.appendChild(d);
+  return li;
+}
+
 function render(r) {
   lastResult = r;
   renderList_('listDecided', 'emptyDecided', r.decided, function (it) {
-    return textRow_(it.text, I18N.t('labWho'), it.who);
+    return datedRow_(it, 'date', 'dateRaw', 'labDate', 'labWho', it.who);
   });
   renderList_('listUndecided', 'emptyUndecided', r.undecided, function (it) {
     return textRow_(it.text, I18N.t('labWaiting'), it.waiting);
   });
   renderList_('listTodos', 'emptyTodos', r.todos, function (it) {
-    var li = document.createElement('li');
-    var head = document.createElement('div');
-    head.className = 'row-head';
-    // カレンダーに入れられるのは期限のあるものだけ。日付が無い項目にはチェックを出さない。
-    if (it.due) {
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.className = 'reg-chk';
-      cb.checked = true;
-      li.__item = it;
-      head.appendChild(cb);
-    }
-    var p = document.createElement('p');
-    p.className = 'row-main';
-    p.textContent = it.text;
-    head.appendChild(p);
-    li.appendChild(head);
-    if (it.who) {
-      var w = document.createElement('p');
-      w.className = 'row-sub';
-      w.textContent = I18N.t('labOwner') + ': ' + it.who;
-      li.appendChild(w);
-    }
-    // 期限は「直した日付」と「会話での言い方」を並べて出す。
-    // 相対的な書き方（「来週の火曜」）を直した結果が正しいかは、原文と見比べないと判断できない。
-    var d = document.createElement('p');
-    d.className = 'row-sub' + (it.due ? '' : ' weak');
-    d.textContent = I18N.t('labDue') + ': ' + (it.due || I18N.t('dueUnknown'));
-    if (it.dueRaw) d.textContent += '　' + I18N.t('dueFromText', { raw: it.dueRaw });
-    li.appendChild(d);
-    return li;
+    return datedRow_(it, 'due', 'dueRaw', 'labDue', 'labOwner', it.who);
   });
   el('result').style.display = '';
-  // 登録ボタンは、期限のある「やること」が1件でもあるときだけ出す
-  var hasDated = r.todos.some(function (it) { return !!it.due; });
+  // 登録ボタンは、日付のある項目が「決まったこと」「やること」のどちらかに1件でもあるときだけ出す
+  var hasDated = r.decided.some(function (it) { return !!it.date; })
+              || r.todos.some(function (it) { return !!it.due; });
   el('regWrap').style.display = hasDated ? '' : 'none';
   el('regMsg').textContent = '';
 }
@@ -262,30 +266,34 @@ function addDay_(ymd) {
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 }
 
+// 登録用に整えた形（{text, who, date, raw}）を受け取る。決まったこと・やることで同じ形にしてある。
 function buildEvent_(it) {
-  // 期限は時刻を伴わないので終日予定にする。終了日は+1（Google側が排他的に扱うため）。
+  // 日付だけで時刻を伴わないので終日予定にする。終了日は+1（Google側が排他的に扱うため）。
   var ev = {
     summary: it.text,
     colorId: EVENT_COLOR_ID,
-    start: { date: it.due },
-    end: { date: addDay_(it.due) }
+    start: { date: it.date },
+    end: { date: addDay_(it.date) }
   };
   var desc = [];
-  if (it.who) desc.push(I18N.t('labOwner') + ': ' + it.who);
-  // 相対的な書き方から直した日付なので、元の言い方も残しておく（後から検証できるように）
-  if (it.dueRaw) desc.push(I18N.t('dueFromText', { raw: it.dueRaw }));
+  if (it.who) desc.push(it.who);
+  // 相対的な書き方や期間から直した日付なので、元の言い方も残しておく（後から検証できるように）
+  if (it.raw) desc.push(I18N.t('dueFromText', { raw: it.raw }));
   desc.push(I18N.t('evFrom'));
   ev.description = desc.join('\n');
   return ev;
 }
 
+// 決まったこと・やることの両方から、チェックの入っている行を集める
 function regTargets_() {
   var out = [];
-  var lis = el('listTodos').querySelectorAll('li');
-  for (var i = 0; i < lis.length; i++) {
-    var cb = lis[i].querySelector('.reg-chk');
-    if (cb && cb.checked && lis[i].__item) out.push({ cb: cb, it: lis[i].__item });
-  }
+  ['listDecided', 'listTodos'].forEach(function (id) {
+    var lis = el(id).querySelectorAll('li');
+    for (var i = 0; i < lis.length; i++) {
+      var cb = lis[i].querySelector('.reg-chk');
+      if (cb && cb.checked && lis[i].__item) out.push({ cb: cb, it: lis[i].__item });
+    }
+  });
   return out;
 }
 
@@ -335,7 +343,12 @@ function summaryText(r) {
   var L = [];
   L.push(I18N.t('secDecided'));
   if (!r.decided.length) L.push('・' + I18N.t('emptyDecided'));
-  r.decided.forEach(function (it) { L.push('・' + it.text + (it.who ? '（' + I18N.t('labWho') + ': ' + it.who + '）' : '')); });
+  r.decided.forEach(function (it) {
+    var s = '・' + it.text;
+    if (it.date) s += ' ／ ' + I18N.t('labDate') + ': ' + it.date;
+    if (it.who) s += ' ／ ' + I18N.t('labWho') + ': ' + it.who;
+    L.push(s);
+  });
   L.push('');
   L.push(I18N.t('secUndecided'));
   if (!r.undecided.length) L.push('・' + I18N.t('emptyUndecided'));
@@ -402,11 +415,6 @@ async function run() {
   });
 
   el('runBtn').addEventListener('click', run);
-  el('resetBtn').addEventListener('click', function () {
-    setFiles([]);
-    el('result').style.display = 'none';
-    setMsg('');
-  });
   el('keyChangeBtn').addEventListener('click', function () { askKey(true); });
   el('regBtn').addEventListener('click', register);
 
