@@ -52,21 +52,32 @@
       '全体を読んで、JSONのオブジェクトだけを返してください（前置き・説明・コードフェンスは不要）。\n' +
       '■ いちばん大事なこと\n' +
       '・**決まったこと（decided）と、まだ決まっていないこと（undecided）を分けること。** これがこの作業の目的です。\n' +
-      '・**decided は「誰かが決めた・合意した・承認した」ことに限ります。**\n' +
-      '　C（文書）では「決定した」「承認された」「可決された」「了承された」「一任された」' +
-      '「〜することとなった」のように、決まったと明示されているものを拾ってください。\n' +
-      '・**起きた出来事や経緯の説明を decided に入れないこと。** これがいちばん多い誤りです。\n' +
-      '　例:「7月25日で特別国会が終了しました」は事実の報告であって、誰かが決めたことではありません。' +
-      'こうした文は decided に入れないでください。\n' +
+      '・**判定の軸は「これからのことか」×「確定しているか」の2つです。誰が決めたかではありません。**\n' +
+      '　　これから × 確定している　→ decided（決まったこと）\n' +
+      '　　これから × まだ確定していない → undecided（まだ決まっていないこと）\n' +
+      '　　すでに済んだこと　　　　→ **どちらにも入れない**\n' +
+      '・decided に入るのは次のようなものです。\n' +
+      '　・話し合いで合意されたこと（例:「9/15に開催で決まり」）\n' +
+      '　・文書で「決定した」「承認された」「可決された」「了承された」「一任された」' +
+      '「〜することとなった」と書かれていること\n' +
+      '　・**「〜する予定」「〜が開催される」のように、日程や実施が確定している事柄。**' +
+      'その記録の中で誰かが決めたものでなくても構いません。予定として確定していれば decided です' +
+      '（例:「2027年1月1日に合併し発足予定」「3月19日〜9月26日に開催予定」）。\n' +
+      '・**すでに済んだ出来事の報告は、decided にも undecided にも入れないこと。** これがいちばん多い誤りです。\n' +
+      '　例:「7月25日で特別国会が終了しました」「1月23日解散」「2月8日投開票」は、' +
+      '起きたことの振り返りであって、これから確定している事柄ではありません。\n' +
+      '　見分け方: 文末が「〜しました」「〜だった」のように**済んだ言い方**なら入れない。' +
+      '「〜予定」「〜する」「〜と決定した」のように**これから効く言い方**なら入れる。\n' +
       '・会話では話が二転三転します。**後の発言が前の発言を打ち消している場合、最終的な結論だけを decided に入れ、' +
       '打ち消された方は入れないこと**（例:「12日で」→「やっぱり15日で」なら、決定は15日のみ）。\n' +
       '・「どうする？」「誰か分かる人いますか」のように問いかけたまま返事が無い、' +
       '「候補は2つある」のように選択肢が残っている、返事待ちで止まっている——これらは undecided です。\n' +
       '　C（文書）では「継続審議」「保留」「次回に持ち越し」「今後の課題」「検討中」が undecided にあたります。\n' +
       '・**推測で決定事項を作らないこと。** 記録に書かれていないことは出さない。決まっていなければ undecided に置く。\n' +
-      '・**決まったことが何も無ければ、decided を空配列にしてください。** 3項目すべてが空でも構いません。' +
-      '随筆・お知らせ・報道のように、そもそも何も決めていない文書があります。' +
-      '**無理に項目を作らないこと。空で返すことは正しい答えです。**\n' +
+      '・**該当が無ければ空配列にしてください。** 随筆や振り返りのように、済んだ話ばかりで' +
+      'これから確定していることが何も無い文書では、3項目すべてが空になります。それは正しい答えです。\n' +
+      '　ただし**確定した予定が書かれているのに空で返すのは誤りです。** 上の「これから × 確定」に' +
+      'あてはまるものは、記録の中で誰かが決めたかどうかに関わらず拾ってください。\n' +
       '■ 話者\n' +
       '・A（スクショ）の場合: 吹き出しが右側（自分の発言）の話者は「自分」としてください。' +
       '左側は表示されている名前を使ってください。\n' +
@@ -120,20 +131,31 @@
       'Read the whole thing and return ONLY a JSON object (no preamble, explanation, or code fences).\n' +
       'The most important thing:\n' +
       '- **Separate what was decided (decided) from what is still open (undecided).** That is the point of this task.\n' +
-      '- **decided is only for what someone decided, agreed or approved.**\n' +
-      '  In C (documents), pick up what is explicitly settled: "was decided", "was approved", "was carried", ' +
-      '"was endorsed", "was delegated to", "it was agreed that".\n' +
-      '- **Do not put events or background narration in decided. This is the most common mistake.**\n' +
-      '  For example "the special session closed on 25 July" reports something that happened; nobody decided it. ' +
-      'Leave such sentences out of decided.\n' +
+      '- **Judge on two axes: is it still ahead, and is it settled? Not on who decided it.**\n' +
+      '    ahead + settled     -> decided\n' +
+      '    ahead + not settled -> undecided\n' +
+      '    already happened    -> **neither**\n' +
+      '- decided covers:\n' +
+      '  - what was agreed in the conversation (e.g. "the 15th it is")\n' +
+      '  - what a document states as "was decided", "was approved", "was carried", "was endorsed", ' +
+      '"was delegated to", "it was agreed that"\n' +
+      '  - **anything whose date or execution is settled, such as "is scheduled for" or "will be held".** ' +
+      'It does not have to be something decided by anyone in this record. If it is a settled plan, it is decided ' +
+      '(e.g. "the merger takes effect on 1 January 2027", "runs from 19 March to 26 September").\n' +
+      '- **Do not put already-completed events in decided or undecided. This is the most common mistake.**\n' +
+      '  "The special session closed on 25 July", "dissolved on 23 January", "polling day 8 February" all look back ' +
+      'at what happened; none of them is settled and ahead.\n' +
+      '  Test: past-tense narration ("closed", "was held") stays out; forward-looking wording ("is scheduled", ' +
+      '"will run", "was decided") goes in.\n' +
       '- Conversations change course. **If a later message overrides an earlier one, put only the final conclusion ' +
       'in decided and leave the overridden one out** (e.g. "let us do the 12th" then "actually the 15th" — only the 15th is decided).\n' +
       '- A question left unanswered, a choice still open between options, or anything waiting on a reply belongs in undecided.\n' +
       '  In C, "held over", "deferred", "carried to the next meeting", "under consideration" belong in undecided.\n' +
       '- **Do not invent decisions.** If it is not in the record, leave it out; if it is not settled, put it in undecided.\n' +
-      '- **If nothing was decided, return an empty decided array. All three may be empty.** ' +
-      'Essays, announcements and news reports often settle nothing. ' +
-      '**Do not manufacture entries. Returning empty is a correct answer.**\n' +
+      '- **Use empty arrays when there is nothing to report.** An essay or a look back that only recounts ' +
+      'what already happened will leave all three empty, and that is a correct answer.\n' +
+      '  But **returning empty when settled plans are written down is wrong.** Anything matching ' +
+      '"ahead + settled" above belongs in decided, whoever decided it.\n' +
       'Speakers:\n' +
       '- For A (screenshots): messages in bubbles on the right are the screenshot owner, so use "me" as the speaker. ' +
       'On the left, use the displayed name.\n' +
