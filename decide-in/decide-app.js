@@ -392,6 +392,85 @@ function summaryText(r) {
   return L.join('\n');
 }
 
+/* ===== 画像で書き出す =====
+   LINE・WhatsApp はテキストより画像の方が回る。貼り付け先で折り返しが崩れず、
+   出典も焼き込まれるので消えない。ライブラリは足さない（Canvasだけで描く）。
+   イベントドロッパー（app.js の annRenderImage_）と同じ考え方で作ってあるが、
+   ツールごとにファイルが分かれているため実装は別。片方を直したらもう片方も見ること。 */
+var IMG_W = 1080, IMG_PAD = 72, IMG_FS = 34, IMG_LH = 60, IMG_HFS = 40;
+var IMG_FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+
+// 1行を幅に収まるよう折り返す。日本語は空白が無いので、語で入らなければ1文字ずつ詰める。
+// 絵文字はサロゲートペアなので Array.from で分ける（[j] で切ると壊れる）。
+function imgWrap_(ctx, line, maxW) {
+  if (!line) return [''];
+  var out = [], cur = '';
+  var tokens = line.match(/\s+|\S+/g) || [];
+  for (var i = 0; i < tokens.length; i++) {
+    var tk = tokens[i];
+    if (ctx.measureText(cur + tk).width <= maxW) { cur += tk; continue; }
+    if (cur.replace(/\s+$/, '')) { out.push(cur.replace(/\s+$/, '')); cur = ''; }
+    if (/^\s+$/.test(tk)) continue;
+    var chars = Array.from(tk);
+    for (var j = 0; j < chars.length; j++) {
+      if (cur && ctx.measureText(cur + chars[j]).width > maxW) { out.push(cur); cur = ''; }
+      cur += chars[j];
+    }
+  }
+  out.push(cur.replace(/\s+$/, ''));
+  return out;
+}
+
+// まとめ → PNG の Blob。Webフォントの読み込みを待ってから描く
+// （待たずに描くと、画面と違う既定フォントで焼き付いてしまう）。
+function renderImage_(text) {
+  var heads = ['secDecided', 'secUndecided', 'secTodos', 'secRecords'].map(function (k) { return I18N.t(k); });
+  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  return ready.catch(function () {}).then(function () {
+    var maxW = IMG_W - IMG_PAD * 2;
+    var probe = document.createElement('canvas').getContext('2d');
+    // 節の見出しは大きく太く出す。本文と同じ字面だと4つの塊が読み分けられない。
+    var rows = [];
+    String(text || '').split('\n').forEach(function (ln) {
+      var isHead = heads.indexOf(ln.trim()) >= 0;
+      probe.font = (isHead ? '700 ' + IMG_HFS : '500 ' + IMG_FS) + 'px ' + IMG_FONT;
+      imgWrap_(probe, ln, maxW).forEach(function (r) { rows.push({ text: r, head: isHead }); });
+    });
+
+    var footH = 132, topBar = 14;
+    var h = topBar + IMG_PAD;
+    rows.forEach(function (r) { h += r.head ? IMG_LH + 16 : IMG_LH; });
+    h += IMG_PAD + footH;
+
+    var cv = document.createElement('canvas');
+    cv.width = IMG_W; cv.height = Math.max(h, 640);
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#06b6a4';                       // --teal
+    ctx.fillRect(0, 0, cv.width, topBar);
+    ctx.textBaseline = 'top';
+
+    var y = topBar + IMG_PAD;
+    rows.forEach(function (r) {
+      if (r.head) { y += 16; ctx.font = '700 ' + IMG_HFS + 'px ' + IMG_FONT; ctx.fillStyle = '#048b7f'; }
+      else { ctx.font = '500 ' + IMG_FS + 'px ' + IMG_FONT; ctx.fillStyle = '#0f3d3a'; }
+      ctx.fillText(r.text, IMG_PAD, y);
+      y += IMG_LH;
+    });
+
+    // 出典の帯。画像に焼き込むので、テキストと違って消せない。
+    var fy = cv.height - footH;
+    ctx.fillStyle = '#06b6a4';
+    ctx.fillRect(0, fy, cv.width, footH);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '700 30px ' + IMG_FONT;
+    ctx.fillText(I18N.t('imgCredit'), IMG_PAD, fy + 46);
+
+    return new Promise(function (resolve) { cv.toBlob(resolve, 'image/png'); });
+  });
+}
+
 /* ===== 読み取り ===== */
 var STATUS_KEYS = { queued: 'msgQueued', running: 'msgRunning', retry: 'msgRetry' };
 var ERROR_KEYS = {
@@ -455,6 +534,42 @@ async function run() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(done, done);
     } else { done(); }
+  });
+
+  // 画像で書き出す。共有できる端末は「画像＋まとめのテキスト」を一緒に渡し、
+  // 対応していない端末では PNG をダウンロードする。どちらも通らないときだけ失敗表示。
+  el('imgBtn').addEventListener('click', function () {
+    if (!lastResult) return;
+    var b = el('imgBtn'), old = b.textContent;
+    var restore = function (key) {
+      b.textContent = I18N.t(key);
+      setTimeout(function () { b.textContent = old; b.disabled = false; }, 1800);
+    };
+    b.disabled = true;
+    b.textContent = I18N.t('imgMaking');
+    var txt = summaryText(lastResult);
+    renderImage_(txt).then(function (blob) {
+      if (!blob) { restore('imgFail'); return; }
+      var name = 'decide-' + Date.now() + '.png';
+      var file = null;
+      try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+      if (file && navigator.share && navigator.canShare) {
+        if (navigator.canShare({ files: [file], text: txt })) {
+          navigator.share({ files: [file], text: txt }).catch(function () {});
+          restore('imgDone'); return;
+        }
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file] }).catch(function () {});
+          restore('imgDone'); return;
+        }
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      restore('imgDone');
+    }, function () { restore('imgFail'); });
   });
 
   // 基準日の既定は今日。「来週の火曜」を直す起点になるので、空のままにしない。
