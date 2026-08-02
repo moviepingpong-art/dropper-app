@@ -860,7 +860,27 @@ function annHashtag_(typeKey) {
   }
   return '';
 }
-function buildAnnouncement_(f, channel, typeKey) {
+// ===== 案内文のクレジット行 =====
+// 案内文はLINE/WhatsAppのグループに貼られて多くの人の目に触れる。その末尾に一行入れることで、
+// 告知文そのものが実例つきの導線になる。既定はONで、利用者が外せる。
+var ANN_CREDIT_STORE = 'dropper_ann_credit';
+// キーが無い＝初回利用者は ON 扱い（'0' のときだけ OFF）。
+function annCreditOn_() {
+  try { return localStorage.getItem(ANN_CREDIT_STORE) !== '0'; } catch (e) { return true; }
+}
+function setAnnCreditOn_(on) {
+  try { localStorage.setItem(ANN_CREDIT_STORE, on ? '1' : '0'); } catch (e) {}
+}
+// 本体（buildAnnouncementBody_）は3チャネルとも途中 return するうえ、line は末尾の空白を落として返す。
+// クレジットは各チャネルの中ではなく、組み立てが終わったこの最終段で1回だけ足す。
+// 付けるかどうかは呼び出し側から渡す（本体を localStorage に依存させないため）。
+function buildAnnouncement_(f, channel, typeKey, withCredit) {
+  var body = buildAnnouncementBody_(f, channel, typeKey);
+  if (!withCredit) return body;
+  // Xタブは字数が厳しいので短縮版を使う
+  return body + '\n\n' + I18N.t(channel === 'x' ? 'annCreditShort' : 'annCredit');
+}
+function buildAnnouncementBody_(f, channel, typeKey) {
   var emoji = typeCfg_(typeKey).annEmoji || '🏓';   // 種類別の先頭絵文字（sports=🏓 / general=🎉）
   // 会期で開催する種類（展示会など）は、日を1件ずつ並べず「初日〜最終日」の1行にまとめる
   var isRange = !!typeCfg_(typeKey).dateRange;
@@ -963,8 +983,14 @@ function wireAnnouncement_(li, cardApi) {
   var tabs = panel.querySelectorAll('.ann-tab');
   var copyBtn = panel.querySelector('.ann-copy');
   var shareBtn = panel.querySelector('.ann-share');
+  var creditChk = panel.querySelector('.ann-credit-chk');
+  var waBtn = panel.querySelector('.ann-wa');
+  var lineBtn = panel.querySelector('.ann-line');
   var current = 'line';
-  function regen() { ta.value = buildAnnouncement_(cardApi.read(), current, li.getAttribute('data-type')); }
+  function regen() {
+    ta.value = buildAnnouncement_(cardApi.read(), current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
+  }
+  panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
   btn.addEventListener('click', function () {
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
@@ -991,6 +1017,36 @@ function wireAnnouncement_(li, cardApi) {
   if (shareBtn) {
     if (navigator.share) { shareBtn.addEventListener('click', function () { navigator.share({ text: ta.value }).catch(function () {}); }); }
     else { shareBtn.style.display = 'none'; }
+  }
+  // クレジットのON/OFF。保存先は端末に1つなので、切り替えたらページ内の全カードに反映する。
+  // 合わせないと、2枚目以降のチェック表示と本文が実態とズレる。
+  if (creditChk) {
+    creditChk.checked = annCreditOn_();
+    creditChk.addEventListener('change', function () {
+      setAnnCreditOn_(creditChk.checked);
+      var panels = document.querySelectorAll('.ann-panel');
+      for (var i = 0; i < panels.length; i++) {
+        var c = panels[i].querySelector('.ann-credit-chk');
+        if (c) c.checked = creditChk.checked;
+        // 開いているパネルだけ作り直す。閉じているものは開くときに regen される。
+        if (panels[i].style.display !== 'none' && panels[i].__regen) panels[i].__regen();
+      }
+    });
+  }
+  // 直行ボタン。本文はクリック時点の textarea から取る（利用者の手直しを反映するため）。
+  if (waBtn) {
+    waBtn.addEventListener('click', function () {
+      window.open('https://wa.me/?text=' + encodeURIComponent(ta.value), '_blank', 'noopener');
+    });
+  }
+  if (lineBtn) {
+    // LINEボタンは日本語版のみ。en/in では出さない（index.html は3フォルダ同一を保つため、ここで制御する）。
+    if (window.LANG === 'en' || window.LANG === 'in') { lineBtn.style.display = 'none'; }
+    else {
+      lineBtn.addEventListener('click', function () {
+        window.open('https://line.me/R/msg/text/?' + encodeURIComponent(ta.value), '_blank', 'noopener');
+      });
+    }
   }
 }
 
@@ -1044,9 +1100,12 @@ function addCard(name) {
             '<button type="button" class="ann-tab" data-ch="plain">' + I18N.t('annTabPlain') + '</button>' +
           '</div>' +
           '<textarea class="ann-text" rows="12" spellcheck="false"></textarea>' +
+          '<label class="ann-credit"><input type="checkbox" class="ann-credit-chk"><span>' + I18N.t('annCreditToggle') + '</span></label>' +
           '<div class="ann-actions">' +
             '<button type="button" class="ann-copy">' + I18N.t('annCopy') + '</button>' +
             '<button type="button" class="ann-share">' + I18N.t('annShare') + '</button>' +
+            '<button type="button" class="ann-wa">' + I18N.t('annWaBtn') + '</button>' +
+            '<button type="button" class="ann-line">' + I18N.t('annLineBtn') + '</button>' +
           '</div>' +
         '</div>' +
       '</div>' +

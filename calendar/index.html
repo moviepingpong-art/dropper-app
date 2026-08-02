@@ -380,11 +380,21 @@
     .ann-tab { font-size:12.5px; font-weight:700; padding:5px 12px; border:1px solid var(--teal); background:#fff; color:var(--teal-d); border-radius:999px; cursor:pointer; }
     .ann-tab.on { background:var(--teal); color:#fff; }
     .ann-text { width:100%; box-sizing:border-box; font-family:inherit; font-size:13px; line-height:1.7; color:var(--ink); padding:10px; border:1px solid var(--line); border-radius:10px; background:#fff; resize:vertical; white-space:pre-wrap; word-break:break-word; }
-    .ann-actions { display:flex; gap:8px; margin-top:8px; }
+    .ann-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
     .ann-copy, .ann-share { font-size:13px; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer; border:1px solid var(--teal); }
     .ann-copy { background:#e6fffb; color:var(--teal-d); }
     .ann-share { background:#fff; color:var(--teal-d); }
     .ann-copy:hover, .ann-share:hover { filter:brightness(0.98); }
+    /* クレジット行のトグル。既定ONで、利用者が外せる。 */
+    .ann-credit { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12.5px; color:var(--sub); cursor:pointer; }
+    .ann-credit input { width:16px; height:16px; accent-color:var(--teal); cursor:pointer; }
+    /* 直行ボタン。各サービスのブランド色にして、コピー／共有と役割が違うことを見た目で分ける。
+       LINEボタンは日本語版のみ（表示制御は app.js が window.LANG を見て行う）。 */
+    .ann-wa, .ann-line { font-size:13px; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer;
+      border:1px solid transparent; color:#fff; box-shadow:none; }
+    .ann-wa { background:#25d366; }
+    .ann-line { background:#06c755; }
+    .ann-wa:hover, .ann-line:hover { filter:brightness(0.96); }
   </style>
 </head>
 <body>

@@ -212,6 +212,12 @@
       annCopy: 'コピー',
       annCopied: 'コピーしました',
       annShare: '共有',
+      // 案内文の末尾に足すクレジット行。リンク先は言語別（en/in の利用者を日本語トップに着地させない）。
+      annCredit: '— この案内文は無料で作れます｜ドロッパー dropper-tools.com',
+      annCreditShort: '無料作成→dropper-tools.com',   // Xタブ用（字数対策）
+      annCreditToggle: 'クレジットを入れる',
+      annWaBtn: 'WhatsAppで送る',
+      annLineBtn: 'LINEで送る',   // 日本語版のみ表示（app.js が window.LANG で制御）
       annSchedule: '日程',
       annVenue: '会場',
       annMap: '地図',
@@ -421,6 +427,11 @@
       annCopy: 'Copy',
       annCopied: 'Copied',
       annShare: 'Share',
+      annCredit: '— Created free with Dropper → dropper-tools.com/en',
+      annCreditShort: 'via dropper-tools.com/en',
+      annCreditToggle: 'Include credit',
+      annWaBtn: 'Send on WhatsApp',
+      annLineBtn: 'Send on LINE',
       annSchedule: 'Schedule',
       annVenue: 'Venue',
       annMap: 'Map',
@@ -626,6 +637,11 @@
       annCopy: 'Copy',
       annCopied: 'Copy ho gaya',
       annShare: 'Share',
+      annCredit: '— Yeh post free mein banayein | Dropper: dropper-tools.com/in',
+      annCreditShort: 'via dropper-tools.com/in',
+      annCreditToggle: 'Credit shamil karein',
+      annWaBtn: 'WhatsApp par bhejein',
+      annLineBtn: 'LINE par bhejein',
       annSchedule: 'Schedule',
       annVenue: 'Venue',
       annMap: 'Map',
@@ -676,6 +692,13 @@
   // data-i18n 属性を持つ要素に文言を流し込む。data-i18n-attr があればその属性に、なければテキストに。
   function applyDom() {
     document.title = t('pageTitle');
+    // <html lang> は3フォルダとも 'ja' のまま（index.html を同一に保つ決まりのため）。
+    // そのままだと en/in が「日本語のページ」と宣言することになり、sitemap の hreflang と
+    // 食い違ううえ、読み上げも誤った言語になる。表示言語に合わせてここで書き換える。
+    // in が 'en-IN' なのは sitemap の hreflang に合わせているため（勝手に変えない）。
+    try {
+      document.documentElement.lang = (global.LANG === 'en') ? 'en' : (global.LANG === 'in') ? 'en-IN' : 'ja';
+    } catch (e) {}
     // 使い方ガイドは3言語とも公開済み。リンク先を言語別に切り替える。
     var gl = document.getElementById('guideLink');
     if (gl) {
