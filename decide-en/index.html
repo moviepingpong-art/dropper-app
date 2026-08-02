@@ -45,6 +45,8 @@
 
     h1 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:26px; color:var(--teal-d); margin:0 0 6px; line-height:1.3; }
     .lead { margin:0 0 18px; font-size:14px; color:var(--sub); }
+    .visitor-badge { margin:10px 0 0; }
+    .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
 
     .card { background:var(--paper); border-radius:18px; padding:18px 16px; margin:0 0 16px;
       box-shadow:0 8px 26px rgba(6,182,164,.13); }
@@ -171,6 +173,10 @@
 
     <h1 data-i18n="appName">決めごとドロッパー</h1>
     <p class="lead" data-i18n="lead">「結局これ決まったんだっけ？」を探す時間をなくします。</p>
+    <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
+    <p class="visitor-badge" id="visitorBadge">
+      <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+    </p>
 
     <!-- 投げ込むもの自体が私的な会話なので、扱いを正面から出す -->
     <div class="priv">
@@ -289,6 +295,16 @@
   <script src="https://accounts.google.com/gsi/client" async></script>
   <!-- window.LANG を読むスクリプトは、必ず window.LANG を設定したあとに置くこと -->
   <script>window.LANG = 'en';</script>
+  <script>
+    // 訪問者カウンター(hits.sh)を言語別に分ける。パスは window.LANG から決める。
+    // ※必ず window.LANG を設定したあとに置くこと。イベント／予定表では以前ヘッダー内にあり、
+    //   LANG が未定義のまま走っていたため、en/in の訪問がすべて ja の数に混ざっていた。
+    (function () {
+      var seg = (window.LANG === 'en') ? 'decide-en' : (window.LANG === 'in') ? 'decide-in' : 'decide';
+      var img = document.getElementById('visitorImg');
+      if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
+    })();
+  </script>
   <script src="decide-i18n.js"></script>
   <script src="decide-ai.js"></script>
   <script src="decide-app.js"></script>
