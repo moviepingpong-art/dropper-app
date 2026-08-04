@@ -323,10 +323,12 @@ function updateAiRecheckVisibility_() {
 // タブを押すたびに説明を挟むと、行き来する人に毎回1クリック増えるため。
 var TOOLS_SEEN_STORE = 'dropper_tools_seen';
 
-function openToolsModal_(tab) {
+// 開くときは必ず「いま開いているドロッパー」のタブから見せる。
+// どれが自分かは #tools-modal の data-home が持つ（3本でこのJSを同一に保つため）。
+function openToolsModal_() {
   var m = document.getElementById('tools-modal');
   if (!m) return;
-  if (tab) selectToolsTab_(tab);
+  selectToolsTab_(m.getAttribute('data-home') || 'event');
   m.classList.add('show');
   try { localStorage.setItem(TOOLS_SEEN_STORE, '1'); } catch (e) {}
 }
@@ -355,7 +357,7 @@ function selectToolsTab_(name) {
   if (!m) return;
 
   var btn = document.getElementById('whatBtn');
-  if (btn) btn.addEventListener('click', function () { openToolsModal_('event'); });
+  if (btn) btn.addEventListener('click', function () { openToolsModal_(); });
 
   var tabs = m.querySelectorAll('.tm-tab');
   for (var i = 0; i < tabs.length; i++) {
@@ -376,7 +378,7 @@ function selectToolsTab_(name) {
   try { seen = localStorage.getItem(TOOLS_SEEN_STORE) || ''; } catch (e) { seen = '1'; }
   if (!seen) {
     var ai = document.getElementById('ai-modal');
-    if (!ai || !ai.classList.contains('show')) openToolsModal_('event');
+    if (!ai || !ai.classList.contains('show')) openToolsModal_();
   }
 })();
 

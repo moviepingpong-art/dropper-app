@@ -577,3 +577,68 @@ async function run() {
   el('baseDate').value = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   el('runBtn').disabled = true;
 })();
+
+
+// 「何ができる？」ポップアップ（#tools-modal）。3本それぞれの入力と出力を図で見せる。
+// タブ（.tool-tab）は今までどおり直行させ、説明はこのポップアップに分けてある。
+// タブを押すたびに説明を挟むと、行き来する人に毎回1クリック増えるため。
+var TOOLS_SEEN_STORE = 'dropper_tools_seen';
+
+// 開くときは必ず「いま開いているドロッパー」のタブから見せる。
+// どれが自分かは #tools-modal の data-home が持つ（3本でこのJSを同一に保つため）。
+function openToolsModal_() {
+  var m = document.getElementById('tools-modal');
+  if (!m) return;
+  selectToolsTab_(m.getAttribute('data-home') || 'event');
+  m.classList.add('show');
+  try { localStorage.setItem(TOOLS_SEEN_STORE, '1'); } catch (e) {}
+}
+function closeToolsModal_() {
+  var m = document.getElementById('tools-modal');
+  if (m) m.classList.remove('show');
+}
+
+// 中のタブを切り替える（ポップアップを閉じずに3本を見比べられるようにする）
+function selectToolsTab_(name) {
+  var m = document.getElementById('tools-modal');
+  if (!m) return;
+  var tabs = m.querySelectorAll('.tm-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].setAttribute('aria-selected', tabs[i].getAttribute('data-tab') === name ? 'true' : 'false');
+  }
+  var panels = m.querySelectorAll('.tm-panel');
+  for (var j = 0; j < panels.length; j++) {
+    var on = (panels[j].getAttribute('data-panel') === name);
+    if (on) { panels[j].classList.add('on'); } else { panels[j].classList.remove('on'); }
+  }
+}
+
+(function wireToolsModal_() {
+  var m = document.getElementById('tools-modal');
+  if (!m) return;
+
+  var btn = document.getElementById('whatBtn');
+  if (btn) btn.addEventListener('click', function () { openToolsModal_(); });
+
+  var tabs = m.querySelectorAll('.tm-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function () { selectToolsTab_(this.getAttribute('data-tab')); });
+  }
+  // 背景をクリック、または「閉じる」で閉じる（「使ってみる」はそのまま移動する）
+  m.addEventListener('click', function (e) {
+    if (e.target === m || (e.target.hasAttribute && e.target.hasAttribute('data-tm-close'))) closeToolsModal_();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && m.classList.contains('show')) closeToolsModal_();
+  });
+
+  // 初回だけ自動で開く。2回目以降は「何ができる？」を押したときだけ。
+  // AI利用ポップアップはログイン後に出るので、この時点では重ならない。
+  // それでも既に何か開いていたら譲る（ポップアップを二重に見せない）。
+  var seen = '1';
+  try { seen = localStorage.getItem(TOOLS_SEEN_STORE) || ''; } catch (e) { seen = '1'; }
+  if (!seen) {
+    var ai = document.getElementById('ai-modal');
+    if (!ai || !ai.classList.contains('show')) openToolsModal_();
+  }
+})();

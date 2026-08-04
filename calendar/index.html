@@ -269,7 +269,7 @@
     /* ===== 「何ができる？」ポップアップ（#tools-modal） =====
        中で3本を選び直せる。図は SVG ではなく HTML+CSS で組んである。
        ラベルが普通のテキストなので data-i18n がそのまま効き、英語で文字幅が伸びても折り返せるため。 */
-    #tools-modal { position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
+    #tools-modal { position:fixed; inset:0; z-index:1080; display:none; align-items:center; justify-content:center;
       background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
     #tools-modal.show { display:flex; }
     .tm-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
@@ -645,7 +645,7 @@
   <!-- 「何ができる？」ポップアップ。3本それぞれの入力と出力を図で見せる。
        いま開いているのはイベントなので、イベントのパネルだけ .tm-here（リンクにしない）。
        移動先の href は i18n.js の applyDom が window.LANG を見て張り替える（直書きは ja 用の既定値）。 -->
-  <div id="tools-modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+  <div id="tools-modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" data-home="event">
     <div class="tm-card">
       <h2 id="tmTitle" data-i18n="tmTitle">🎁 3つのドロッパー、何ができる？</h2>
       <p class="tm-intro" data-i18n="tmIntro">どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。</p>
