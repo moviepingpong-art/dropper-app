@@ -255,6 +255,106 @@
     .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
     /* 狭い画面ではラベルを独立した行にして、タブ2つが並んで入るようにする */
     @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
+    /* タブ列の右端。3本それぞれで何ができるかのポップアップを開く。
+       タブ自体は今までどおり直行させ、説明はこのボタンに分ける（毎回1クリック増やさないため）。 */
+    .what-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px;
+      padding:7px 15px; border-radius:999px; color:var(--teal-d);
+      background:#fff; border:2px dashed var(--teal);
+      transition:background .15s, transform .12s;
+    }
+    .what-btn:hover { background:#f0fffb; transform:translateY(-1px); }
+
+    /* ===== 「何ができる？」ポップアップ（#tools-modal） =====
+       中で3本を選び直せる。図は SVG ではなく HTML+CSS で組んである。
+       ラベルが普通のテキストなので data-i18n がそのまま効き、英語で文字幅が伸びても折り返せるため。 */
+    #tools-modal { position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
+    #tools-modal.show { display:flex; }
+    .tm-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
+      padding:24px 22px; box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
+    .tm-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px;
+      margin:0 0 5px; color:var(--teal-d); line-height:1.3; }
+    .tm-intro { color:var(--sub); font-size:13.5px; margin:0 0 15px; }
+    .tm-tabs { display:flex; gap:7px; margin:0 0 15px; }
+    .tm-tab {
+      flex:1; font-family:'Zen Maru Gothic',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer;
+      padding:9px 6px; border-radius:13px; color:var(--teal-d);
+      background:#fff; border:2px solid var(--line); white-space:nowrap;
+      transition:border-color .15s, background .15s;
+    }
+    .tm-tab:hover { border-color:var(--teal); background:#f0fffb; }
+    .tm-tab[aria-selected="true"] {
+      border-color:transparent; color:var(--ink);
+      background:linear-gradient(100deg,var(--yellow),var(--lime));
+      box-shadow:0 6px 16px rgba(163,230,53,.3);
+    }
+    .tm-panel { display:none; }
+    .tm-panel.on { display:block; animation:tmIn .28s ease both; }
+    @keyframes tmIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    .tm-name { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px; margin:0 0 3px; color:var(--ink); }
+    .tm-one { font-size:13.5px; color:var(--sub); margin:0 0 13px; }
+
+    /* --- 図。横に入りきらない画面では図だけが横スクロールする（本文は折り返さない） --- */
+    .fig { display:flex; align-items:center; gap:9px; flex-wrap:nowrap;
+      padding:15px 12px; border-radius:16px; overflow-x:auto;
+      background:linear-gradient(135deg,#f0fffb,#f8ffe9); border:2px solid var(--line); }
+    .fig-col { display:flex; flex-direction:column; align-items:center; gap:6px; flex:none; }
+    .fig-cap { font-size:11px; font-weight:700; color:var(--teal-d); white-space:nowrap; }
+    .fig-arrow { flex:none; font-size:17px; font-weight:700; color:var(--lime-d); }
+    .sheet { width:78px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
+    .sheet.wide { width:92px; }
+    .bar { height:4px; border-radius:2px; background:var(--line); }
+    .bar.t { height:6px; background:var(--lime); width:80%; }
+    .bar.hi { background:var(--yellow); }
+    .bar.tl { background:#9fdcd5; }
+    .bar.s { width:60%; }
+    .tbl { display:grid; grid-template-columns:14px 1fr; gap:2.5px 4px; }
+    .tbl i { display:block; height:4px; border-radius:2px; background:var(--yellow); }
+    .tbl b { display:block; height:4px; border-radius:2px; background:var(--line); }
+    .cal { width:82px; background:#fff; border:2px solid var(--teal); border-radius:8px; overflow:hidden; }
+    .cal-top { height:9px; background:linear-gradient(100deg,var(--teal),var(--teal-d)); }
+    .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; padding:5px; }
+    .cal-grid s { display:block; height:6px; border-radius:1.5px; background:#eef6f4; }
+    .cal-grid s.f { background:var(--lime); }
+    .cal-grid s.f1 { background:var(--yellow); box-shadow:0 0 0 1.5px var(--lime-d); }
+    .bub { position:relative; width:82px; background:#fff; border:2px solid var(--teal);
+      border-radius:9px; padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
+    .bub::after { content:''; position:absolute; left:12px; bottom:-8px; width:0; height:0;
+      border:6px solid transparent; border-top-color:var(--teal); border-bottom:0; }
+    .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 6px; display:flex; flex-direction:column; gap:4.5px; }
+    .chk div { display:flex; align-items:center; gap:4px; }
+    .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
+    .chk .bar { flex:1; }
+    .chat { width:80px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 5px; display:flex; flex-direction:column; gap:4px; }
+    .chat u { display:block; height:9px; border-radius:5px; background:var(--line); width:74%; }
+    .chat u.r { margin-left:auto; background:#c8f0a8; width:62%; }
+    .bins { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .bin { background:#fff; border:2px solid var(--line); border-radius:8px;
+      padding:5px 6px; font-size:10px; font-weight:700; color:var(--teal-d); white-space:nowrap; }
+    .bin.a { border-color:var(--lime-d); }
+    .bin.b { border-color:var(--yellow); }
+
+    .tm-tags { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 0; }
+    .tm-tag { font-size:11.5px; font-weight:700; color:var(--teal-d);
+      background:rgba(6,182,164,.13); border-radius:999px; padding:4px 11px; }
+    .tm-btns { display:flex; gap:9px; flex-wrap:wrap; margin-top:16px; align-items:center; }
+    .tm-go { font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700; color:#fff;
+      border:none; border-radius:999px; padding:11px 22px; cursor:pointer; text-decoration:none;
+      display:inline-block;
+      background:linear-gradient(100deg,var(--teal),var(--lime-d)); box-shadow:0 6px 16px rgba(6,182,164,.32); }
+    .tm-go:hover { transform:translateY(-2px); box-shadow:0 9px 22px rgba(6,182,164,.4); }
+    /* いま開いているドロッパーはリンクにしない（タブの .on と同じ考え方） */
+    .tm-here { font-size:13px; font-weight:700; color:var(--sub);
+      border:2px solid var(--line); border-radius:999px; padding:9px 18px; background:#fff; }
+    .tm-close { font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; color:var(--sub);
+      background:none; border:none; cursor:pointer; text-decoration:underline; padding:9px 4px; }
+    .tm-foot { font-size:11px; color:var(--sub); margin:13px 0 0; }
+    @media (prefers-reduced-motion: reduce){ .tm-panel.on { animation:none; } }
 
     .subtitle-row { margin:12px 0 4px; }
     /* ドロッパーの種類選択（ボタン一覧 → 選択後は名称を表示） */
@@ -429,6 +529,7 @@
       <span class="tool-tab on" data-i18n="toolEvent">🎪 イベント</span>
       <a class="tool-tab" id="tabSchedule" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
       <a class="tool-tab" id="tabDecide" href="/decide/" data-i18n="toolDecide">✅ 決めごと</a>
+      <button type="button" id="whatBtn" class="what-btn" data-i18n="tmBtn">🔍 何ができる？</button>
     </nav>
     <p class="tool-hint" id="toolHint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと</p>
     <h1 data-i18n="appName">イベントドロッパー</h1>
@@ -538,6 +639,161 @@
         <button type="button" id="aiUseBtn" data-i18n="aiModalUseBtn">AIを使う（キーを入力）</button>
       </div>
       <p class="ai-modal-foot" data-i18n="aiModalFoot">※この選択は記憶され、次回からは表示されません。あとから「AI設定を変更」でいつでも変更できます。</p>
+    </div>
+  </div>
+
+  <!-- 「何ができる？」ポップアップ。3本それぞれの入力と出力を図で見せる。
+       いま開いているのはイベントなので、イベントのパネルだけ .tm-here（リンクにしない）。
+       移動先の href は i18n.js の applyDom が window.LANG を見て張り替える（直書きは ja 用の既定値）。 -->
+  <div id="tools-modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <div class="tm-card">
+      <h2 id="tmTitle" data-i18n="tmTitle">🎁 3つのドロッパー、何ができる？</h2>
+      <p class="tm-intro" data-i18n="tmIntro">どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。</p>
+
+      <div class="tm-tabs" role="tablist">
+        <button class="tm-tab" type="button" role="tab" aria-selected="true"  data-tab="event" data-i18n="toolEvent">🎪 イベント</button>
+        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="schedule" data-i18n="toolSchedule">📅 予定表</button>
+        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="decide" data-i18n="toolDecide">✅ 決めごと</button>
+      </div>
+
+      <!-- イベント：1枚 → 1件（＋案内文）。カレンダーのマスが1つだけ光るのが要点。 -->
+      <div class="tm-panel on" data-panel="event" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameEvent">🎪 イベントドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneEvent">チラシ1枚から、予定1件と、そのまま配れる案内文。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="sheet" aria-hidden="true">
+              <span class="bar t"></span><span class="bar hi"></span><span class="bar tl s"></span>
+              <span class="bar"></span><span class="bar s"></span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigFlyer">チラシ1枚</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s></s><s></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s class="f1"></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s></s><s></s><s></s><s></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigOneEntry">カレンダーに1件</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">＋</span>
+          <div class="fig-col">
+            <div class="bub" aria-hidden="true">
+              <span class="bar t"></span><span class="bar"></span><span class="bar s"></span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigAnnounce">LINE/SNS案内文</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagEvent1">どんなイベントにも</span>
+          <span class="tm-tag" data-i18n="tmTagEvent2">日付・会場を自動で</span>
+          <span class="tm-tag" data-i18n="tmTagEvent3">案内文もワンタップ</span>
+        </div>
+        <div class="tm-btns">
+          <span class="tm-here" data-i18n="tmHere">いま使っています</span>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <!-- 予定表：1枚 → 何件も。マスが多数光ることと、間に「一覧で確認」が挟まるのが要点。 -->
+      <div class="tm-panel" data-panel="schedule" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameSchedule">📅 予定表ドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneSchedule">予定表1枚から、中の予定を全部。確認してからまとめて登録。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="sheet wide" aria-hidden="true">
+              <span class="bar t"></span>
+              <div class="tbl">
+                <i></i><b></b><i></i><b></b><i></i><b></b>
+                <i></i><b></b><i></i><b></b><i></i><b></b>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigSheet">予定表1枚</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="chk" aria-hidden="true">
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigReview">一覧で確認</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s class="f"></s><s></s><s class="f"></s><s></s><s></s><s class="f"></s>
+                <s class="f"></s><s></s><s class="f"></s><s></s><s class="f"></s><s></s><s></s>
+                <s></s><s class="f"></s><s></s><s></s><s class="f"></s><s class="f"></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigBulk">まとめて登録</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagSchedule1">1枚からまとめて</span>
+          <span class="tm-tag" data-i18n="tmTagSchedule2">マス目の予定表もOK</span>
+          <span class="tm-tag" data-i18n="tmTagSchedule3">二重登録を防ぐ</span>
+        </div>
+        <div class="tm-btns">
+          <a class="tm-go" id="tmGoSchedule" href="/schedule/" data-i18n="tmGoSchedule">📅 予定表ドロッパーを使ってみる</a>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <!-- 決めごと：会話・メモ → 4つに仕分け。カレンダーではなく仕分け箱が主役なのが要点。 -->
+      <div class="tm-panel" data-panel="decide" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameDecide">✅ 決めごとドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneDecide">会話やメモから、決まったこと・未決・やること・記録に仕分け。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="chat" aria-hidden="true">
+              <u></u><u class="r"></u><u></u><u class="r"></u>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigChat">会話・手書きメモ</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="bins">
+              <span class="bin a" data-i18n="tmBinDecided">✅ 決まった</span>
+              <span class="bin b" data-i18n="tmBinOpen">❓ 未決</span>
+              <span class="bin a" data-i18n="tmBinTodo">📌 やること</span>
+              <span class="bin" data-i18n="tmBinRecord">🗒 記録</span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigSort">4つに仕分け</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s></s><s></s><s class="f1"></s><s></s><s></s><s></s>
+                <s></s><s class="f1"></s><s></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s></s><s></s><s></s><s class="f1"></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigDeadline">期限だけ登録</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagDecide1">ログイン不要で試せる</span>
+          <span class="tm-tag" data-i18n="tmTagDecide2">会話のスクショから</span>
+          <span class="tm-tag" data-i18n="tmTagDecide3">手書き・議事録もOK</span>
+        </div>
+        <div class="tm-btns">
+          <a class="tm-go" id="tmGoDecide" href="/decide/" data-i18n="tmGoDecide">✅ 決めごとドロッパーを使ってみる</a>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <p class="tm-foot" data-i18n="tmFoot">※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。</p>
     </div>
   </div>
 
