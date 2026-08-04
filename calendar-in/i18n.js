@@ -7,7 +7,7 @@
   var I18N = {
     ja: {
       // --- ページ全体 ---
-      pageTitle: 'イベントドロッパー',
+      pageTitle: 'イベントドロッパー｜PDF・画像から文章を抽出してGoogleカレンダーへ',
       appName: 'イベントドロッパー',
       // --- ヘッダー（種類セレクタ＝サブタイトル、リード文） ---
       // 種類ごとのサブタイトル・リード文は app.js の DROPPER_TYPES が辞書キーで参照する
@@ -275,7 +275,7 @@
       descFlyerTail: ' )\n※フォルダのファイルを削除するとこの添付も消えます。'
     },
     en: {
-      pageTitle: 'Event Dropper',
+      pageTitle: 'Event Dropper | Extract text from a PDF or image into Google Calendar',
       appName: 'Event Dropper',
       evSports: 'tournament', docSports: 'guidelines',
       evMusic: 'performance', docMusic: 'flyer',
@@ -518,7 +518,7 @@
       descFlyerTail: ' )\nNote: deleting the file from this folder will also remove this attachment.'
     },
     "in": {
-      pageTitle: 'Event Dropper',
+      pageTitle: 'Event Dropper | PDF ya image se text extract karke Google Calendar mein',
       appName: 'Event Dropper',
       evSports: 'tournament', docSports: 'guidelines',
       evMusic: 'performance', docMusic: 'flyer',

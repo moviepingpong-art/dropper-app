@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://app.dropper-tools.com/calendar/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/calendar/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/calendar-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/calendar-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/calendar/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/calendar-en/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/calendar/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/calendar-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/calendar-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/calendar/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/calendar-in/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/calendar/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/calendar-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/calendar-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/calendar/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/schedule/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/schedule/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/schedule-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/schedule-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/schedule/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/schedule-en/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/schedule/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/schedule-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/schedule-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/schedule/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/schedule-in/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/schedule/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/schedule-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/schedule-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/schedule/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/decide/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/decide/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/decide-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/decide-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/decide/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/decide-en/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/decide/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/decide-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/decide-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/decide/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://app.dropper-tools.com/decide-in/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://app.dropper-tools.com/decide/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://app.dropper-tools.com/decide-en/"/>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://app.dropper-tools.com/decide-in/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://app.dropper-tools.com/decide/"/>
+    <lastmod>2026-08-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>

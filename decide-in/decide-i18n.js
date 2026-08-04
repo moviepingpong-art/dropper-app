@@ -10,7 +10,7 @@
 
   var I18N = {
     ja: {
-      pageTitle: '決めごとドロッパー｜会話のスクショ・打ち合わせメモ・議事録から、決まったこと・未決事項を取り出す',
+      pageTitle: '決めごとドロッパー｜スクショ・手書きメモ・議事録から文章を抽出して決定事項を仕分け',
       appName: '決めごとドロッパー',
       // ツール切り替えタブ。文言・絵文字はイベント／予定表の辞書と同じものにそろえる。
       typePrompt: 'ドロッパーの選択',
@@ -158,7 +158,7 @@
     },
 
     en: {
-      pageTitle: 'Decide Dropper | Pull decisions and open questions out of chat screenshots, notes and minutes',
+      pageTitle: 'Decide Dropper | Extract text from chat screenshots, notes and minutes',
       appName: 'Decide Dropper',
       typePrompt: 'Choose a dropper',
       toolEvent: '🎪 Event',
@@ -294,7 +294,7 @@
     },
 
     "in": {
-      pageTitle: 'Decide Dropper | Chat screenshots, notes aur minutes se decisions aur open points nikaalein',
+      pageTitle: 'Decide Dropper | Chat screenshots, notes aur minutes se text extract karein',
       appName: 'Decide Dropper',
       typePrompt: 'Dropper chunein',
       toolEvent: '🎪 Event',

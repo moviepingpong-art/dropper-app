@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# /add/ と /line/ は各ページの <meta name="robots" content="noindex"> で除外する。
+# ここで Disallow にすると noindex 自体を読めなくなるため、あえて許可したままにする。
+
+Sitemap: https://app.dropper-tools.com/sitemap.xml

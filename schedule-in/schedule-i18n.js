@@ -9,7 +9,7 @@
 
   var I18N = {
     ja: {
-      pageTitle: '予定表ドロッパー',
+      pageTitle: '予定表ドロッパー｜予定表から文章を抽出してGoogleカレンダーへ一括登録',
       appName: '予定表ドロッパー',
       lead: '年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録',
       freeBadge: '🎉 今なら無料公開中',
@@ -193,7 +193,7 @@
     },
 
     en: {
-      pageTitle: 'Schedule Dropper',
+      pageTitle: 'Schedule Dropper | Extract a whole schedule into Google Calendar',
       appName: 'Schedule Dropper',
       lead: 'Drop a schedule — a year planner, a fixture list, a season calendar → check the list → add it all to Google Calendar at once',
       freeBadge: '🎉 Now FREE to use!',
@@ -357,7 +357,7 @@
     },
 
     "in": {
-      pageTitle: 'Schedule Dropper',
+      pageTitle: 'Schedule Dropper | Poore schedule se text extract karke Google Calendar mein',
       appName: 'Schedule Dropper',
       lead: 'Schedule drop karein — year planner, fixture list, season calendar → list check karein → sab ek saath Google Calendar mein',
       freeBadge: '🎉 Abhi FREE hai!',
