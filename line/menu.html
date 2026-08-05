@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リッチメニュー画像の生成｜ドロッパー</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --teal:#06b6a4; --teal-d:#048b7f; --ink:#0f3d3a; --sub:#4f7c78; --line:#cdeae6; }
+    * { box-sizing:border-box; }
+    body { font-family:'Zen Maru Gothic',Meiryo,sans-serif; font-weight:500; color:var(--ink);
+      margin:0; line-height:1.6; background:#f4fbf9; }
+    .wrap { max-width:900px; margin:0 auto; padding:24px 16px 60px; }
+    h1 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px;
+      color:var(--teal-d); margin:0 0 6px; }
+    .lead { margin:0 0 18px; font-size:13px; color:var(--sub); }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin:0 0 16px; }
+    .card h2 { font-size:15px; color:var(--teal-d); margin:0 0 10px; }
+    #preview { width:100%; height:auto; display:block; border:1px solid var(--line); border-radius:10px; }
+    button { font-family:inherit; font-size:15px; font-weight:700; padding:12px 22px; border:none;
+      border-radius:12px; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal),var(--teal-d)); }
+    button:disabled { opacity:.5; cursor:default; }
+    table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    th, td { border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+    th { background:#f0fffb; color:var(--teal-d); white-space:nowrap; }
+    td.u { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11.5px; word-break:break-all; }
+    .note { font-size:12.5px; color:var(--sub); line-height:1.9; margin:10px 0 0; }
+    .note b { color:var(--ink); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>リッチメニュー画像の生成</h1>
+    <p class="lead">LINE公式アカウントマネージャーにアップロードする画像（2500×1686px）を作ります。このページはLINEからは辿れません。</p>
+
+    <div class="card">
+      <h2>プレビュー</h2>
+      <canvas id="preview"></canvas>
+      <p class="note" id="status">描画しています…</p>
+      <p><button type="button" id="dl" disabled>PNGをダウンロード</button></p>
+    </div>
+
+    <div class="card">
+      <h2>各マスに設定するリンク</h2>
+      <p class="note">マネージャーの「テンプレート」で<b>6分割（大）</b>を選び、下の順にアクション＝リンクを設定します。</p>
+      <table id="links"></table>
+      <p class="note">
+        <b>ツールとAPIキーのリンクには <code>?openExternalBrowser=1</code> が付いています。</b>
+        これが無いとLINE内のブラウザで開き、<b>Googleログインが弾かれて使えません</b>。消さないでください。<br>
+        安心の理由（プライバシーポリシー）は読むだけなので付けていません。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ===== リッチメニュー画像 =====
+    // 大サイズ 2500×1686 の6分割。3列 × 2行。
+    // 上段＝ツール3本（濃い色・白抜き）、下段＝サポート（淡色）。
+    // スマホでは 1080px 程度に縮んで表示されるので、文字は大きめに取っている。
+    var W = 2500, H = 1686;
+    var COLS = [0, 833, 1666], CW = [833, 833, 834];   // 合計 2500
+    var RH = 843;
+    var FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+
+    var CELLS = [
+      { emoji:'🎪', name:'イベント',   sub:'チラシ1枚から',   bg:'#06b6a4', fg:'#ffffff',
+        url:'https://app.dropper-tools.com/calendar/?openExternalBrowser=1' },
+      { emoji:'📅', name:'予定表',     sub:'1枚からまとめて', bg:'#84cc16', fg:'#ffffff',
+        url:'https://app.dropper-tools.com/schedule/?openExternalBrowser=1' },
+      { emoji:'✅', name:'決めごと',   sub:'会話・メモから',  bg:'#048b7f', fg:'#ffffff',
+        url:'https://app.dropper-tools.com/decide/?openExternalBrowser=1' },
+      { emoji:'🔑', name:'APIキー',    sub:'無料・3分で取得', bg:'#f7fffd', fg:'#0f3d3a',
+        url:'https://dropper-tools.com/apikey.html?openExternalBrowser=1' },
+      { emoji:'📖', name:'使い方',     sub:'ガイドを見る',    bg:'#f7fffd', fg:'#0f3d3a',
+        url:'https://dropper-tools.com/guide.html?openExternalBrowser=1' },
+      { emoji:'🔒', name:'安心の理由', sub:'データの扱い',    bg:'#f7fffd', fg:'#0f3d3a',
+        url:'https://dropper-tools.com/privacy.html' }
+    ];
+
+    function draw(ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (var i = 0; i < CELLS.length; i++) {
+        var c = CELLS[i];
+        var col = i % 3, row = (i < 3) ? 0 : 1;
+        var x = COLS[col], y = row * RH, w = CW[col], h = RH;
+        var cx = x + w / 2;
+
+        ctx.fillStyle = c.bg;
+        ctx.fillRect(x, y, w, h);
+
+        ctx.fillStyle = c.fg;
+        ctx.font = '170px ' + FONT;
+        ctx.fillText(c.emoji, cx, y + h * 0.34);
+        ctx.font = '900 76px ' + FONT;
+        ctx.fillText(c.name, cx, y + h * 0.63);
+        ctx.font = '500 44px ' + FONT;
+        ctx.globalAlpha = (row === 0) ? 0.92 : 0.65;
+        ctx.fillText(c.sub, cx, y + h * 0.77);
+        ctx.globalAlpha = 1;
+      }
+
+      // 仕切り線。下段は淡色どうしなので、これが無いと境目が見えない。
+      ctx.strokeStyle = 'rgba(15,61,58,0.14)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, RH); ctx.lineTo(W, RH);
+      ctx.moveTo(COLS[1], 0); ctx.lineTo(COLS[1], H);
+      ctx.moveTo(COLS[2], 0); ctx.lineTo(COLS[2], H);
+      ctx.stroke();
+    }
+
+    (function () {
+      var cv = document.getElementById('preview');
+      cv.width = W; cv.height = H;
+      var ctx = cv.getContext('2d');
+      var st = document.getElementById('status');
+
+      // Webフォントの読み込みを待つ。待たずに描くと既定フォントで焼き付いてしまう。
+      var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+      ready.catch(function () {}).then(function () {
+        draw(ctx);
+        st.textContent = W + ' × ' + H + ' px で描画しました。';
+        var b = document.getElementById('dl');
+        b.disabled = false;
+        b.addEventListener('click', function () {
+          cv.toBlob(function (blob) {
+            if (!blob) { st.textContent = '画像を作れませんでした。'; return; }
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'dropper-richmenu-2500x1686.png';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            st.textContent = 'ダウンロードしました（' + Math.round(blob.size / 1024) + ' KB）。';
+          }, 'image/png');
+        });
+      });
+
+      // 設定用のリンク一覧
+      var t = document.getElementById('links');
+      var head = document.createElement('tr');
+      ['位置', 'マス', 'リンク先'].forEach(function (h) {
+        var th = document.createElement('th'); th.textContent = h; head.appendChild(th);
+      });
+      t.appendChild(head);
+      var POS = ['上段 左', '上段 中央', '上段 右', '下段 左', '下段 中央', '下段 右'];
+      CELLS.forEach(function (c, i) {
+        var tr = document.createElement('tr');
+        var a = document.createElement('td'); a.textContent = POS[i];
+        var b2 = document.createElement('td'); b2.textContent = c.emoji + ' ' + c.name;
+        var d = document.createElement('td'); d.className = 'u'; d.textContent = c.url;
+        tr.appendChild(a); tr.appendChild(b2); tr.appendChild(d);
+        t.appendChild(tr);
+      });
+    })();
+  </script>
+</body>
+</html>
