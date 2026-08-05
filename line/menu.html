@@ -66,6 +66,13 @@
     var RH = 843;
     var FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
 
+    // 文字の大きさ。スマホでは 1080px 程度に縮んで表示される（約0.43倍）ので、
+    // ここの値を 0.43 倍したものが実際の見え方になる。
+    var EMOJI_PX = 240;   // 実機で約 103px
+    var NAME_PX  = 124;   // 実機で約 53px
+    var SUB_PX   = 66;    // 実機で約 28px
+    var PAD_X    = 40;    // セル左右の余白。ここに収まらない文字は自動で縮める
+
     var CELLS = [
       { emoji:'🎪', name:'イベント',   sub:'チラシ1枚から',   bg:'#06b6a4', fg:'#ffffff',
         url:'https://app.dropper-tools.com/calendar/?openExternalBrowser=1' },
@@ -80,6 +87,18 @@
       { emoji:'🔒', name:'安心の理由', sub:'データの扱い',    bg:'#f7fffd', fg:'#0f3d3a',
         url:'https://dropper-tools.com/privacy.html' }
     ];
+
+    // 指定の大きさで幅に収まらなければ、収まるまで縮めて font 文字列を返す。
+    // CELLS の文言を長くしても隣のマスへはみ出さないようにするため。
+    function fitFont(ctx, text, weight, basePx, maxW) {
+      var px = basePx;
+      while (px > 24) {
+        ctx.font = weight + ' ' + px + 'px ' + FONT;
+        if (ctx.measureText(text).width <= maxW) break;
+        px -= 2;
+      }
+      return px;
+    }
 
     function draw(ctx) {
       ctx.fillStyle = '#ffffff';
@@ -96,14 +115,19 @@
         ctx.fillStyle = c.bg;
         ctx.fillRect(x, y, w, h);
 
+        var maxW = w - PAD_X * 2;
         ctx.fillStyle = c.fg;
-        ctx.font = '170px ' + FONT;
-        ctx.fillText(c.emoji, cx, y + h * 0.34);
-        ctx.font = '900 76px ' + FONT;
-        ctx.fillText(c.name, cx, y + h * 0.63);
-        ctx.font = '500 44px ' + FONT;
-        ctx.globalAlpha = (row === 0) ? 0.92 : 0.65;
-        ctx.fillText(c.sub, cx, y + h * 0.77);
+
+        ctx.font = EMOJI_PX + 'px ' + FONT;
+        ctx.fillText(c.emoji, cx, y + h * 0.32);
+
+        fitFont(ctx, c.name, '900', NAME_PX, maxW);
+        ctx.fillText(c.name, cx, y + h * 0.60);
+
+        fitFont(ctx, c.sub, '700', SUB_PX, maxW);
+        // 淡色の下段は薄くしすぎると読めない。上段より控えめな下げ幅にする。
+        ctx.globalAlpha = (row === 0) ? 0.95 : 0.78;
+        ctx.fillText(c.sub, cx, y + h * 0.79);
         ctx.globalAlpha = 1;
       }
 
