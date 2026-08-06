@@ -29,6 +29,19 @@ var summaryEl = el('summary'), countLabel = el('countLabel'), regBtn = el('reg')
 
 function setMsg(t) { msgEl.textContent = t || ''; }
 
+/* ===== GA4 計測 =====
+   言語は定数で書かず **実行時に window.LANG から読む**。
+   このファイルは3フォルダでバイト同一を保つ決まりなので、ja/en/in を直書きすると同期が壊れる。
+   tool はこのファイル固有の値なので定数でよい。
+   gtag が無い場合（タグ未設置・広告ブロッカー）でも動作に影響を与えないこと。 */
+function track(name, params) {
+  if (typeof gtag !== 'function') return;
+  try {
+    gtag('event', name, Object.assign(
+      { tool: 'schedule', lang: window.LANG || 'ja' }, params || {}));
+  } catch (e) {}
+}
+
 /* ===== Googleログイン ===== */
 function ensureTokenClient() {
   if (tokenClient) return true;
@@ -193,6 +206,7 @@ function askKey(force) {
       if (!k) { input.focus(); return; }
       // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまうため。
       try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
+      track('key_saved');
       close(k);
     }
     function onCancel() { close(''); }
@@ -265,6 +279,8 @@ if (el('diagCopy')) {
 async function handleFile(file) {
   if (!file) return;
   var useAi = aiMode;
+  // 読み取りを始める前に送る。drop はあるが extract_ok が無い＝途中で失敗した人の数になる。
+  track('drop', { mode: useAi ? 'ai' : 'normal' });
   lastFile = file;
   resultEl.style.display = 'none';
   el('diag').style.display = 'none';
@@ -307,6 +323,8 @@ async function handleFile(file) {
     }
     items.forEach(function (it) { it.on = !!it.start; });   // 日付が取れた行だけ最初から選択
     render();
+    // 0件も送る。「読めなかった」がどのモード・どの言語で起きているかを知りたいため。
+    track('extract_ok', { count: items.length, mode: useAi ? 'ai' : 'normal' });
     // OCRで読んだあとは、取りこぼしてもモードを切り替えずに済むよう逃げ道を出す
     el('retryAi').style.display = useAi ? 'none' : 'block';
     // マス目を通常モードで読んでしまった場合の警告。件数が出ていても対応が狂っているので、
@@ -456,6 +474,7 @@ regBtn.addEventListener('click', async function () {
   }
   render();
   regMsg.textContent = I18N.t('msgRegistered', { n: ok }) + (ng ? I18N.t('msgRegisterFailed', { n: ng }) : '');
+  track('calendar_add', { count: ok, failed: ng });
 });
 
 

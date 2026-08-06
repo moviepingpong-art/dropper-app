@@ -199,6 +199,19 @@ function typeLabel_(typeKey, slot, defKey) {
 }
 var aiMode = 'hybrid';   // 'hybrid'=正規表現＋必要時AI / 'ai'=最初から全項目AIで取り直す
 
+/* ===== GA4 計測 =====
+   言語は定数で書かず **実行時に window.LANG から読む**。
+   このファイルは3フォルダでバイト同一を保つ決まりなので、ja/en/in を直書きすると同期が壊れる。
+   tool はこのファイル固有の値なので定数でよい。
+   gtag が無い場合（タグ未設置・広告ブロッカー）でも動作に影響を与えないこと。 */
+function track(name, params) {
+  if (typeof gtag !== 'function') return;
+  try {
+    gtag('event', name, Object.assign(
+      { tool: 'event', lang: window.LANG || 'ja' }, params || {}));
+  } catch (e) {}
+}
+
 // 多言語：HTMLのdata-i18n要素に現在の言語の文言を流し込む
 if (window.I18N) { try { I18N.applyDom(); } catch (e) {} }
 
@@ -521,11 +534,16 @@ function ensureToken() {
 async function handleFiles(fileList) {
   var files = Array.prototype.slice.call(fileList || []);
   if (!files.length) { unpopAnim(); return; }
+  // ログインを求める前に送る。drop はあるが extract_ok が無い＝ログインの壁で止まった人の数になる。
+  track('drop', { mode: aiMode, files: files.length });
   setMsg(I18N.t('msgReading'));
   try { await ensureToken(); }
   catch (e) { setMsg(e && e.message ? e.message : I18N.t('msgLoginFailed')); unpopAnim(); return; }
   setMsg('');
+  // items は投入のたびに積み上がるので、今回ぶんだけを数える
+  var before = items.length;
   for (var i = 0; i < files.length; i++) { await processOne(files[i]); }
+  track('extract_ok', { count: items.length - before, mode: aiMode });
   unpopAnim();   // 結果カード（登録画面）が出たので拡大を解除して元に戻す
   if (items.length) bar.style.display = 'flex';
 }
@@ -1767,6 +1785,7 @@ function askAiKey_() {
       }
       // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまうため。
       try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
+      track('key_saved');
       finish(k);
     };
     var onCancel = function () { finish(''); };
@@ -2081,6 +2100,7 @@ async function doRegister() {
       retryTargets[r].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (re && re.message ? re.message : re) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
     }
   }
+  track('calendar_add', { count: ok, failed: ng });
   if (ok) {
     var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
                   : 'https://drive.google.com/drive/';

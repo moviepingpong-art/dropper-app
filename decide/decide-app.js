@@ -18,6 +18,19 @@ var EVENT_COLOR_ID = '11';   // 赤。シリーズで揃えている
 
 function el(id) { return document.getElementById(id); }
 
+/* ===== GA4 計測 =====
+   言語は定数で書かず **実行時に window.LANG から読む**。
+   このファイルは3フォルダでバイト同一を保つ決まりなので、ja/en/in を直書きすると同期が壊れる。
+   tool はこのファイル固有の値なので定数でよい。
+   gtag が無い場合（タグ未設置・広告ブロッカー）でも動作に影響を与えないこと。 */
+function track(name, params) {
+  if (typeof gtag !== 'function') return;
+  try {
+    gtag('event', name, Object.assign(
+      { tool: 'decide', lang: window.LANG || 'ja' }, params || {}));
+  } catch (e) {}
+}
+
 var pickedFiles = [];
 var lastResult = null;
 var accessToken = null, tokenClient = null, pendingAuth = null;
@@ -135,6 +148,7 @@ function askKey(force) {
       if (!k) { input.focus(); return; }
       // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまう。
       try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
+      track('key_saved');
       close(k);
     }
     function onCancel() { close(''); }
@@ -351,6 +365,7 @@ async function register() {
   if (String(el('regMsg').textContent) !== I18N.t('msgSessionExpired')) {
     el('regMsg').textContent = I18N.t('msgRegDone', { ok: ok }) + (ng ? I18N.t('msgRegFail', { ng: ng }) : '');
   }
+  track('calendar_add', { count: ok, failed: ng });
   el('regBtn').disabled = false;
 }
 
@@ -480,6 +495,8 @@ var ERROR_KEYS = {
 
 async function run() {
   if (!pickedFiles.length) { setMsg(I18N.t('msgNoFiles'), 'ng'); return; }
+  // キーを求める前に送る。drop はあるが extract_ok が無い＝キーの壁で止まった人の数になる。
+  track('drop', { mode: 'ai', files: pickedFiles.length });
   var key = await askKey(false);
   if (!key) { setMsg(I18N.t('msgNoKey'), 'ng'); return; }
 
@@ -493,6 +510,11 @@ async function run() {
       onStatus: function (s) { if (STATUS_KEYS[s]) setMsg(I18N.t(STATUS_KEYS[s]), 'wait'); }
     });
     render(r);
+    track('extract_ok', {
+      count: r.decided.length + r.undecided.length + r.todos.length + r.records.length,
+      decided: r.decided.length, undecided: r.undecided.length,
+      todos: r.todos.length, records: r.records.length
+    });
     setMsg(I18N.t('msgDone'), 'ok');
   } catch (e) {
     var code = (e && e.message) ? e.message : '';
