@@ -2380,6 +2380,16 @@ function applyHandoff_() {
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });
     if (bar) bar.style.display = 'flex';
+
+    // **作業画面を開く。** #work は既定で display:none で、通常はログイン成功時に初めて開く。
+    // これを忘れるとカードは出来ているのに画面に出ない（実際にそうなった）。
+    //
+    // ここでログインを求めないのは意図的。LINEから来た人は結果を受け取りに来たのであって、
+    // 見るだけならログインは要らない。ログインが必要になるのは「登録」を押したときで、
+    // doRegister が自前で ensureToken() を呼ぶので、この時点では不要。
+    // AI利用ポップアップも出さない（すでにLINE側で読み取り済みの人に選ばせる意味がない）。
+    if (loginArea) loginArea.style.display = 'none';
+    if (workArea) workArea.style.display = '';
   } catch (e3) {
     // カードを作れなくても、通常の初期画面は使えるようにしておく
   }
