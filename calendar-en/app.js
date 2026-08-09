@@ -2436,38 +2436,60 @@ function focusHandoff_() {
   var hidden = [];
   function hide(el) { if (el) { el.style.display = 'none'; hidden.push(el); } }
 
-  // 投入用のUI
-  hide(document.getElementById('typePicker'));     // イベントの種類（ボタン列）
-  hide(document.getElementById('typePrompt'));     // 「イベントの種類」の見出し
-  hide(document.querySelector('.sport-row'));      // ① 競技を選ぶ
-  hide(document.querySelector('.step-drop-label'));// ② 要項ファイルをドロップ
-  hide(document.getElementById('drop'));           // ドロップ領域
-  hide(document.getElementById('ocrNote'));        // 読み取り方法の注記
-  hide(document.getElementById('mode-banner'));    // AIモードの帯
-  hide(document.getElementById('visitorBadge'));   // 訪問者カウンター（hits.sh）
+  // **ヘッダーごと隠す。** タブ・h1・バッジ2つ・AI無料枠の帯・種類選択・説明文・
+  // 訪問者カウンターがすべてこの中にある。個別に指定するより取りこぼしがない。
+  // （残していた h1 とタブも、結果カードを画面の一番上に置くために隠す）
+  hide(document.querySelector('header'));
 
-  // 宣伝・説明のたぐい。**結果を受け取りに来た人には売り込みが要らない。**
-  // とくに .idle-band（AI無料枠の訴求）は200px近くあり、カードが画面の外へ押し出されていた。
-  hide(document.querySelector('.idle-band'));      // 「眠ったままのAI無料枠」の帯
-  hide(document.querySelector('.free-badge'));     // 🎉 今なら無料公開中
-  hide(document.querySelector('.multi-badge'));    // 🎪 様々なイベントチラシに対応
-  hide(document.getElementById('toolHint'));       // タブ下の説明文
+  // main 側に残る投入用のUI
+  hide(document.querySelector('.sport-row'));       // ① 競技を選ぶ
+  hide(document.querySelector('.step-drop-label')); // ② 要項ファイルをドロップ
+  hide(document.getElementById('drop'));            // ドロップ領域
+  hide(document.getElementById('ocrNote'));         // 読み取り方法の注記
+  hide(document.getElementById('mode-banner'));     // AIモードの帯
 
-  // h1・ドロッパー切り替えタブ・使い方ガイドは残す。
-  // 「いまどの道具にいるか」と「他の道具へ行く道」まで消すと、行き止まりになるため。
+  if (!hidden.length || !bar || !bar.parentNode) return;
 
-  if (!hidden.length || !list || !list.parentNode) return;
+  // ===== 結果カードと登録ボタンの「下」に、他の道具への案内を置く =====
+  // 上に置くとカードが押し下げられて本来の用件が見えなくなる。
+  // 用件（確認して登録）を済ませたあとの人に、次の道具を知ってもらう位置。
+  var sfx = (window.LANG === 'en') ? '-en' : (window.LANG === 'in') ? '-in' : '';
+  var box = document.createElement('div');
+  box.style.cssText = 'margin:20px auto 0;padding:12px 14px;max-width:640px;border-top:1px solid rgba(128,128,128,.3);' +
+    'font-size:.86rem;line-height:1.7;opacity:.85;text-align:center;';
 
+  var lead = document.createElement('p');
+  lead.style.cssText = 'margin:0 0 4px;';
+  lead.textContent = I18N.t('handoffMoreLead');
+
+  var links = document.createElement('p');
+  links.style.cssText = 'margin:0;';
+  function toolLink(path, labelKey) {
+    var a = document.createElement('a');
+    a.href = path;
+    a.textContent = I18N.t(labelKey);
+    a.style.cssText = 'white-space:nowrap;';
+    return a;
+  }
+  links.appendChild(toolLink('/schedule' + sfx + '/', 'tmGoSchedule'));
+  links.appendChild(document.createTextNode('　／　'));
+  links.appendChild(toolLink('/decide' + sfx + '/', 'tmGoDecide'));
+
+  // 「別の要項を読み取る」もここへ。隠した画面を元に戻す。
   var btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = I18N.t('handoffAddMore');
-  btn.style.cssText = 'display:block;margin:0 auto 12px;padding:6px 14px;border:1px dashed currentColor;' +
-    'border-radius:8px;background:transparent;color:inherit;opacity:.65;font:inherit;cursor:pointer;';
+  btn.style.cssText = 'display:block;margin:12px auto 0;padding:6px 14px;border:1px dashed currentColor;' +
+    'border-radius:8px;background:transparent;color:inherit;opacity:.7;font:inherit;cursor:pointer;';
   btn.addEventListener('click', function () {
     for (var i = 0; i < hidden.length; i++) hidden[i].style.display = '';
-    btn.style.display = 'none';
+    box.style.display = 'none';
   });
-  list.parentNode.insertBefore(btn, list);
+
+  box.appendChild(lead);
+  box.appendChild(links);
+  box.appendChild(btn);
+  bar.parentNode.insertBefore(box, bar.nextSibling);
 }
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
