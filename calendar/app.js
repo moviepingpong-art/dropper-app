@@ -910,20 +910,44 @@ function annMapsLink_(f) {
   return annRedirect_({ t: 'm', q: q });
 }
 // Googleカレンダー「予定を追加」公開リンク（renderテンプレ）。認可・スコープ不要＝審査に触れない。
+//
+// ===== 長さの上限（2026-08 に実測して修正）=====
+// LINEは長いURLを最後までリンク化しない。**途中で切れる**のが厄介で、見た目は青いリンクなのに
+// タップすると欠けたURLへ飛び、中継ページ(add/)が復号に失敗する。
+//
+//   128字            … リンク化される
+//   237字（iPhone）  … 約196字で切れた（残り41字が黒い文字のまま）
+//   237字（PC版LINE）… 最後までリンク化される ← クライアントで挙動が違う
+//   453字            … リンク化されない
+//
+// **スマホを基準にすること。** 案内文は転送されて多くの人のスマホで読まれるので、
+// 作った本人のPCで正常に見えても意味がない。
+// （以前ここに「237字＝OK」と書いてあったのは、おそらくPC版での測定）
+//
+// 収まらないときは 会場名 → 大会名 の順に削る。**日程だけは必ず残す。**
+// 短縮が働くのは大会名が長い要項だけで、通常の長さなら従来どおり会場名も入る。
+// dropper-line の announce.gs にも同じ処理がある（両方直すこと）。
+var ANN_GCAL_MAX = 180;
 function annGcalLink_(f) {
   var dates = (f.kaisai_dates || []).slice().sort();
   if (!dates.length) return '';
   var startD = annYmd_(dates[0]);
   var endD = annYmd_(window.Dropper.addDays(dates[dates.length - 1], 1));   // 終日は終了日+1（排他的）
-  // LINEは長いURLをリンク化しない（青下線・タップにならない）。カレンダーリンクは最小限
-  // ＝大会名＋日程＋会場名だけに絞り、地図リンク並みの短さにする。試合形式・締切・住所・
-  // ポイントは案内文本文と地図リンクでカバーする。
-  return annRedirect_({
-    t: 'c',
-    x: f.taikai_mei || '',
-    d: startD + '/' + endD,      // 'YYYYMMDD/YYYYMMDD'（数字と/のみ）
-    l: f.kaijo || ''             // 会場名のみ（住所は入れない＝短縮）
-  });
+  var d = startD + '/' + endD;   // 'YYYYMMDD/YYYYMMDD'（数字と/のみ）
+  var name = f.taikai_mei || '';
+  var venue = f.kaijo || '';     // 会場名のみ（住所は入れない＝短縮）
+
+  var url = annRedirect_({ t: 'c', x: name, d: d, l: venue });
+  if (url.length <= ANN_GCAL_MAX) return url;
+
+  url = annRedirect_({ t: 'c', x: name, d: d, l: '' });
+  if (url.length <= ANN_GCAL_MAX) return url;
+
+  for (var n = name.length - 1; n >= 4; n--) {
+    url = annRedirect_({ t: 'c', x: name.slice(0, n) + '…', d: d, l: '' });
+    if (url.length <= ANN_GCAL_MAX) return url;
+  }
+  return annRedirect_({ t: 'c', x: '', d: d, l: '' });
 }
 // ハッシュタグ：競技名から自動（AIモードの自動判定表示 or 種目セレクタ）。無ければ空。
 // 競技のない種類（コンサート等の汎用イベント）ではタグを付けない。
@@ -2301,3 +2325,64 @@ async function createEvent(f, fileId, mimeType) {
   if (!res.ok) { var t = await res.text(); throw new Error('カレンダーAPI ' + res.status + ': ' + t.slice(0, 140)); }
   return await res.json();
 }
+
+/* ===== LINE Bot からの引き渡し（?d=） =====
+   LINE公式アカウント（dropper-line）が要項を読み取り、その結果を base64url にして
+   ボタンのURLに載せてくる。ここで受け取ってカードに流し込む＝再ドロップが要らない。
+
+   ・**新しいOAuthスコープは不要。** クエリを読んで欄を埋めるだけのクライアント処理で、
+     ログインもドライブも通らない。審査に影響しない
+   ・符号方式は add/index.html の b64urlDecode と同じ（パディングは復号側で補う）
+   ・**失敗しても例外を投げない。** 壊れたURLで来ても通常の初期画面を出す
+   ・読み込んだら履歴からクエリを消す。再読み込みでカードが二重に増えるのを防ぐ
+
+   受け取るキーは抽出スキーマと同じ。dropper-line 側の handoffPayload_ と対応している。 */
+function handoffDecode_(s) {
+  s = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+
+function applyHandoff_() {
+  var m = /[?&]d=([^&]+)/.exec(location.search || '');
+  if (!m) return;
+
+  var f = null;
+  try { f = JSON.parse(handoffDecode_(m[1])); } catch (e) { f = null; }
+
+  // クエリは成否にかかわらず消す。壊れたリンクを再読み込みで何度も踏ませない。
+  try {
+    if (window.history && history.replaceState) {
+      history.replaceState(null, '', location.pathname + location.hash);
+    }
+  } catch (e2) {}
+
+  if (!f || typeof f !== 'object') return;
+  // 中身が空のものは無視（大会名も日付も無ければ、カードを出す意味がない）
+  var hasDates = !!(f.kaisai_dates && f.kaisai_dates.length);
+  if (!f.taikai_mei && !hasDates) return;
+
+  try {
+    var card = addCard(f.taikai_mei || '');
+    card.fill({
+      taikai_mei: f.taikai_mei || '',
+      kaisai_dates: f.kaisai_dates || [],
+      schedule: f.schedule || [],
+      shiai_keishiki: f.shiai_keishiki || '',
+      kaijo: f.kaijo || '',
+      kaijo_jusho: f.kaijo_jusho || '',
+      kaikai_jikan: f.kaikai_jikan || '',
+      shimekiri: f.shimekiri || '',
+      note: ''
+    });
+    if (card.setKeyInfo && f.key_info && f.key_info.length) card.setKeyInfo(f.key_info);
+    // file は無い（LINE側が読み取った結果だけを受け取っている）。
+    // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
+    items.push({ file: null, card: card, fileId: null, mimeType: '' });
+    if (bar) bar.style.display = 'flex';
+  } catch (e3) {
+    // カードを作れなくても、通常の初期画面は使えるようにしておく
+  }
+}
+
+(function () { try { applyHandoff_(); } catch (e) {} })();
