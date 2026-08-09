@@ -2436,13 +2436,25 @@ function focusHandoff_() {
   var hidden = [];
   function hide(el) { if (el) { el.style.display = 'none'; hidden.push(el); } }
 
-  hide(document.getElementById('typePicker'));     // イベントの種類
+  // 投入用のUI
+  hide(document.getElementById('typePicker'));     // イベントの種類（ボタン列）
+  hide(document.getElementById('typePrompt'));     // 「イベントの種類」の見出し
   hide(document.querySelector('.sport-row'));      // ① 競技を選ぶ
   hide(document.querySelector('.step-drop-label'));// ② 要項ファイルをドロップ
   hide(document.getElementById('drop'));           // ドロップ領域
   hide(document.getElementById('ocrNote'));        // 読み取り方法の注記
   hide(document.getElementById('mode-banner'));    // AIモードの帯
   hide(document.getElementById('visitorBadge'));   // 訪問者カウンター（hits.sh）
+
+  // 宣伝・説明のたぐい。**結果を受け取りに来た人には売り込みが要らない。**
+  // とくに .idle-band（AI無料枠の訴求）は200px近くあり、カードが画面の外へ押し出されていた。
+  hide(document.querySelector('.idle-band'));      // 「眠ったままのAI無料枠」の帯
+  hide(document.querySelector('.free-badge'));     // 🎉 今なら無料公開中
+  hide(document.querySelector('.multi-badge'));    // 🎪 様々なイベントチラシに対応
+  hide(document.getElementById('toolHint'));       // タブ下の説明文
+
+  // h1・ドロッパー切り替えタブ・使い方ガイドは残す。
+  // 「いまどの道具にいるか」と「他の道具へ行く道」まで消すと、行き止まりになるため。
 
   if (!hidden.length || !list || !list.parentNode) return;
 
