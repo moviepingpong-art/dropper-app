@@ -2417,9 +2417,44 @@ function applyHandoff_() {
     // AI利用ポップアップも出さない（すでにLINE側で読み取り済みの人に選ばせる意味がない）。
     if (loginArea) loginArea.style.display = 'none';
     if (workArea) workArea.style.display = '';
+    focusHandoff_();
   } catch (e3) {
     // カードを作れなくても、通常の初期画面は使えるようにしておく
   }
+}
+
+/* LINEから来た人の画面を「確認して登録する」ことに絞る。
+
+   投入用のUI（種類選択・競技選択・ドロップ領域・AIモード帯）が結果カードの上に並んでいると、
+   **もう一度読み取らせようとしているように見えて混乱する。**
+   すでに読み取りは済んでいるので、ここでやることは確認と登録だけ。
+
+   ただし消してしまうと「ついでにもう1枚」ができなくなるので、
+   戻すリンクを1本だけ出す。CSSは index.html を触らずに済むよう直書きする
+   （index.html は言語ごとにSEOが違い、3フォルダで別ファイルとして扱うため）。 */
+function focusHandoff_() {
+  var hidden = [];
+  function hide(el) { if (el) { el.style.display = 'none'; hidden.push(el); } }
+
+  hide(document.getElementById('typePicker'));     // イベントの種類
+  hide(document.querySelector('.sport-row'));      // ① 競技を選ぶ
+  hide(document.querySelector('.step-drop-label'));// ② 要項ファイルをドロップ
+  hide(document.getElementById('drop'));           // ドロップ領域
+  hide(document.getElementById('ocrNote'));        // 読み取り方法の注記
+  hide(document.getElementById('mode-banner'));    // AIモードの帯
+
+  if (!hidden.length || !list || !list.parentNode) return;
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = I18N.t('handoffAddMore');
+  btn.style.cssText = 'display:block;margin:0 auto 12px;padding:6px 14px;border:1px dashed currentColor;' +
+    'border-radius:8px;background:transparent;color:inherit;opacity:.65;font:inherit;cursor:pointer;';
+  btn.addEventListener('click', function () {
+    for (var i = 0; i < hidden.length; i++) hidden[i].style.display = '';
+    btn.style.display = 'none';
+  });
+  list.parentNode.insertBefore(btn, list);
 }
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
