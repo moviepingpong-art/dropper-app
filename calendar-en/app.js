@@ -2489,7 +2489,12 @@ function focusHandoff_() {
   box.appendChild(lead);
   box.appendChild(links);
   box.appendChild(btn);
-  bar.parentNode.insertBefore(box, bar.nextSibling);
+
+  // **#msg より後ろに入れること。** HTMLの並びは list → bar → msg で、
+  // 登録後の「N件を登録しました／カレンダーで確認する」は #msg に出る。
+  // bar の直後に入れると、この案内が登録ボタンとメッセージの間に割り込んでしまう。
+  var after = (msg && msg.parentNode) ? msg : bar;
+  after.parentNode.insertBefore(box, after.nextSibling);
 }
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
