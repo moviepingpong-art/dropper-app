@@ -2071,6 +2071,7 @@ async function doRegister() {
 
   var ok = 0, ng = 0;
   var lastFolderId = null;   // 登録成功時の保存先（メッセージのリンク用に最後の1件を覚える）
+  var firstDate = '';        // 最初に登録できた予定の開催日（カレンダーをその日で開くため）
   for (var i = 0; i < targets.length; i++) {
     var f = targets[i].card.read();
     try {
@@ -2087,6 +2088,7 @@ async function doRegister() {
       await createEvent(f, fileId, targets[i].mimeType);   // 要項ファイルを添付
       targets[i].registered = true;              // 登録済み（再実行でスキップ・ファイルは保持）
       targets[i].card.setStatus(I18N.t('stRegistered'), 'ok');
+      if (!firstDate) firstDate = f.kaisai_dates[0] || '';
       ok++;
       // クラブ運用モード（?club=hakusan）のときだけ、大会マスタ・シートに1行追記（出欠システム連携）。
       // 追記失敗はカレンダー登録の成否に影響させない（best-effort。状態表示に注記のみ）。
@@ -2126,13 +2128,35 @@ async function doRegister() {
   }
   track('calendar_add', { count: ok, failed: ng });
   if (ok) {
-    var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
-                  : 'https://drive.google.com/drive/';
-    msg.innerHTML =
-      ok + I18N.t('msgRegDoneA') +
-      '<a href="' + folderUrl + '" target="_blank" rel="noopener">' + I18N.t('msgFolderName') + '</a>' +
-      I18N.t('msgRegDoneB') +
-      (ng ? '　' + ng + I18N.t('msgRegFailCount') : '');
+    // 要項ファイルを保存できたカードが1件でもあるか。
+    // LINEから ?d= で来たカードは読み取り結果だけで file を持たないため、
+    // ドライブに何も保存していない。それなのに「保存しました」と出すのは事実と違う。
+    var attached = 0;
+    for (var ai = 0; ai < targets.length; ai++) {
+      if (targets[ai].registered && targets[ai].fileId) attached++;
+    }
+    // 登録した予定の日へ直接飛ぶリンク。カレンダーを開くだけだと今日が表示され、
+    // 先の日付に入れた予定は見つけられない。
+    var calUrl = 'https://calendar.google.com/calendar/r';
+    var fd = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(firstDate || '');
+    if (fd) calUrl += '/day/' + fd[1] + '/' + Number(fd[2]) + '/' + Number(fd[3]);
+    var calLink = '<a href="' + calUrl + '" target="_blank" rel="noopener">' +
+      I18N.t('msgOpenCalendar') + '</a>';
+
+    if (attached) {
+      var folderUrl = lastFolderId ? 'https://drive.google.com/drive/folders/' + lastFolderId
+                    : 'https://drive.google.com/drive/';
+      msg.innerHTML =
+        ok + I18N.t('msgRegDoneA') +
+        '<a href="' + folderUrl + '" target="_blank" rel="noopener">' + I18N.t('msgFolderName') + '</a>' +
+        I18N.t('msgRegDoneB') + '　' + calLink +
+        (ng ? '　' + ng + I18N.t('msgRegFailCount') : '');
+    } else {
+      // 要項を保存していないので、ドライブの話はしない
+      msg.innerHTML =
+        ok + I18N.t('msgRegDoneSimple') + '　' + calLink +
+        (ng ? '　' + ng + I18N.t('msgRegFailCount') : '');
+    }
   } else {
     setMsg(ng ? ng + I18N.t('msgRegAllFail') : I18N.t('msgNoItems'));
   }
