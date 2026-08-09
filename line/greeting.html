@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>あいさつメッセージ用「送り方」画像の生成｜ドロッパー</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --teal:#06b6a4; --teal-d:#048b7f; --ink:#0f3d3a; --sub:#4f7c78; --line:#cdeae6; --paper:#fff; }
+    * { box-sizing:border-box; }
+    body { font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN',Meiryo,sans-serif; font-weight:500;
+           color:var(--ink); margin:0; padding:24px; line-height:1.7; background:#f3fbfa; }
+    h1 { font-size:1.15rem; margin:0 0 .3rem; }
+    p.note { color:var(--sub); font-size:.86rem; margin:0 0 1.2rem; }
+    .row { display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; }
+    canvas { border:1px solid var(--line); border-radius:12px; background:#fff; max-width:100%; height:auto; }
+    button { font:inherit; font-weight:700; padding:10px 18px; border:0; border-radius:10px;
+             background:var(--teal); color:#fff; cursor:pointer; }
+    button:hover { background:var(--teal-d); }
+    .hint { font-size:.82rem; color:var(--sub); margin-top:10px; max-width:420px; }
+  </style>
+</head>
+<body>
+
+<h1>あいさつメッセージ用「要項の送り方」画像</h1>
+<p class="note">
+  LINE公式アカウントのあいさつメッセージ（2通目）に添える画像を、その場で描いて書き出します。
+  文言は下の <code>STEPS</code> にまとまっています。
+</p>
+
+<div class="row">
+  <canvas id="preview" width="1040" height="1000"></canvas>
+  <div>
+    <button id="dl" type="button">PNGをダウンロード</button>
+    <p class="hint">
+      <strong>LINEのUIを模写していません。</strong>
+      機種やアプリの版で画面の見た目が変わるため、実物のスクリーンショットを真似ると
+      かえって迷わせます。ここでは「どこを押すか」を一般化した図にしてあります。
+    </p>
+    <p class="hint">
+      幅1040pxで書き出します。LINEのトーク画面ではこの比率のまま縮小表示されます。
+    </p>
+  </div>
+</div>
+
+<script>
+  // ===== 図の中身。文言を変えるならここだけ触る =====
+  var TITLE = '要項の送り方';
+  // リッチメニューが開いていると入力欄が隠れている。まずそこを切り替えてもらう。
+  // **ここを飛ばすと「写真マークが見つからない」で詰まる。**
+  // 「押すと何が出るか」まで見せるほうが確実なので、出てくるマークも並べて描く。
+  // 絵の前後で文字を分けて持つ（1本の文字列の空白に描き込むと位置が狂いやすい）。
+  var LEAD_A = '左下の';
+  var LEAD_B = 'を押すと';
+  var LEAD_C = 'が出ます';
+  var LEAD_ICONS = ['menu', 'plus', 'camera', 'photo'];
+
+  var STEPS = [
+    { n:'1', head:'写真で撮ったもの', body:'「写真マーク」から選ぶ',              icon:'photo' },
+    { n:'2', head:'PDFファイル',      body:'「＋」を押して「ファイル」を選ぶ',     icon:'plus'  },
+    { n:'3', head:'ほかのトークの要項', body:'ほかのトーク画面に入り直し、\nその要項を長押し →「転送」\n→ ドロッパーを選ぶ', icon:'forward', best:true }
+  ];
+  var BEST = 'いちばん簡単です';
+
+  var TEAL = '#06b6a4', TEAL_D = '#048b7f', INK = '#0f3d3a', SUB = '#4f7c78', LINE_C = '#cdeae6';
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // 指定の幅に収まるところまで字を小さくして、そのフォントを ctx にセットする。
+  // menu.html の fitFont と同じ考え方。文言を変えたときに黙ってはみ出すのを防ぐ。
+  function fitFont(ctx, text, weight, basePx, maxW) {
+    var px = basePx;
+    do {
+      ctx.font = weight + ' ' + px + 'px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+      if (ctx.measureText(text).width <= maxW) return px;
+      px -= 2;
+    } while (px >= 20);
+    return px;
+  }
+
+  // アイコンは絵文字に頼らず線で描く。環境によって絵文字の見た目が大きく変わるため。
+  // color を省くと白（塗り円の上に描く用）。
+  function drawIcon(ctx, kind, cx, cy, s, color) {
+    var c = color || '#fff';
+    ctx.save();
+    ctx.strokeStyle = c; ctx.fillStyle = c;
+    ctx.lineWidth = s * 0.09; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (kind === 'menu') {                        // 三：横3本
+      for (var mi = -1; mi <= 1; mi++) {
+        ctx.beginPath();
+        ctx.moveTo(cx - s*0.32, cy + mi * s*0.22);
+        ctx.lineTo(cx + s*0.32, cy + mi * s*0.22);
+        ctx.stroke();
+      }
+    } else if (kind === 'camera') {               // カメラ：本体＋レンズ＋出っぱり
+      ctx.beginPath();
+      ctx.moveTo(cx - s*0.14, cy - s*0.34); ctx.lineTo(cx + s*0.14, cy - s*0.34);
+      ctx.stroke();
+      roundRect(ctx, cx - s*0.40, cy - s*0.26, s*0.80, s*0.60, s*0.12); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy + s*0.04, s*0.17, 0, Math.PI*2); ctx.stroke();
+    } else if (kind === 'photo') {                // 写真：枠＋山＋太陽
+      roundRect(ctx, cx - s/2, cy - s*0.4, s, s*0.8, s*0.12); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - s*0.34, cy + s*0.28);
+      ctx.lineTo(cx - s*0.06, cy - s*0.06);
+      ctx.lineTo(cx + s*0.12, cy + s*0.12);
+      ctx.lineTo(cx + s*0.26, cy - s*0.02);
+      ctx.lineTo(cx + s*0.40, cy + s*0.28);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + s*0.20, cy - s*0.18, s*0.07, 0, Math.PI*2); ctx.fill();
+    } else if (kind === 'plus') {                 // ＋
+      ctx.beginPath();
+      ctx.moveTo(cx - s*0.34, cy); ctx.lineTo(cx + s*0.34, cy);
+      ctx.moveTo(cx, cy - s*0.34); ctx.lineTo(cx, cy + s*0.34);
+      ctx.stroke();
+    } else {                                      // 転送：右向きの矢印
+      ctx.beginPath();
+      ctx.moveTo(cx - s*0.36, cy); ctx.lineTo(cx + s*0.28, cy);
+      ctx.moveTo(cx + s*0.06, cy - s*0.22); ctx.lineTo(cx + s*0.30, cy);
+      ctx.lineTo(cx + s*0.06, cy + s*0.22);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // キーボードの絵（左下の ⌨ ボタンを指す）。絵文字だと環境差が大きいので線で描く。
+  // 戻り値は描いた幅。文字と並べるときの送り量に使う。
+  function drawKeyboard(ctx, x, cy, w) {
+    var h = w * 0.62;
+    ctx.save();
+    ctx.strokeStyle = TEAL_D; ctx.fillStyle = TEAL_D;
+    ctx.lineWidth = Math.max(2, w * 0.055); ctx.lineJoin = 'round';
+    roundRect(ctx, x, cy - h/2, w, h, w * 0.1); ctx.stroke();
+    var r = w * 0.035;
+    for (var row = 0; row < 2; row++) {
+      for (var col = 0; col < 4; col++) {
+        ctx.beginPath();
+        ctx.arc(x + w*0.20 + col * w*0.20, cy - h*0.18 + row * h*0.30, r, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    // 最下段はスペースキーに見立てた横棒
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.26, cy + h*0.30); ctx.lineTo(x + w*0.74, cy + h*0.30);
+    ctx.stroke();
+    ctx.restore();
+    return w;
+  }
+
+  // アイコンを角丸の枠に入れて1つ描く（前置きで「出てくるマーク」を並べる用）。
+  function drawGlyphBox(ctx, kind, x, cy, s) {
+    ctx.save();
+    ctx.strokeStyle = LINE_C; ctx.fillStyle = '#fff'; ctx.lineWidth = 3;
+    roundRect(ctx, x, cy - s/2, s, s, s * 0.24); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    drawIcon(ctx, kind, x + s/2, cy, s * 0.58, TEAL_D);
+    return s;
+  }
+
+  function draw() {
+    var cv = document.getElementById('preview');
+    var pad = 46, gap = 26;
+    var leadY = 186, leadH = 148;             // 前置きの帯（2行ぶん）
+    var top = leadY + leadH + 30;             // カードの開始位置は帯の下から決める
+
+    // **高さは中身から決める。** 固定値にすると、行数を増やしたときに
+    // 本文がカードからはみ出す／脚注が食い込む（実際に両方やった）。
+    // カードごとに本文の行数から高さを出し、位置を積み上げていく。
+    var HEAD_BLOCK = 124;   // カード上端から本文1行目のベースラインまで
+    var LINE_H = 48;        // 本文の行送り
+    var PAD_BOTTOM = 52;    // 本文の最終行から下端まで
+    var cardH = [], cardY = [], yy = top;
+    for (var ci = 0; ci < STEPS.length; ci++) {
+      var nLines = STEPS[ci].body.split('\n').length;
+      cardH[ci] = HEAD_BLOCK + (nLines - 1) * LINE_H + PAD_BOTTOM;
+      cardY[ci] = yy;
+      yy += cardH[ci] + gap;
+    }
+    var lastBottom = yy - gap;
+    cv.height = lastBottom + 116;
+
+    var ctx = cv.getContext('2d');
+    var W = cv.width, H = cv.height;
+
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+
+    // 見出し
+    ctx.fillStyle = INK;
+    ctx.font = '900 62px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(TITLE, W/2, 92);
+
+    ctx.strokeStyle = TEAL; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(W/2 - 110, 146); ctx.lineTo(W/2 + 110, 146); ctx.stroke();
+
+    // 前置き：2行。
+    //   1行目 「左下の [⌨] を押すと」
+    //   2行目 「[三][＋][📷][🖼] が出ます」
+    // 押した先に何が現れるかまで見せる。文字と絵をひとかたまりとして測って中央に置く。
+    ctx.fillStyle = '#eefaf8';
+    roundRect(ctx, pad, leadY, W - pad*2, leadH, 22); ctx.fill();
+
+    var leadFont = '700 34px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+    var kbW = 62, gW = 56, sp = 14, gsp = 10;
+    var y1 = leadY + leadH * 0.30, y2 = leadY + leadH * 0.72;
+
+    // 1行目
+    ctx.font = leadFont;
+    var wA = ctx.measureText(LEAD_A).width, wB = ctx.measureText(LEAD_B).width;
+    var t1 = wA + sp + kbW + sp + wB, x1 = (W - t1) / 2;
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(LEAD_A, x1, y1);
+    drawKeyboard(ctx, x1 + wA + sp, y1, kbW);
+    ctx.font = leadFont; ctx.fillStyle = INK;
+    ctx.fillText(LEAD_B, x1 + wA + sp + kbW + sp, y1);
+
+    // 2行目
+    ctx.font = leadFont;
+    var wC = ctx.measureText(LEAD_C).width;
+    var iconsW = LEAD_ICONS.length * gW + (LEAD_ICONS.length - 1) * gsp;
+    var t2 = iconsW + sp + wC, x2 = (W - t2) / 2;
+    for (var g = 0; g < LEAD_ICONS.length; g++) {
+      drawGlyphBox(ctx, LEAD_ICONS[g], x2 + g * (gW + gsp), y2, gW);
+    }
+    ctx.font = leadFont; ctx.fillStyle = INK;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(LEAD_C, x2 + iconsW + sp, y2);
+
+    // 3つの手順（高さと位置はカードごとに算出済み）
+    for (var i = 0; i < STEPS.length; i++) {
+      var s = STEPS[i];
+      var y = cardY[i], h = cardH[i];
+
+      ctx.fillStyle = s.best ? '#e9fbf8' : '#f7fdfc';
+      ctx.strokeStyle = s.best ? TEAL : LINE_C;
+      ctx.lineWidth = s.best ? 5 : 3;
+      roundRect(ctx, pad, y, W - pad*2, h, 26);
+      ctx.fill(); ctx.stroke();
+
+      // 丸アイコン
+      var cx = pad + 108, cy = y + h/2;
+      ctx.fillStyle = s.best ? TEAL_D : TEAL;
+      ctx.beginPath(); ctx.arc(cx, cy, 62, 0, Math.PI*2); ctx.fill();
+      drawIcon(ctx, s.icon, cx, cy, 66);
+
+      // 番号
+      ctx.fillStyle = SUB;
+      ctx.font = '700 30px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(s.n, pad + 196, y + 62);
+
+      // 「いちばん簡単です」の印。**カードの右上に固定する。**
+      // 見出しの右に並べる置き方だと、見出しの長さで位置が動いてはみ出す。
+      // 先にこちらを描いて場所を確保し、見出しは残った幅に合わせて縮める。
+      var headMaxW = W - pad - 24 - (pad + 230);
+      if (s.best) {
+        ctx.font = '700 26px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+        var bw = ctx.measureText(BEST).width + 30, bh = 40;
+        var bx = W - pad - 24 - bw;
+        ctx.fillStyle = TEAL;
+        roundRect(ctx, bx, y + 26, bw, bh, 20); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(BEST, bx + 15, y + 26 + bh/2);
+        ctx.textBaseline = 'alphabetic';
+        headMaxW = bx - 24 - (pad + 230);   // 印の左までが見出しに使える幅
+      }
+
+      // 見出し。収まらなければ字を縮める（menu.html の fitFont と同じ考え方）。
+      // 文言を変えたときに黙ってはみ出す・重なるのを防ぐための保険。
+      ctx.fillStyle = INK;
+      fitFont(ctx, s.head, '900', 40, headMaxW);
+      ctx.fillText(s.head, pad + 230, y + 66);
+
+      // 本文（\n で改行）
+      ctx.fillStyle = SUB;
+      ctx.font = '500 34px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+      var lines = s.body.split('\n');
+      for (var k = 0; k < lines.length; k++) {
+        ctx.fillText(lines[k], pad + 230, y + 124 + k * 48);
+      }
+    }
+
+    // 脚注（最後のカードの下端から測る）
+    ctx.fillStyle = SUB;
+    ctx.font = '500 30px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('※ 複数ページの要項は 1枚ずつ 送ってください', W/2, lastBottom + 62);
+  }
+
+  document.getElementById('dl').addEventListener('click', function () {
+    document.getElementById('preview').toBlob(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'dropper-line-howtosend-1040.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }, 'image/png');
+  });
+
+  // Webフォントが来てから描く。来なければ既定のフォントで描く。
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(draw).catch(draw);
+  } else {
+    window.addEventListener('load', draw);
+  }
+</script>
+
+</body>
+</html>
