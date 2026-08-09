@@ -2442,6 +2442,7 @@ function focusHandoff_() {
   hide(document.getElementById('drop'));           // ドロップ領域
   hide(document.getElementById('ocrNote'));        // 読み取り方法の注記
   hide(document.getElementById('mode-banner'));    // AIモードの帯
+  hide(document.getElementById('visitorBadge'));   // 訪問者カウンター（hits.sh）
 
   if (!hidden.length || !list || !list.parentNode) return;
 
