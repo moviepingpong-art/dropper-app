@@ -41,9 +41,36 @@ var items = [];   // { file, card, fileId }
 var drop = document.getElementById('drop');
 var fileInput = document.getElementById('file');
 var list = document.getElementById('list');
+// カードのチェックが変わったら登録ボタンの状態を追随させる。
+// 個々のカードに配線せず #list への委譲にしておけば、あとで足したカードにも自動で効く。
+if (list) {
+  list.addEventListener('change', function (e) {
+    var t = e && e.target;
+    if (t && t.type === 'checkbox' && t.closest && t.closest('.chk')) syncRegBtn_();
+  });
+}
 var bar = document.getElementById('bar');
 var msg = document.getElementById('msg');
 var regBtn = document.getElementById('reg');
+
+/* 登録ボタンの有効・無効を、登録対象の数から決める。
+   チェックを全部外すと押しても「登録する項目がありません」と言われるだけなので、
+   押せないことを見た目で示す。予定表ドロッパーの updateCount_ と同じ考え方。
+
+   **regBtn.disabled = false と直接書かず、必ずこれを通すこと。**
+   直接 false にすると、対象が0件でも押せる状態に戻ってしまう。
+   登録処理中の disabled = true だけは、この関数を通さず直接指定してよい。 */
+function syncRegBtn_() {
+  if (!regBtn) return;
+  var n = 0;
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    if (it && it.card && !it.registered && it.card.isChecked()) n++;
+  }
+  regBtn.disabled = (n === 0);
+  regBtn.style.opacity = n ? '' : '.45';
+  regBtn.style.cursor = n ? '' : 'not-allowed';
+}
 var loginBtn = document.getElementById('loginBtn');
 var pickBtn = document.getElementById('pickBtn');
 var loginArea = document.getElementById('login-area');
@@ -546,6 +573,7 @@ async function handleFiles(fileList) {
   track('extract_ok', { count: items.length - before, mode: aiMode });
   unpopAnim();   // 結果カード（登録画面）が出たので拡大を解除して元に戻す
   if (items.length) bar.style.display = 'flex';
+  syncRegBtn_();
 }
 
 async function processOne(file) {
@@ -2033,14 +2061,14 @@ function getVal(li, k) { var el = li.querySelector('[data-k="' + k + '"]'); retu
 /* ===== 登録 ===== */
 function onRegisterClick() {
   regBtn.disabled = true;
-  doRegister().catch(function (e) { setMsg(I18N.t('msgError') + (e && e.message ? e.message : e)); regBtn.disabled = false; });
+  doRegister().catch(function (e) { setMsg(I18N.t('msgError') + (e && e.message ? e.message : e)); syncRegBtn_(); });
 }
 async function doRegister() {
   await ensureToken();
   var targets = items.filter(function (it) { return it.card.isChecked() && !it.registered; });
   // クラブモード：登録は済んだがマスタ追記だけ失敗した大会（再試行対象）。カレンダー登録は再実行しない＝重複予定を作らない。
   var retryTargets = CLUB_MODE ? items.filter(function (it) { return it.registered && !it.masterAppended && it.fileId; }) : [];
-  if (!targets.length && !retryTargets.length) { setMsg(I18N.t('msgNoItems')); regBtn.disabled = false; return; }
+  if (!targets.length && !retryTargets.length) { setMsg(I18N.t('msgNoItems')); syncRegBtn_(); return; }
 
   // ② 登録前チェック：チェック済みで開催日が空のカードがあれば警告して中断
   var emptyCards = targets.filter(function (it) { return !it.card.read().kaisai_dates.length; });
@@ -2048,7 +2076,7 @@ async function doRegister() {
     emptyCards.forEach(function (it) { it.card.markDateEmpty(); });
     setMsg(I18N.t('msgDateEmptyA') + emptyCards.length + I18N.t('msgDateEmptyB'));
     emptyCards[0].card.focusDate();
-    regBtn.disabled = false;
+    syncRegBtn_();
     return;
   }
 
@@ -2064,7 +2092,7 @@ async function doRegister() {
     if (noEventCards.length) {
       setMsg(I18N.t('msgEventEmptyA') + noEventCards.length + I18N.t('msgEventEmptyB'));
       noEventCards[0].card.focusFormat();
-      regBtn.disabled = false;
+      syncRegBtn_();
       return;
     }
   }
@@ -2160,7 +2188,7 @@ async function doRegister() {
   } else {
     setMsg(ng ? ng + I18N.t('msgRegAllFail') : I18N.t('msgNoItems'));
   }
-  regBtn.disabled = false;
+  syncRegBtn_();
 }
 
 // ===== クラブ運用時のみ：大会マスタ・シート書き出し（出欠システム連携。案1） =====
@@ -2408,6 +2436,7 @@ function applyHandoff_() {
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });
     if (bar) bar.style.display = 'flex';
+    syncRegBtn_();
 
     // **作業画面を開く。** #work は既定で display:none で、通常はログイン成功時に初めて開く。
     // これを忘れるとカードは出来ているのに画面に出ない（実際にそうなった）。
