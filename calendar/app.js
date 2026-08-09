@@ -2363,7 +2363,10 @@ function applyHandoff_() {
   if (!f.taikai_mei && !hasDates) return;
 
   try {
-    var card = addCard(f.taikai_mei || '');
+    // addCard に渡すのは **カード左のファイル名欄（.fn）** に出る文字。
+    // ここに大会名を渡すと、細い列で何行にも折り返して縦長に潰れる（実際にそうなった）。
+    // 大会名は下の入力欄に出るので重複でもある。短い固定文言にする。
+    var card = addCard(I18N.t('handoffFrom'));
     card.fill({
       taikai_mei: f.taikai_mei || '',
       kaisai_dates: f.kaisai_dates || [],
