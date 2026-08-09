@@ -2403,6 +2403,7 @@ function applyHandoff_() {
       note: ''
     });
     if (card.setKeyInfo && f.key_info && f.key_info.length) card.setKeyInfo(f.key_info);
+    reshapeHandoffCard_(list.lastElementChild);
     // file は無い（LINE側が読み取った結果だけを受け取っている）。
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });
@@ -2420,6 +2421,55 @@ function applyHandoff_() {
     focusHandoff_();
   } catch (e3) {
     // カードを作れなくても、通常の初期画面は使えるようにしておく
+  }
+}
+
+/* LINEから来たカードの見た目を組み直す。
+
+   通常のカードは「チェック＋ファイル名」と状態表示が枠の中の1行目に並ぶ。
+   LINEから来た場合はファイル名が無く（大会名は下の入力欄に出るので重複になる）、
+   カードも必ず1枚なので、この並びが分かりにくかった。
+
+   組み直したあとの並び:
+     読み取り完了                       ← .st
+     内容を確認してください。…           ← .edit-hint
+     ☑                                 ← チェックだけ
+     ┌ 枠 ─────────────┐
+     │ 大会名・日付・会場…            │  ← .fields
+     └─────────────────┘
+
+   **チェックボックスは li の中に残すこと。** cardApi.isChecked() が
+   li.querySelector('.chk input') で探しており、外に出すと登録対象の判定が壊れる。
+   枠は li から .fields へ移し替えることで、見た目だけを外に出している。 */
+function reshapeHandoffCard_(li) {
+  if (!li) return;
+  var hd = li.querySelector('.hd');
+  var st = li.querySelector('.st');
+  var fn = li.querySelector('.fn');
+  var fields = li.querySelector('.fields');
+  var hint = li.querySelector('.edit-hint');
+  var foot = li.querySelector('.card-foot');
+  if (!hd || !fields) return;
+
+  if (fn) fn.textContent = '';   // 「LINEから」を消す（大会名は下の入力欄にある）
+
+  // 枠を li から .fields へ移す
+  li.style.cssText += ';border:0;background:none;box-shadow:none;padding:0;';
+  fields.style.cssText += ';border:2px solid var(--line);border-radius:18px;padding:16px;background:var(--paper);box-shadow:0 6px 18px rgba(6,182,164,.07);';
+
+  // 並べ替え：状態 → 説明 → チェック → 枠
+  if (st) { st.style.display = 'block'; st.style.margin = '0 0 6px'; li.insertBefore(st, hd); }
+  if (hint) li.insertBefore(hint, hd);          // 説明を枠の外へ
+  hd.style.margin = '0 0 10px';
+
+  // チェックを外したらカードの中身を隠す（登録対象からも外れる）
+  var input = li.querySelector('.chk input');
+  if (input) {
+    input.addEventListener('change', function () {
+      var on = input.checked;
+      fields.style.display = on ? '' : 'none';
+      if (foot) foot.style.display = on ? '' : 'none';
+    });
   }
 }
 
