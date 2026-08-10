@@ -32,7 +32,7 @@
 </p>
 
 <div class="row">
-  <canvas id="preview" width="1040" height="1000"></canvas>
+  <canvas id="preview" width="1800" height="840"></canvas>
   <div>
     <button id="dl" type="button">PNGをダウンロード</button>
     <p class="hint">
@@ -41,7 +41,8 @@
       かえって迷わせます。ここでは「どこを押すか」を一般化した図にしてあります。
     </p>
     <p class="hint">
-      幅1040pxで書き出します。LINEのトーク画面ではこの比率のまま縮小表示されます。
+      1800×838（横長）で書き出します。LINEのトークでは画像の高さに上限があるため、
+      この比率が吹き出しの幅・高さを最も使い切る形です（これ以上大きくはできません）。
     </p>
   </div>
 </div>
@@ -61,7 +62,7 @@
   var STEPS = [
     { n:'1', head:'写真で撮ったもの', body:'「写真マーク」から選ぶ',              icon:'photo' },
     { n:'2', head:'PDFファイル',      body:'「＋」を押して「ファイル」を選ぶ',     icon:'plus'  },
-    { n:'3', head:'ほかのトークの要項', body:'ほかのトーク画面に入り直し、\nその要項を長押し →「転送」\n→ ドロッパーを選ぶ', icon:'forward', best:true }
+    { n:'3', head:'ほかのトークの要項', body:'ほかのトーク画面に入り直し、長押し →「転送」→ ドロッパー', icon:'forward', best:true }
   ];
   var BEST = 'いちばん簡単です';
 
@@ -170,16 +171,22 @@
 
   function draw() {
     var cv = document.getElementById('preview');
-    var pad = 46, gap = 26;
-    var leadY = 186, leadH = 148;             // 前置きの帯（2行ぶん）
-    var top = leadY + leadH + 30;             // カードの開始位置は帯の下から決める
+    // ===== 横長にする =====
+    // LINEのトークでは、縦長の画像は高さで頭打ちになり、結果として幅が縮んで表示される
+    // （テキストの吹き出しより細く見えた）。横長にすると吹き出しの幅いっぱいまで広がる。
+    // だから幅を広げ、前置きを1行に、本文の行数も詰めてある。
+    var pad = 56, gap = 22;
+    var leadY = 120, leadH = 100;              // 前置きの帯（1行）
+    var top = leadY + leadH + 22;             // カードの開始位置は帯の下から決める
 
     // **高さは中身から決める。** 固定値にすると、行数を増やしたときに
     // 本文がカードからはみ出す／脚注が食い込む（実際に両方やった）。
     // カードごとに本文の行数から高さを出し、位置を積み上げていく。
-    var HEAD_BLOCK = 124;   // カード上端から本文1行目のベースラインまで
-    var LINE_H = 48;        // 本文の行送り
-    var PAD_BOTTOM = 52;    // 本文の最終行から下端まで
+    var HEAD_BLOCK = 134;   // カード上端から本文1行目のベースラインまで。
+    // **見出しのベースライン(y+62)＋見出しの下ばみ＋すき間＋本文の高さ より大きくすること。**
+    // 106 にしていたら見出しと本文が重なった（見出し54px／本文48px のとき 134 が下限）。
+    var LINE_H = 56;        // 本文の行送り
+    var PAD_BOTTOM = 40;    // 本文の最終行から下端まで
     var cardH = [], cardY = [], yy = top;
     for (var ci = 0; ci < STEPS.length; ci++) {
       var nLines = STEPS[ci].body.split('\n').length;
@@ -188,7 +195,7 @@
       yy += cardH[ci] + gap;
     }
     var lastBottom = yy - gap;
-    cv.height = lastBottom + 116;
+    cv.height = lastBottom + 28;
 
     var ctx = cv.getContext('2d');
     var W = cv.width, H = cv.height;
@@ -197,45 +204,43 @@
 
     // 見出し
     ctx.fillStyle = INK;
-    ctx.font = '900 62px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+    ctx.font = '900 60px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(TITLE, W/2, 92);
+    ctx.fillText(TITLE, W/2, 62);
 
     ctx.strokeStyle = TEAL; ctx.lineWidth = 6; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(W/2 - 110, 146); ctx.lineTo(W/2 + 110, 146); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W/2 - 108, 102); ctx.lineTo(W/2 + 108, 102); ctx.stroke();
 
-    // 前置き：2行。
-    //   1行目 「左下の [⌨] を押すと」
-    //   2行目 「[三][＋][📷][🖼] が出ます」
+    // 前置き：1行にまとめる。
+    //   「左下の [⌨] を押すと [三][＋][📷][🖼] が出ます」
     // 押した先に何が現れるかまで見せる。文字と絵をひとかたまりとして測って中央に置く。
     ctx.fillStyle = '#eefaf8';
     roundRect(ctx, pad, leadY, W - pad*2, leadH, 22); ctx.fill();
 
-    var leadFont = '700 34px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
-    var kbW = 62, gW = 56, sp = 14, gsp = 10;
-    var y1 = leadY + leadH * 0.30, y2 = leadY + leadH * 0.72;
+    var leadFont = '700 46px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+    var kbW = 76, gW = 68, sp = 16, gsp = 10;
+    var cyLead = leadY + leadH/2;
 
-    // 1行目
     ctx.font = leadFont;
-    var wA = ctx.measureText(LEAD_A).width, wB = ctx.measureText(LEAD_B).width;
-    var t1 = wA + sp + kbW + sp + wB, x1 = (W - t1) / 2;
-    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(LEAD_A, x1, y1);
-    drawKeyboard(ctx, x1 + wA + sp, y1, kbW);
-    ctx.font = leadFont; ctx.fillStyle = INK;
-    ctx.fillText(LEAD_B, x1 + wA + sp + kbW + sp, y1);
-
-    // 2行目
-    ctx.font = leadFont;
+    var wA = ctx.measureText(LEAD_A).width;
+    var wB = ctx.measureText(LEAD_B).width;
     var wC = ctx.measureText(LEAD_C).width;
     var iconsW = LEAD_ICONS.length * gW + (LEAD_ICONS.length - 1) * gsp;
-    var t2 = iconsW + sp + wC, x2 = (W - t2) / 2;
+    var totalW = wA + sp + kbW + sp + wB + sp + iconsW + sp + wC;
+    var lx = (W - totalW) / 2;
+
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(LEAD_A, lx, cyLead);                       lx += wA + sp;
+    drawKeyboard(ctx, lx, cyLead, kbW);                     lx += kbW + sp;
+    ctx.font = leadFont; ctx.fillStyle = INK;
+    ctx.fillText(LEAD_B, lx, cyLead);                       lx += wB + sp;
     for (var g = 0; g < LEAD_ICONS.length; g++) {
-      drawGlyphBox(ctx, LEAD_ICONS[g], x2 + g * (gW + gsp), y2, gW);
+      drawGlyphBox(ctx, LEAD_ICONS[g], lx + g * (gW + gsp), cyLead, gW);
     }
+    lx += iconsW + sp;
     ctx.font = leadFont; ctx.fillStyle = INK;
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(LEAD_C, x2 + iconsW + sp, y2);
+    ctx.fillText(LEAD_C, lx, cyLead);
 
     // 3つの手順（高さと位置はカードごとに算出済み）
     for (var i = 0; i < STEPS.length; i++) {
@@ -249,61 +254,57 @@
       ctx.fill(); ctx.stroke();
 
       // 丸アイコン
-      var cx = pad + 108, cy = y + h/2;
+      var cx = pad + 116, cy = y + h/2;
       ctx.fillStyle = s.best ? TEAL_D : TEAL;
-      ctx.beginPath(); ctx.arc(cx, cy, 62, 0, Math.PI*2); ctx.fill();
-      drawIcon(ctx, s.icon, cx, cy, 66);
+      ctx.beginPath(); ctx.arc(cx, cy, 66, 0, Math.PI*2); ctx.fill();
+      drawIcon(ctx, s.icon, cx, cy, 72);
 
       // 番号
       ctx.fillStyle = SUB;
-      ctx.font = '700 30px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+      ctx.font = '700 34px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
       ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-      ctx.fillText(s.n, pad + 196, y + 62);
+      ctx.fillText(s.n, pad + 214, y + 58);
 
       // 「いちばん簡単です」の印。**カードの右上に固定する。**
       // 見出しの右に並べる置き方だと、見出しの長さで位置が動いてはみ出す。
       // 先にこちらを描いて場所を確保し、見出しは残った幅に合わせて縮める。
-      var headMaxW = W - pad - 24 - (pad + 230);
+      var headMaxW = W - pad - 24 - (pad + 254);
       if (s.best) {
-        ctx.font = '700 26px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
-        var bw = ctx.measureText(BEST).width + 30, bh = 40;
+        ctx.font = '700 32px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+        var bw = ctx.measureText(BEST).width + 34, bh = 48;
         var bx = W - pad - 24 - bw;
         ctx.fillStyle = TEAL;
-        roundRect(ctx, bx, y + 26, bw, bh, 20); ctx.fill();
+        roundRect(ctx, bx, y + 20, bw, bh, 24); ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.textBaseline = 'middle';
-        ctx.fillText(BEST, bx + 15, y + 26 + bh/2);
+        ctx.fillText(BEST, bx + 17, y + 20 + bh/2);
         ctx.textBaseline = 'alphabetic';
-        headMaxW = bx - 24 - (pad + 230);   // 印の左までが見出しに使える幅
+        headMaxW = bx - 24 - (pad + 254);   // 印の左までが見出しに使える幅
       }
 
       // 見出し。収まらなければ字を縮める（menu.html の fitFont と同じ考え方）。
       // 文言を変えたときに黙ってはみ出す・重なるのを防ぐための保険。
       ctx.fillStyle = INK;
-      fitFont(ctx, s.head, '900', 40, headMaxW);
-      ctx.fillText(s.head, pad + 230, y + 66);
+      fitFont(ctx, s.head, '900', 54, headMaxW);
+      ctx.fillText(s.head, pad + 254, y + 62);
 
-      // 本文（\n で改行）
+      // 本文（\n で改行）。位置は HEAD_BLOCK / LINE_H と必ず揃えること。
+      // ここだけ別の数字にすると、カードの高さ計算と食い違って本文がはみ出す。
       ctx.fillStyle = SUB;
-      ctx.font = '500 34px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
+      ctx.font = '500 48px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
       var lines = s.body.split('\n');
       for (var k = 0; k < lines.length; k++) {
-        ctx.fillText(lines[k], pad + 230, y + 124 + k * 48);
+        ctx.fillText(lines[k], pad + 254, y + HEAD_BLOCK + k * LINE_H);
       }
     }
 
-    // 脚注（最後のカードの下端から測る）
-    ctx.fillStyle = SUB;
-    ctx.font = '500 30px "Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('※ 複数ページの要項は 1枚ずつ 送ってください', W/2, lastBottom + 62);
   }
 
   document.getElementById('dl').addEventListener('click', function () {
     document.getElementById('preview').toBlob(function (blob) {
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = 'dropper-line-howtosend-1040.png';
+      a.href = url; a.download = 'dropper-line-howtosend.png';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }, 'image/png');
