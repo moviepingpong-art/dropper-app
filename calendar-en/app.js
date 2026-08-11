@@ -4,29 +4,22 @@
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
 
-// クラブ運用モード：?club=hakusan でアクセスしたときだけ有効。
-// このときだけ「大会マスタ・シート」への書き出し（出欠システム連携）を行う。一般公開URLでは動かない。
-// 運用ルール：クラブモード時は必ず hakusan.large@gmail.com でログインすること（シートがそのアカウント所有になる）。
-var CLUB_MODE = (function () {
-  try { return new URLSearchParams(window.location.search).get('club') === 'hakusan'; }
-  catch (e) { return false; }
-})();
-var MASTER_SHEET_TITLE = '大会マスタ（出欠連携）';   // クラブモードで新規作成する大会マスタ・シートのタイトル
+// 出欠システム連携（出欠ドロッパー）：主催者自身のGASウェブアプリにイベントを1件作り、
+// 案内文に「🙋 出欠を回答する」リンクを同梱する。URLと書き込みキーは端末の localStorage にだけ持つ。
+// 通信相手は主催者のGASだけで、Googleの権限は使わない＝OAuthスコープは増えない（attendance-hook.js）。
+// 旧クラブ運用モード（?club=hakusan の大会マスタ・シート書き出し）は、この仕組みに置き換えて撤去した。
+// v1は日本語版のみ出す（出欠ページ /attend/ が日本語のため）。en/in は3言語ぶんまとめて同期する。
+var ATTEND_AVAILABLE = (window.LANG !== 'en' && window.LANG !== 'in');
 
-// OAuthスコープはアクセスモードで出し分ける（OAuth本番審査を軽くするため）。
-//   一般公開URL：drive.file（OCR用・アプリが作ったファイルのみ）＋ drive.appdata（フォルダID対応表の端末間共有）＋ calendar.events（予定作成）
-//   クラブURL（?club=hakusan）：上記に spreadsheets（大会マスタ書き出し）を追加
-// spreadsheets を一般ユーザーの同意対象から外すことで、一般公開の審査対象スコープを減らす。
-// クラブ運用は白山クラブ内部のみ（テストユーザー登録済みアカウントで利用）。
+// OAuthスコープ：drive.file（OCR用・アプリが作ったファイルのみ）＋ drive.appdata（フォルダID対応表の端末間共有）
+//              ＋ calendar.events（予定作成）
+// ★この配列に新しいスコープを足さない。2026-07-19に本番審査で承認済みで、増やすと再審査になる。
 var BASE_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/drive.appdata',
   'https://www.googleapis.com/auth/calendar.events'
 ];
-var CLUB_EXTRA_SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets'
-];
-var SCOPE = (CLUB_MODE ? BASE_SCOPES.concat(CLUB_EXTRA_SCOPES) : BASE_SCOPES).join(' ');
+var SCOPE = BASE_SCOPES.join(' ');
 var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';   // 赤
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';   // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）
@@ -1037,12 +1030,16 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var BC = ja ? '】' : ']';
   var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
+  var attend = (f.attend_url || '').trim();
   if (channel === 'x') {
     L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
     if (f.kaijo) L.push('📍' + f.kaijo);
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
-    if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
+    // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
+    // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
+    if (attend) L.push('🙋 ' + I18N.t('annAttend') + ' ▶ ' + attend);
+    else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
   }
@@ -1065,6 +1062,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
+    if (attend) { L.push(''); L.push('▼ ' + I18N.t('annAttend')); L.push(attend); }
     if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     return L.join('\n');
@@ -1105,6 +1103,8 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     });
     L.push('');
   }
+  // 出欠リンクはカレンダー追加リンクの上に置く。回答には締切があり、先に見てほしいのはこちら。
+  if (attend) { L.push('🙋 ' + I18N.t('annAttend') + ' ▶ ' + attend); L.push(''); }
   if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
@@ -1215,7 +1215,9 @@ function wireAnnouncement_(li, cardApi) {
   var imgBtn = panel.querySelector('.ann-img');
   var current = 'line';
   function regen() {
-    ta.value = buildAnnouncement_(cardApi.read(), current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
+    var f = cardApi.read();
+    f.attend_url = li.__attendUrl || '';   // 出欠を作成ずみのときだけ入る
+    ta.value = buildAnnouncement_(f, current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
   btn.addEventListener('click', function () {
@@ -1346,14 +1348,16 @@ function addCard(name) {
     '</div>' +
     '<div class="card-foot" style="display:none;margin-top:6px">' +
       '<p class="warn-notice" style="display:none;margin:0 0 6px;padding:6px 8px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;font-size:12px;color:#7a4f01"></p>' +
-      (CLUB_MODE ?
-        '<label class="master-optin" style="display:block;margin:0 0 8px;padding:7px 10px;background:#f0f5ff;border:1px solid #adc6ff;border-radius:8px;font-size:13px;color:#1d39c4;cursor:pointer">' +
-          '<input type="checkbox" class="master-chk" checked style="margin-right:6px;vertical-align:middle">' +
-          '出欠フォームに載せる（大会マスタへ書き出し）' +
-        '</label>' : '') +
       '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
       '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
+      // 出欠システム連携。未設定なら「用意する」（設定を開く）、設定ずみなら「出欠を作る」。
+      // 表示・非表示は wireAttendance_ が決める（v1は日本語版のみ）。
+      '<div class="attend-wrap" style="display:none">' +
+        '<button type="button" class="attend-btn"></button>' +
+        '<button type="button" class="attend-gear" title="' + I18N.t('attendSettings') + '" style="display:none">⚙</button>' +
+        '<span class="attend-status"></span>' +
+      '</div>' +
       '<div class="ann-wrap">' +
         '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
         '<div class="ann-panel" style="display:none">' +
@@ -1617,14 +1621,10 @@ function addCard(name) {
     setFormatLabel: function (label) { setFormatLabel_(label); },
     // 重要情報欄をセット（AIモードのみ）／チェックされた重要情報を読み取る
     setKeyInfo: function (items) { setKeyInfo_(items); },
-    readKeyInfo: function () { return readKeyInfo_(); },
-    // 「出欠フォームに載せる」チェックの状態（クラブモード限定。チェックが無い＝一般モードは true 扱い）
-    masterOptIn: function () {
-      var chk = li.querySelector('.master-chk');
-      return chk ? chk.checked : true;
-    }
+    readKeyInfo: function () { return readKeyInfo_(); }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
+  wireAttendance_(li, cardApi);     // 出欠システム連携の配線（案内文より先に配線する）
   wireAnnouncement_(li, cardApi);   // 案内文パネルの配線
   return cardApi;
 }
@@ -2066,9 +2066,7 @@ function onRegisterClick() {
 async function doRegister() {
   await ensureToken();
   var targets = items.filter(function (it) { return it.card.isChecked() && !it.registered; });
-  // クラブモード：登録は済んだがマスタ追記だけ失敗した大会（再試行対象）。カレンダー登録は再実行しない＝重複予定を作らない。
-  var retryTargets = CLUB_MODE ? items.filter(function (it) { return it.registered && !it.masterAppended && it.fileId; }) : [];
-  if (!targets.length && !retryTargets.length) { setMsg(I18N.t('msgNoItems')); syncRegBtn_(); return; }
+  if (!targets.length) { setMsg(I18N.t('msgNoItems')); syncRegBtn_(); return; }
 
   // ② 登録前チェック：チェック済みで開催日が空のカードがあれば警告して中断
   var emptyCards = targets.filter(function (it) { return !it.card.read().kaisai_dates.length; });
@@ -2078,23 +2076,6 @@ async function doRegister() {
     emptyCards[0].card.focusDate();
     syncRegBtn_();
     return;
-  }
-
-  // ②-2 登録前チェック（クラブモード限定）：出欠フォームに載せるカードなのに、
-  // 競技方法欄から種目を1つも取り出せない（masterEvents_が空）ものがあれば、
-  // 手入力を促して中断する。空でも競技方法しか無い場合でもメッセージは同一（A案）。
-  // 出欠フォームは1項目=1種目で並ぶため、D列（種目）が空だと選択肢を作れないのを防ぐ。
-  if (CLUB_MODE) {
-    var noEventCards = targets.filter(function (it) {
-      if (!it.card.masterOptIn()) return false;   // 「載せない」カードは対象外
-      return !masterEvents_(it.card.read().shiai_keishiki_by_day);   // 種目が空なら対象
-    });
-    if (noEventCards.length) {
-      setMsg(I18N.t('msgEventEmptyA') + noEventCards.length + I18N.t('msgEventEmptyB'));
-      noEventCards[0].card.focusFormat();
-      syncRegBtn_();
-      return;
-    }
   }
 
   var ok = 0, ng = 0;
@@ -2118,42 +2099,12 @@ async function doRegister() {
       targets[i].card.setStatus(I18N.t('stRegistered'), 'ok');
       if (!firstDate) firstDate = f.kaisai_dates[0] || '';
       ok++;
-      // クラブ運用モード（?club=hakusan）のときだけ、大会マスタ・シートに1行追記（出欠システム連携）。
-      // 追記失敗はカレンダー登録の成否に影響させない（best-effort。状態表示に注記のみ）。
-      // 失敗した大会は masterAppended が立たず、もう一度「登録」を押すと追記だけ再試行される。
-      if (CLUB_MODE) {
-        if (!targets[i].card.masterOptIn()) {
-          targets[i].masterAppended = true;   // 「載せない」を選択＝追記対象外（再試行もしない）
-        } else {
-          try {
-            await appendMasterRow_(f, fileId);
-            targets[i].masterAppended = true;
-          } catch (me) {
-            targets[i].masterAppended = false;
-            targets[i].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (me && me.message ? me.message : me) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
-          }
-        }
-      } else {
-        targets[i].masterAppended = true;   // 一般モードでは追記対象外＝再試行不要の印
-      }
     } catch (e) {
       targets[i].card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
       ng++;
     }
   }
   // 案X では登録した要項だけを保存するため、未登録要項の後始末（cleanupUnregistered_）は不要。
-  // クラブモード：マスタ追記だけ失敗していた大会の再試行（カレンダー登録はしない）
-  for (var r = 0; r < retryTargets.length; r++) {
-    if (!retryTargets[r].card.masterOptIn()) { retryTargets[r].masterAppended = true; continue; }   // 後からチェックを外した場合も尊重
-    try {
-      await appendMasterRow_(retryTargets[r].card.read(), retryTargets[r].fileId);
-      retryTargets[r].masterAppended = true;
-      retryTargets[r].card.setStatus(I18N.t('stRegistered'), 'ok');
-      ok++;
-    } catch (re) {
-      retryTargets[r].card.setStatus(I18N.t('stRegistered') + '（マスタ追記失敗: ' + (re && re.message ? re.message : re) + '。もう一度「登録」を押すと追記だけ再試行します）', 'ok');
-    }
-  }
   track('calendar_add', { count: ok, failed: ng });
   if (ok) {
     // 要項ファイルを保存できたカードが1件でもあるか。
@@ -2191,13 +2142,12 @@ async function doRegister() {
   syncRegBtn_();
 }
 
-// ===== クラブ運用時のみ：大会マスタ・シート書き出し（出欠システム連携。案1） =====
-// 出欠システムが読む1大会=1行のデータを作る。列：
-//   大会名 / 開催日 / 申込締切 / 種目 / 要項ファイルID / 要項リンク / 登録日時
-var MASTER_HEADERS = ['大会名', '開催日', '申込締切', '種目', '要項ファイルID', '要項リンク', '登録日時'];
+// ===== 出欠システムへ渡す値の整形 =====
+// 旧・大会マスタ・シート書き出し（?club=hakusan）で使っていた変換をそのまま流用している。
+// 実チラシで詰めた判定なので、作り直さないこと（種目の取り出しが特にそう）。
 
 // 締切を単一日付（必着＝終了日）にする。範囲 "A～B" なら B を返す。単一ならそのまま。
-function masterDeadline_(shimekiri) {
+function attendDeadline_(shimekiri) {
   if (!shimekiri) return '';
   var parts = String(shimekiri).split(/[~～]/).map(function (s) { return s.trim(); }).filter(Boolean);
   return parts.length ? parts[parts.length - 1] : '';
@@ -2218,7 +2168,7 @@ function isEventName_(name) {
 // ただし「同名種目が複数日にまたがる」ときだけ、その種目に「N日目 」接頭辞を付けて一意化する。
 // f.shiai_keishiki_by_day = [{date, format}]（format自体が「、」区切りの複数種目）を想定。
 // 競技方法の説明が混ざっている場合は除外し、種目だけを出す。
-function masterEvents_(byDay) {
+function attendEvents_(byDay) {
   var days = (byDay || []).filter(function (d) { return d && d.format && d.format.trim(); });
   if (!days.length) return '';
   // まず各日の種目を配列化し、競技方法（非種目）を除外
@@ -2243,70 +2193,150 @@ function masterEvents_(byDay) {
 }
 
 // 開催日を単一日付にする（複数日開催なら開始日1つ）。f.kaisai_dates は昇順配列を想定。
-function masterEventDate_(dates) {
+function attendEventDate_(dates) {
   if (!dates || !dates.length) return '';
   return dates.slice().sort()[0];
 }
 
-// 登録データ f と要項fileId から、大会マスタの1行（配列）を作る
-function masterRowFromFields_(f, fileId) {
-  var flyerLink = fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : '';
-  var stamp = new Date().toISOString();
-  return [
-    f.taikai_mei || '',
-    masterEventDate_(f.kaisai_dates),
-    masterDeadline_(f.shimekiri),
-    masterEvents_(f.shiai_keishiki_by_day),
-    fileId || '',
-    flyerLink,
-    stamp
-  ];
+// ===== 出欠システム連携（カード1枚 = 出欠イベント1件） =====
+// 通信は attendance-hook.js に閉じてある。ここは画面まわりだけ。
+// 失敗しても要項を入れ直させない（＝再ドロップでカレンダー予定が重複する事故を避ける）。
+// ボタンは必ず押しなおせる状態に戻すこと。
+
+function attendReady_() {
+  return ATTEND_AVAILABLE && typeof AttendanceHook !== 'undefined';
 }
 
-// 大会マスタ・シートのIDを確保する。appDataの対応表に 'master_sheet_id' で記録し端末間共有。
-// 無ければ新規スプレッドシートを作成し、1行目にヘッダーを書く。
-async function ensureMasterSheet_() {
-  var map = await getChildFolderMap_();
-  var KEY = 'master_sheet_id';
-  if (map[KEY]) {
-    // 実在確認（ゴミ箱でないか）。消えていたら作り直す。
-    if (await folderExists_(map[KEY])) return map[KEY];
-    delete map[KEY];
-  }
-  // 新規スプレッドシート作成（Sheets API）
-  var c = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ properties: { title: MASTER_SHEET_TITLE } })
-  });
-  if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
-  if (!c.ok) { throw new Error('シート作成 ' + c.status + ': ' + (await c.text()).slice(0, 140)); }
-  var sheetId = (await c.json()).spreadsheetId;
-  // ヘッダー行を書く
-  await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
-              '/values/A1:append?valueInputOption=USER_ENTERED', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [MASTER_HEADERS] })
-  });
-  map[KEY] = sheetId;
-  await saveChildFolderMap_(map);
-  return sheetId;
+// カードの入力値から出欠イベントの中身を作る。要項リンクは保存ずみのときだけ付ける。
+function attendPayload_(cardApi, fileId) {
+  var f = cardApi.read();
+  return {
+    name: (f.taikai_mei || '').trim(),
+    date: attendEventDate_(f.kaisai_dates),
+    deadline: attendDeadline_(f.shimekiri),
+    items: attendEvents_(f.shiai_keishiki_by_day),
+    youkou: fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : ''
+  };
 }
 
-// 大会1件を大会マスタ・シートの末尾に1行追記する（クラブモード時のみ呼ぶ）
-async function appendMasterRow_(f, fileId) {
-  var sheetId = await ensureMasterSheet_();
-  var row = masterRowFromFields_(f, fileId);
-  var r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
-                      '/values/A1:append?valueInputOption=USER_ENTERED', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [row] })
+function wireAttendance_(li, cardApi) {
+  var wrap = li.querySelector('.attend-wrap');
+  if (!wrap || !attendReady_()) return;
+  var btn = wrap.querySelector('.attend-btn');
+  var gear = wrap.querySelector('.attend-gear');
+  var status = wrap.querySelector('.attend-status');
+
+  wrap.style.display = 'block';
+  li.__attendRefresh = function () {
+    var made = !!li.__attendUrl;
+    var set = AttendanceHook.configured();
+    btn.textContent = made ? I18N.t('attendDone') : (set ? I18N.t('attendBtn') : I18N.t('attendSetupBtn'));
+    btn.disabled = made;
+    gear.style.display = set ? '' : 'none';
+  };
+  li.__attendRefresh();
+
+  gear.addEventListener('click', function () { openAttendModal_(); });
+
+  btn.addEventListener('click', function () {
+    if (!AttendanceHook.configured()) { openAttendModal_(); return; }
+
+    var item = null;
+    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
+    var body = attendPayload_(cardApi, item && item.fileId);
+
+    if (!body.name) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
+    // 出欠ページは1項目=1種目で並ぶ。種目が取れないと選択肢を作れないので、先に手入力してもらう。
+    if (!body.items) {
+      setAttendStatus_(status, 'ng', I18N.t('attendNoEvents'));
+      cardApi.focusFormat();
+      return;
+    }
+
+    btn.disabled = true;
+    setAttendStatus_(status, '', I18N.t('attendCreating'));
+    AttendanceHook.createEvent(body).then(function (res) {
+      li.__attendUrl = res.url;
+      li.__attendRefresh();
+      setAttendStatus_(status, 'ok', res.existing ? I18N.t('attendExisting') : I18N.t('attendCreated'));
+      var panel = li.querySelector('.ann-panel');
+      if (panel && panel.__regen) panel.__regen();   // 開いている案内文にリンクを入れ直す
+      track('attend_create', {});
+    }).catch(function (e) {
+      setAttendStatus_(status, 'ng', (e && e.message) ? e.message : String(e));
+      btn.disabled = false;   // ★同じ画面で押しなおせる状態に戻す
+    });
   });
-  if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
-  if (!r.ok) { throw new Error('シート追記 ' + r.status + ': ' + (await r.text()).slice(0, 140)); }
-  return sheetId;
+}
+
+function setAttendStatus_(el, cls, text) {
+  if (!el) return;
+  el.className = 'attend-status' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+}
+
+// 設定を変えたら、画面にある全カードのボタン表示を合わせる
+function refreshAttendUi_() {
+  var lis = list ? list.querySelectorAll('li') : [];
+  Array.prototype.forEach.call(lis, function (li) {
+    if (li.__attendRefresh) li.__attendRefresh();
+  });
+}
+
+// 出欠システムの設定（URL＋書き込みキー）。保存前に必ず疎通とキーを確かめる。
+function openAttendModal_() {
+  var modal = document.getElementById('attend-modal');
+  if (!modal || !attendReady_()) return;
+  var urlEl = document.getElementById('attendUrlInput');
+  var keyEl = document.getElementById('attendKeyInput');
+  var msgEl = document.getElementById('attendCheck');
+  var saveBtn = document.getElementById('attendSaveBtn');
+  var closeBtn = document.getElementById('attendCloseBtn');
+  var clearBtn = document.getElementById('attendClearBtn');
+
+  var cur = AttendanceHook.settings();
+  urlEl.value = cur.deployId ? AttendanceHook.apiUrlOf(cur.deployId) : '';
+  keyEl.value = cur.writeKey || '';
+  clearBtn.style.display = AttendanceHook.configured() ? '' : 'none';
+  setAttendMsg_(msgEl, '', '');
+  modal.classList.add('show');
+
+  var close = function () {
+    modal.classList.remove('show');
+    saveBtn.removeEventListener('click', onSave);
+    closeBtn.removeEventListener('click', close);
+    clearBtn.removeEventListener('click', onClear);
+  };
+  var onSave = function () {
+    saveBtn.disabled = true;
+    setAttendMsg_(msgEl, '', I18N.t('attendChecking'));
+    AttendanceHook.saveSettings({ deployId: urlEl.value, writeKey: keyEl.value }).then(function (res) {
+      saveBtn.disabled = false;
+      setAttendMsg_(msgEl, 'ok', I18N.t('attendOk') + (res.org || ''));
+      refreshAttendUi_();
+      setTimeout(close, 1200);
+    }).catch(function (e) {
+      saveBtn.disabled = false;
+      setAttendMsg_(msgEl, 'ng', (e && e.message) ? e.message : String(e));
+    });
+  };
+  var onClear = function () {
+    AttendanceHook.clear();
+    urlEl.value = '';
+    keyEl.value = '';
+    clearBtn.style.display = 'none';
+    setAttendMsg_(msgEl, '', I18N.t('attendCleared'));
+    refreshAttendUi_();
+  };
+  saveBtn.addEventListener('click', onSave);
+  closeBtn.addEventListener('click', close);
+  clearBtn.addEventListener('click', onClear);
+}
+
+function setAttendMsg_(el, cls, text) {
+  if (!el) return;
+  el.className = 'key-check' + (text ? ' show ' : '') + cls;
+  el.textContent = text;
 }
 
 async function createEvent(f, fileId, mimeType) {
