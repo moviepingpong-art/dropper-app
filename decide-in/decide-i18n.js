@@ -56,6 +56,10 @@
       tmHere: 'いま使っています',
       tmClose: '閉じる',
       tmFoot: '※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。',
+      tmLineTitle: 'LINEでも使えます',
+      tmLineText: '公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。',
+      tmLineBtn: '友だち追加して試す',
+      tmLineQr: 'パソコンの方はスマホのLINEで読み取り',
       lead: '「結局これ決まったんだっけ？」を読み返して探す時間をなくします。',
       // プライバシー（このツールは投げ込むもの自体が私的な会話なので、正面から書く）
       privTitle: '入れたものの扱い',
@@ -201,6 +205,10 @@
       tmHere: 'You are here',
       tmClose: 'Close',
       tmFoot: 'Opens automatically the first time. After that, use "What can these do?" whenever you like.',
+      tmLineTitle: 'Also on LINE',
+      tmLineText: 'Send an image or PDF to the official account. No login needed.',
+      tmLineBtn: 'Add as friend',
+      tmLineQr: 'Scan with LINE on your phone',
       lead: 'Stop scrolling back asking "so what did we actually decide?"',
       privTitle: 'What happens to what you drop',
       priv1: 'We run no server, so neither the files nor what is read from them reaches us.',
@@ -337,6 +345,10 @@
       tmHere: 'Abhi yahi khula hai',
       tmClose: 'Band karein',
       tmFoot: 'Pehli baar apne aap khulta hai. Uske baad "Ye kya kar sakte hain?" se kabhi bhi dekh sakte hain.',
+      tmLineTitle: 'LINE par bhi',
+      tmLineText: 'Official account ko image ya PDF bhejein. Login ki zaroorat nahi.',
+      tmLineBtn: 'Friend add karein',
+      tmLineQr: 'Phone ke LINE se scan karein',
       lead: 'Group chat scroll karke "aakhir tay kya hua?" dhoondhne ka time bachaiye.',
       privTitle: 'Aap jo daalte hain uska kya hota hai',
       priv1: 'Hamara koi server nahi hai, isliye na images na padha gaya content hum tak aata hai.',
@@ -466,6 +478,12 @@
     var km = document.getElementById('keyMoreLink');
     if (km) km.href = 'https://dropper-tools.com/' + akPath;
 
+    // LINE公式アカウントの導線は **日本語のときだけ** 出す。
+    // LINE Botは日本語のみで、en/in の利用者はLINEを使わない（WhatsApp圏）。
+    // マークアップは9フォルダ共通に置き（index.html のバイト同一性を保つため）、
+    // 出し分けはここで行う。annLineBtn と同じ考え方。
+    var tmLine = document.getElementById('tmLine');
+    if (tmLine) { tmLine.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');

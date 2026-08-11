@@ -62,6 +62,10 @@
       tmHere: 'いま使っています',
       tmClose: '閉じる',
       tmFoot: '※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。',
+      tmLineTitle: 'LINEでも使えます',
+      tmLineText: '公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。',
+      tmLineBtn: '友だち追加して試す',
+      tmLineQr: 'パソコンの方はスマホのLINEで読み取り',
       eventTypePrompt: 'イベントの種類',
       typeSports: 'スポーツ大会の要項',
       leadSports: '要項（PDF・画像）をドロップ → 内容を確認',
@@ -329,6 +333,10 @@
       tmHere: 'You are here',
       tmClose: 'Close',
       tmFoot: 'Opens automatically the first time. After that, use "What can these do?" whenever you like.',
+      tmLineTitle: 'Also on LINE',
+      tmLineText: 'Send an image or PDF to the official account. No login needed.',
+      tmLineBtn: 'Add as friend',
+      tmLineQr: 'Scan with LINE on your phone',
       eventTypePrompt: 'Event type',
       typeSports: 'Sports event flyer',
       leadSports: 'Drop a flyer (PDF / image) → Review the details',
@@ -577,6 +585,10 @@
       tmHere: 'Abhi yahi khula hai',
       tmClose: 'Band karein',
       tmFoot: 'Pehli baar apne aap khulta hai. Uske baad "Ye kya kar sakte hain?" se kabhi bhi dekh sakte hain.',
+      tmLineTitle: 'LINE par bhi',
+      tmLineText: 'Official account ko image ya PDF bhejein. Login ki zaroorat nahi.',
+      tmLineBtn: 'Friend add karein',
+      tmLineQr: 'Phone ke LINE se scan karein',
       eventTypePrompt: 'Event type',
       typeSports: 'Sports event ka flyer',
       leadSports: 'Flyer (PDF / image) drop karein → Details check karein',
@@ -846,6 +858,12 @@
     if (tmGoD) {
       tmGoD.href = (global.LANG === 'en') ? '/decide-en/' : (global.LANG === 'in') ? '/decide-in/' : '/decide/';
     }
+    // LINE公式アカウントの導線は **日本語のときだけ** 出す。
+    // LINE Botは日本語のみで、en/in の利用者はLINEを使わない（WhatsApp圏）。
+    // マークアップは9フォルダ共通に置き（index.html のバイト同一性を保つため）、
+    // 出し分けはここで行う。annLineBtn と同じ考え方。
+    var tmLine = document.getElementById('tmLine');
+    if (tmLine) { tmLine.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
     var els = document.querySelectorAll('[data-i18n]');
     for (var i = 0; i < els.length; i++) {
       var key = els[i].getAttribute('data-i18n');

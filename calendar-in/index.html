@@ -374,6 +374,23 @@
     .tm-close { font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; color:var(--sub);
       background:none; border:none; cursor:pointer; text-decoration:underline; padding:9px 4px; }
     .tm-foot { font-size:11px; color:var(--sub); margin:13px 0 0; }
+    /* LINE公式アカウントへの導線（日本語のときだけ表示。出し分けは i18n.js の applyDom）。
+       ツール本体の画面は汚さず、この説明ポップアップの中だけに置く。 */
+    .tm-line { display:flex; align-items:center; gap:14px; margin:16px 0 0; padding:13px 15px;
+      background:#f2fbf5; border:1px solid rgba(6,199,85,.35); border-radius:12px; }
+    .tm-line-body { flex:1; min-width:0; }
+    .tm-line-title { font-size:13px; font-weight:700; color:#06843a; margin:0 0 3px; }
+    .tm-line-text { font-size:12px; color:var(--sub); line-height:1.7; margin:0 0 9px; }
+    .tm-line-btn { display:inline-block; font-family:'Zen Maru Gothic',sans-serif; font-size:13px;
+      font-weight:700; color:#fff; background:#06C755; text-decoration:none; padding:8px 16px;
+      border-radius:8px; box-shadow:0 5px 14px rgba(6,199,85,.32); transition:transform .2s,box-shadow .2s; }
+    .tm-line-btn:hover { transform:translateY(-2px); box-shadow:0 8px 18px rgba(6,199,85,.42); }
+    .tm-line-qr { flex-shrink:0; text-align:center; }
+    .tm-line-qr img { display:block; width:84px; height:84px; border:1px solid var(--line);
+      border-radius:8px; background:#fff; padding:4px; }
+    .tm-line-cap { font-size:9.5px; color:var(--sub); line-height:1.5; margin:4px 0 0; max-width:92px; }
+    /* 画面が狭いときはQRを隠す（ボタンから直行できるので困らない） */
+    @media (max-width:520px){ .tm-line-qr { display:none; } }
     @media (prefers-reduced-motion: reduce){ .tm-panel.on { animation:none; } }
 
     .subtitle-row { margin:12px 0 4px; }
@@ -813,6 +830,21 @@
         </div>
       </div>
 
+      <!-- LINE公式アカウントへの導線。日本語のときだけ出す（applyDom が制御）。
+           QRは /assets/line-qr.png（9フォルダ共通の絶対パス。index.html を同一に保つため）。
+           友だち追加URLはベーシックID @937eheeb から導出した標準形で、
+           LIFFランチャー（liff.line.me/...）とは別物。混同しないこと。 -->
+      <div class="tm-line" id="tmLine">
+        <div class="tm-line-body">
+          <p class="tm-line-title" data-i18n="tmLineTitle">LINEでも使えます</p>
+          <p class="tm-line-text" data-i18n="tmLineText">公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。</p>
+          <a class="tm-line-btn" href="https://line.me/R/ti/p/@937eheeb" target="_blank" rel="noopener" data-i18n="tmLineBtn">友だち追加して試す</a>
+        </div>
+        <div class="tm-line-qr">
+          <img src="/assets/line-qr.png" width="84" height="84" alt="">
+          <p class="tm-line-cap" data-i18n="tmLineQr">パソコンの方はスマホのLINEで読み取り</p>
+        </div>
+      </div>
       <p class="tm-foot" data-i18n="tmFoot">※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。</p>
     </div>
   </div>
