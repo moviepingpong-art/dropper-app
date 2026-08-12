@@ -145,8 +145,10 @@
 
     #list { margin:20px 0 0; padding:0; list-style:none; }
     .card { border:2px solid var(--line); border-radius:18px; padding:16px; margin-bottom:14px; background:var(--paper); box-shadow:0 6px 18px rgba(6,182,164,.07); }
-    .card .hd { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .card .chk { display:flex; align-items:center; gap:9px; font-weight:700; }
+    /* ファイル名が長いと複数行になる。そのとき状態表示（読み取り完了など）とチェックボックスが
+       行の途中の高さに来ると窮屈に見えるので、どちらも1行目の高さに揃える。1行の場合は見た目に差は出ない。 */
+    .card .hd { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .card .chk { display:flex; align-items:flex-start; gap:9px; font-weight:700; }
     .card .chk input { width:18px; height:18px; accent-color:var(--teal); }
     .card .fn { word-break:break-all; }
     .st { font-size:12px; font-weight:700; white-space:nowrap; }
@@ -344,11 +346,14 @@
       border-radius:9px; padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
     .bub::after { content:''; position:absolute; left:12px; bottom:-8px; width:0; height:0;
       border:6px solid transparent; border-top-color:var(--teal); border-bottom:0; }
-    .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+    /* ★必ず .fig で囲うこと。裸の .chk にすると、カード見出しの
+       <label class="chk">（ファイル名のチェックボックス）にも当たってしまい、
+       width:86px と flex-direction:column が効いてファイル名が1文字ずつ縦に並ぶ。 */
+    .fig .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
       padding:7px 6px; display:flex; flex-direction:column; gap:4.5px; }
-    .chk div { display:flex; align-items:center; gap:4px; }
-    .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
-    .chk .bar { flex:1; }
+    .fig .chk div { display:flex; align-items:center; gap:4px; }
+    .fig .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
+    .fig .chk .bar { flex:1; }
     .chat { width:80px; background:#fff; border:2px solid var(--teal); border-radius:8px;
       padding:7px 5px; display:flex; flex-direction:column; gap:4px; }
     .chat u { display:block; height:9px; border-radius:5px; background:var(--line); width:74%; }

@@ -167,11 +167,14 @@
       border-radius:9px; padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
     .bub::after { content:''; position:absolute; left:12px; bottom:-8px; width:0; height:0;
       border:6px solid transparent; border-top-color:var(--teal); border-bottom:0; }
-    .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+    /* ★必ず .fig で囲うこと。裸の .chk にすると、カード見出しの
+       <label class="chk">（ファイル名のチェックボックス）にも当たってしまい、
+       width:86px と flex-direction:column が効いてファイル名が1文字ずつ縦に並ぶ。 */
+    .fig .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
       padding:7px 6px; display:flex; flex-direction:column; gap:4.5px; }
-    .chk div { display:flex; align-items:center; gap:4px; }
-    .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
-    .chk .bar { flex:1; }
+    .fig .chk div { display:flex; align-items:center; gap:4px; }
+    .fig .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
+    .fig .chk .bar { flex:1; }
     .chat { width:80px; background:#fff; border:2px solid var(--teal); border-radius:8px;
       padding:7px 5px; display:flex; flex-direction:column; gap:4px; }
     .chat u { display:block; height:9px; border-radius:5px; background:var(--line); width:74%; }
