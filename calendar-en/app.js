@@ -420,15 +420,20 @@ function selectToolsTab_(name) {
 // 「◯◯ドロッパー」と付けると、ヘッダーのタブ・h1 と合わせて3重になるため付けない。
 (function buildTypePicker() {
   if (!typePicker) return;
+  // 先頭は未選択のための空欄。種類が6つあり、ボタンを横に並べると狭い画面で
+  // 何段にも折り返してドロップ欄を画面外へ押し出すので、プルダウンにしている。
+  var head = document.createElement('option');
+  head.value = '';
+  head.textContent = I18N.t('eventTypePlaceholder');
+  typePicker.appendChild(head);
+
   Object.keys(DROPPER_TYPES).forEach(function (key) {
-    var b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'type-btn';
-    b.setAttribute('data-type', key);
-    b.textContent = I18N.t(DROPPER_TYPES[key].subtitleKey);
-    b.addEventListener('click', function () { applyType(key); });
-    typePicker.appendChild(b);
+    var o = document.createElement('option');
+    o.value = key;
+    o.textContent = I18N.t(DROPPER_TYPES[key].subtitleKey);
+    typePicker.appendChild(o);
   });
+  typePicker.addEventListener('change', function () { applyType(this.value); });
   applyType('');   // 未選択の状態から始める
 })();
 
@@ -444,10 +449,8 @@ function applyType(key) {
     try { I18N.applyDom(); } catch (e) {}
   }
   if (typePicker) {
-    var btns = typePicker.querySelectorAll('.type-btn');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('on', btns[i].getAttribute('data-type') === currentType);
-    }
+    if (typePicker.value !== currentType) typePicker.value = currentType;   // 外から呼ばれたとき用
+    typePicker.classList.toggle('empty', !currentType);
   }
   if (typeCurrentEl) {
     typeCurrentEl.textContent = t ? I18N.t(t.subtitleKey) : '';
