@@ -2302,10 +2302,16 @@ function openAttendModal_() {
   var closeBtn = document.getElementById('attendCloseBtn');
   var clearBtn = document.getElementById('attendClearBtn');
 
+  var linkRow = document.getElementById('attendLinkRow');
+  var linkBtn = document.getElementById('attendLinkBtn');
+
   var cur = AttendanceHook.settings();
   urlEl.value = cur.deployId ? AttendanceHook.apiUrlOf(cur.deployId) : '';
   keyEl.value = cur.writeKey || '';
   clearBtn.style.display = AttendanceHook.configured() ? '' : 'none';
+  // 設定を持ち歩くリンクは、設定できている時だけ出す
+  if (linkRow) linkRow.style.display = AttendanceHook.configured() ? '' : 'none';
+  if (linkBtn) linkBtn.textContent = I18N.t('attendModalLinkBtn');
   setAttendMsg_(msgEl, '', '');
   modal.classList.add('show');
 
@@ -2314,6 +2320,7 @@ function openAttendModal_() {
     saveBtn.removeEventListener('click', onSave);
     closeBtn.removeEventListener('click', close);
     clearBtn.removeEventListener('click', onClear);
+    if (linkBtn) linkBtn.removeEventListener('click', onLink);
   };
   var onSave = function () {
     saveBtn.disabled = true;
@@ -2336,12 +2343,33 @@ function openAttendModal_() {
     urlEl.value = '';
     keyEl.value = '';
     clearBtn.style.display = 'none';
+    if (linkRow) linkRow.style.display = 'none';
     setAttendMsg_(msgEl, '', I18N.t('attendCleared'));
     refreshAttendUi_();
+  };
+  // 設定を載せたリンクを作ってクリップボードへ。ブックマークしておけば1タップで戻せる。
+  // キーが入っているので、コピーしたことと「人に送らない」ことをその場で伝える。
+  var onLink = function () {
+    var link = AttendanceHook.settingsLink(location.origin + location.pathname);
+    if (!link) { setAttendMsg_(msgEl, 'ng', I18N.t('attendModalLinkNg')); return; }
+    var done = function () {
+      linkBtn.textContent = I18N.t('attendModalLinkCopied');
+      setAttendMsg_(msgEl, 'warn', I18N.t('attendModalLinkWarn'));
+      setTimeout(function () { linkBtn.textContent = I18N.t('attendModalLinkBtn'); }, 2400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done, function () { attendPromptCopy_(link); done(); });
+    } else { attendPromptCopy_(link); done(); }
   };
   saveBtn.addEventListener('click', onSave);
   closeBtn.addEventListener('click', close);
   clearBtn.addEventListener('click', onClear);
+  if (linkBtn) linkBtn.addEventListener('click', onLink);
+}
+
+// クリップボードが使えない端末のために、選択済みの状態で見せて手でコピーしてもらう
+function attendPromptCopy_(link) {
+  try { window.prompt(I18N.t('attendModalLinkBtn'), link); } catch (e) { /* noop */ }
 }
 
 function setAttendMsg_(el, cls, text) {
@@ -2618,3 +2646,28 @@ function focusHandoff_() {
 }
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
+
+// 設定を載せたブックマークから開かれたら、その場で取り込む。
+// キーがアドレス欄に残らないよう、フック側が読み取り直後に # を消している。
+(function () {
+  if (!attendReady_()) return;
+  var p;
+  try { p = AttendanceHook.consumeSettingsHash(); } catch (e) { return; }
+  if (!p) return;
+  p.then(function (res) {
+    refreshAttendUi_();
+    attendToast_(I18N.t('attendFromLink') + (res.org || ''), res.stored ? 'ok' : 'warn');
+  }).catch(function (e) {
+    attendToast_((e && e.message) ? e.message : I18N.t('attendFromLinkNg'), 'ng');
+  });
+})();
+
+// リンクから戻したことを画面上部に短く出す（設定モーダルは開かない）
+function attendToast_(text, cls) {
+  var el = document.createElement('div');
+  el.className = 'attend-toast ' + (cls || '');
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(function () { el.classList.add('go'); }, 3600);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 4200);
+}
