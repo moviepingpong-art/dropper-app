@@ -401,19 +401,21 @@
     .subtitle-row { margin:12px 0 4px; }
     /* ドロッパーの種類選択（ボタン一覧 → 選択後は名称を表示） */
     .type-prompt { font-size:14px; font-weight:700; color:var(--teal-d); margin:0 0 8px; }
-    .type-picker { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 4px; }
-    .type-btn {
-      font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700;
-      padding:10px 16px; border-radius:14px; cursor:pointer;
-      color:var(--teal-d); background:#fff; border:2px solid var(--line);
-      box-shadow:none; transition:border-color .15s, background .15s, transform .12s;
+    /* 種類は6つある。横並びのボタンだと狭い画面で3〜4段に折り返して縦に伸び、
+       肝心のドロップ欄が画面の外へ押し出されるため、プルダウンにしてある。 */
+    .type-select {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:15px; font-weight:700;
+      padding:10px 38px 10px 16px; border-radius:14px; cursor:pointer;
+      color:var(--teal-d); background-color:#fff; border:2px solid var(--line);
+      max-width:100%; appearance:none; -webkit-appearance:none;
+      background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%230d9488' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 14px center; background-size:12px 8px;
+      transition:border-color .15s, background-color .15s;
     }
-    .type-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:none; border-color:var(--teal); background:#f0fffb; }
-    .type-btn.on {
-      border-color:transparent; color:var(--ink);
-      background:linear-gradient(100deg,var(--yellow),var(--lime));
-      box-shadow:0 6px 16px rgba(163,230,53,.3);
-    }
+    .type-select:hover { border-color:var(--teal); background-color:#f0fffb; }
+    .type-select:focus { outline:none; border-color:var(--teal); }
+    /* 選ぶまでは選択待ちだと分かるように、枠を目立たせる */
+    .type-select.empty { border-color:var(--teal); background-color:#f0fffb; }
     .type-current {
       font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px;
       display:inline-block; margin:8px 0 0; padding:9px 16px; border-radius:14px;
@@ -611,7 +613,7 @@
     <h1 data-i18n="appName">イベントドロッパー</h1>
     <div class="subtitle-row">
       <p class="type-prompt" id="typePrompt" data-i18n="eventTypePrompt">イベントの種類</p>
-      <div class="type-picker" id="typePicker"></div>
+      <select class="type-select" id="typePicker" aria-labelledby="typePrompt"></select>
       <p class="type-current" id="typeCurrent" style="display:none"></p>
     </div>
     <p class="lead" id="lead">要項（PDF・画像）をドロップ → 内容を確認</p>
