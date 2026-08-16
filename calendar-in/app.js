@@ -1038,7 +1038,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
     // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
     // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
-    if (attend) L.push('🙋 ' + I18N.t('annAttend') + ' ▶ ' + attend);
+    if (attend) L.push('🙋 ' + (ja ? I18N.t('annAttendMenu') : I18N.t('annAttend') + ' ▶ ' + attend));
     else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
@@ -1062,7 +1062,11 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
-    if (attend) { L.push(''); L.push('▼ ' + I18N.t('annAttend')); L.push(attend); }
+    if (attend) {
+      L.push('');
+      if (ja) { L.push('🙋 ' + I18N.t('annAttendMenu')); }
+      else { L.push('▼ ' + I18N.t('annAttend')); L.push(attend); }
+    }
     if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     return L.join('\n');
@@ -1104,7 +1108,11 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     L.push('');
   }
   // 出欠リンクはカレンダー追加リンクの上に置く。回答には締切があり、先に見てほしいのはこちら。
-  if (attend) { L.push('🙋 ' + I18N.t('annAttend') + ' ▶ ' + attend); L.push(''); }
+  // ja（LINE版）はリッチメニューに出欠ページを常設しているので、URLの代わりにメニュー誘導だけ出す。
+  if (attend) {
+    L.push('🙋 ' + (ja ? I18N.t('annAttendMenu') : I18N.t('annAttend') + ' ▶ ' + attend));
+    L.push('');
+  }
   if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
