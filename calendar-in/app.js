@@ -2321,9 +2321,9 @@ function openAttendModal_() {
     AttendanceHook.saveSettings({ deployId: urlEl.value, writeKey: keyEl.value }).then(function (res) {
       saveBtn.disabled = false;
       refreshAttendUi_();
-      // 保存できていないのに閉じると、次に開いたとき設定が消えていて理由が分からない。
-      // その場に留めて、ブラウザ側の設定を見てもらう。
-      if (!res.stored) { setAttendMsg_(msgEl, 'ng', I18N.t('attendNotStored')); return; }
+      // 端末に残せなかったときも、この画面を開いているあいだは使える（フック側が控えを持つ）。
+      // ただし開き直すと消えるので、それを伝えるために閉じずに出しておく。
+      if (!res.stored) { setAttendMsg_(msgEl, 'warn', I18N.t('attendNotStored')); return; }
       setAttendMsg_(msgEl, 'ok', I18N.t('attendOk') + (res.org || ''));
       setTimeout(close, 1200);
     }).catch(function (e) {
