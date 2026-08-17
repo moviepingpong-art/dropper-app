@@ -92,16 +92,6 @@
     .idle-note { margin:0; font-size:11.5px; line-height:1.7; color:var(--sub); }
     /* 種類選択後：ドロップ→確認のあとに待っている2つの機能を大きく見せるピル */
     /* 矢印はピル群の外に置く。狭い画面で2つ目のピルが折り返しても、1つ目のピルと左端が揃う */
-    .lead-features { display:flex; flex-wrap:nowrap; align-items:center; gap:10px; margin:12px 0 0; }
-    .feat-pills { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-width:0; }
-    .feat-arrow { flex:none; font-size:20px; font-weight:700; color:var(--teal-d); }
-    /* 配色は種類ボタン（未選択時）と同じ：白背景＋ティール文字＋薄い縁 */
-    .feat-pill {
-      display:inline-block; padding:12px 22px; border-radius:16px;
-      font-size:18px; font-weight:700; letter-spacing:.02em;
-      color:var(--teal-d); background:#fff; border:2px solid var(--line);
-    }
-    .lead { color:var(--sub); font-size:15px; font-weight:500; margin:10px 0 0; }
     .guide-link { margin:8px 0 0; font-size:13px; }
     .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; }
     .guide-link a:hover { border-bottom-color:var(--teal); }
@@ -416,12 +406,6 @@
     .type-select:focus { outline:none; border-color:var(--teal); }
     /* 選ぶまでは選択待ちだと分かるように、枠を目立たせる */
     .type-select.empty { border-color:var(--teal); background-color:#f0fffb; }
-    .type-current {
-      font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px;
-      display:inline-block; margin:8px 0 0; padding:9px 16px; border-radius:14px;
-      background:linear-gradient(100deg,var(--yellow),var(--lime)); color:var(--ink);
-      box-shadow:0 6px 16px rgba(163,230,53,.3);
-    }
 
     /* ===== AI利用選択ポップアップ ===== */
     #ai-modal { position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center;
@@ -614,16 +598,6 @@
     <div class="subtitle-row">
       <p class="type-prompt" id="typePrompt" data-i18n="eventTypePrompt">イベントの種類</p>
       <select class="type-select" id="typePicker" aria-labelledby="typePrompt"></select>
-      <p class="type-current" id="typeCurrent" style="display:none"></p>
-    </div>
-    <p class="lead" id="lead">要項（PDF・画像）をドロップ → 内容を確認</p>
-    <!-- 内容確認のあとに待っている2つの機能を大きく見せる（種類選択後のみ表示） -->
-    <div class="lead-features" id="leadFeatures" style="display:none">
-      <span class="feat-arrow" aria-hidden="true">→</span>
-      <div class="feat-pills">
-        <span class="feat-pill" data-i18n="featCalendar">📆 Googleカレンダーに登録</span>
-        <span class="feat-pill" data-i18n="featAnnounce">📣 SNS案内文を自動作成</span>
-      </div>
     </div>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
     <p class="guide-link" id="guideLink">

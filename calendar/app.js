@@ -70,15 +70,12 @@ var loginArea = document.getElementById('login-area');
 var workArea = document.getElementById('work');
 var sportSel = document.getElementById('sport');
 var typePicker = document.getElementById('typePicker');
-var typeCurrentEl = document.getElementById('typeCurrent');
 var typePromptEl = document.getElementById('typePrompt');
-var leadEl = document.getElementById('lead');
 var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 
 // ===== イベントドロッパーの種類定義 =====
 // 種類を増やすときはここに1件足すだけ。
 //   subtitleKey     : サブタイトル（種類セレクタの表示文言）のi18nキー
-//   leadKey         : 操作の流れ説明（ヘッダーのリード文）のi18nキー
 //   useSportSelector: 競技セレクタを表示するか（スポーツ用途のみtrue）
 //   labels          : カード欄ラベルの上書き（slot→i18nキー。無いslotは既定キーを使う）
 //                     slot: name(名称) / format(日ごとの内容) / opening(時刻) / deadline(締切)
@@ -90,14 +87,12 @@ var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 var DROPPER_TYPES = {
   sports: {
     subtitleKey: 'typeSports',
-    leadKey: 'leadSports',
     evKey: 'evSports', docKey: 'docSports',
     useSportSelector: true,
     annEmoji: '🏓'
   },
   music: {
     subtitleKey: 'typeMusic',
-    leadKey: 'leadMusic',
     evKey: 'evMusic', docKey: 'docMusic',
     useSportSelector: false,
     labels: { name: 'fldNameMusic', format: 'fldFormatMusic', opening: 'fldOpeningMusic', deadline: 'fldDeadlineMusic' },
@@ -120,7 +115,6 @@ var DROPPER_TYPES = {
   },
   exhibition: {
     subtitleKey: 'typeExhibition',
-    leadKey: 'leadExhibition',
     evKey: 'evExhibition', docKey: 'docExhibition',
     useSportSelector: false,
     labels: { name: 'fldNameExhibition', format: 'fldFormatExhibition', opening: 'fldOpeningExhibition', deadline: 'fldDeadlineExhibition' },
@@ -149,7 +143,6 @@ var DROPPER_TYPES = {
   },
   lecture: {
     subtitleKey: 'typeLecture',
-    leadKey: 'leadLecture',
     evKey: 'evLecture', docKey: 'docLecture',
     useSportSelector: false,
     labels: { name: 'fldNameLecture', format: 'fldFormatLecture', opening: 'fldOpeningLecture', deadline: 'fldDeadlineLecture' },
@@ -172,7 +165,6 @@ var DROPPER_TYPES = {
   },
   festival: {
     subtitleKey: 'typeFestival',
-    leadKey: 'leadFestival',
     evKey: 'evFestival', docKey: 'docFestival',
     useSportSelector: false,
     labels: { name: 'fldNameFestival', format: 'fldFormatFestival', opening: 'fldOpeningFestival', deadline: 'fldDeadlineFestival' },
@@ -198,7 +190,6 @@ var DROPPER_TYPES = {
   },
   general: {
     subtitleKey: 'typeGeneral',
-    leadKey: 'leadGeneral',
     evKey: 'evGeneral', docKey: 'docGeneral',
     useSportSelector: false,
     labels: { name: 'fldNameGeneral', format: 'fldFormatGeneral', opening: 'fldOpeningGeneral' },
@@ -452,16 +443,10 @@ function applyType(key) {
     if (typePicker.value !== currentType) typePicker.value = currentType;   // 外から呼ばれたとき用
     typePicker.classList.toggle('empty', !currentType);
   }
-  if (typeCurrentEl) {
-    typeCurrentEl.textContent = t ? I18N.t(t.subtitleKey) : '';
-    typeCurrentEl.style.display = t ? 'inline-block' : 'none';
-  }
   if (typePromptEl) typePromptEl.style.display = t ? 'none' : '';
-  if (leadEl) leadEl.style.display = t ? '' : 'none';
-  if (t && leadEl && t.leadKey) leadEl.textContent = I18N.t(t.leadKey);
   if (sportRow) sportRow.style.display = (t && t.useSportSelector) ? '' : 'none';
   // 種類が決まるまでドロップ欄・機能ピル（カレンダー登録／SNS案内文）は出さない
-  ['.step-drop-label', '#drop', '#ocrNote', '#leadFeatures'].forEach(function (sel) {
+  ['.step-drop-label', '#drop', '#ocrNote'].forEach(function (sel) {
     var el = document.querySelector(sel);
     if (el) el.style.display = t ? '' : 'none';
   });
