@@ -56,23 +56,15 @@
       -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
       filter:drop-shadow(0 2px 0 rgba(6,182,164,.12));
     }
-    .free-badge {
-      display:inline-block; margin:0 0 14px; padding:11px 26px;
-      font-size:18px; font-weight:700; color:#fff; letter-spacing:.03em;
+    /* 「完全無料」。ヒーロー上の小さなバッジから、AI無料枠の帯の中の見出しへ移した。
+       キャッチより一段大きくして、帯に入って最初に目に入るようにする。 */
+    .idle-free {
+      display:inline-block; margin:0 0 12px; padding:8px 20px;
+      font-family:'Mochiy Pop One',sans-serif; font-weight:400; letter-spacing:.04em;
+      font-size:clamp(24px,6vw,34px); line-height:1.25; color:#fff;
       background:linear-gradient(100deg,#16a34a,#22c55e);
-      border-radius:999px; box-shadow:0 8px 22px rgba(34,197,94,.38);
-      animation: freeBadgePulse 2.2s ease-in-out infinite;
+      border-radius:14px; box-shadow:0 8px 22px rgba(34,197,94,.38);
     }
-    @keyframes freeBadgePulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.06); } }
-    @media (prefers-reduced-motion: reduce){ .free-badge { animation:none; } }
-    /* 無料バッジの右横：対応チラシの幅広さを示すバッジ（同じ大きさ・色違い） */
-    .multi-badge {
-      display:inline-block; margin:0 0 14px 10px; padding:11px 26px;
-      font-size:18px; font-weight:700; color:#fff; letter-spacing:.03em;
-      background:linear-gradient(100deg,var(--teal),var(--lime-d));
-      border-radius:999px; box-shadow:0 8px 22px rgba(6,182,164,.35);
-    }
-    @media (max-width:640px){ .multi-badge { margin-left:0; } }
     /* AI無料枠の帯。「Googleアカウントに眠っている無料枠をこの道具に回す」を大きく見せる。
        改行は辞書側の \n で表す（i18n は textContent で流し込むため <br> は使えない）。
        すぐ下の注記（.idle-note）は必ず残すこと。キーが要るツールだと誤解されるのを防ぐ。 */
@@ -566,11 +558,11 @@
 </head>
 <body>
   <header>
-    <p class="free-badge" data-i18n="freeBadge">🎉 今なら無料公開中</p><p class="multi-badge" data-i18n="multiBadge">🎪 様々なイベントチラシに対応</p>
     <!-- Googleアカウントに眠っているAIの無料枠を、この道具に回してもらうための帯。
          ボタンはAI利用ポップアップを開くだけ（説明を飛ばす経路は増やさない）。
          .idle-note（キー無しでも使える）は外さないこと。AIモードは任意である。 -->
     <div class="idle-band">
+      <p class="idle-free" data-i18n="freeBadge">完全無料</p>
       <p class="idle-catch" data-i18n="idleCatch">眠ったままのAI無料枠、
 ここで使いませんか。</p>
       <p class="idle-sub" data-i18n="idleSub">Googleアカウントには、毎日戻ってくるAIの無料枠があります。使わなければ、そのまま消えるだけ。クレカ不要・0円・約3分で、この道具の読み取りに回せます。</p>
