@@ -442,17 +442,10 @@
       color:#ad4e00; border-radius:6px; cursor:pointer; font-family:inherit; }
     .attend-btn:hover:not(:disabled) { background:#ffe7ba; }
     .attend-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
-    .attend-gear { font-size:13px; padding:6px 9px; margin-left:6px; border:1px solid var(--line);
-      background:#fff; color:var(--sub); border-radius:6px; cursor:pointer; font-family:inherit; }
     .attend-status { margin-left:8px; font-size:12px; color:#555; }
     .attend-status.ok { color:#389e0d; font-weight:700; }
     .attend-status.ng { color:#cf1322; font-weight:700; }
-    #attend-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
-      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
-    #attend-modal.show { display:flex; }
     .attend-clear-row { margin:10px 0 0; text-align:center; }
-    #attendClearBtn { font-size:12.5px; background:none; border:none; color:var(--sub);
-      text-decoration:underline; cursor:pointer; font-family:inherit; }
     .key-steps { margin:8px 0 14px; padding-left:1.3em; font-size:13px; color:var(--sub); line-height:1.9; }
     .key-steps li { padding-left:2px; }
     .key-studio-btn { display:inline-block; background:var(--teal); color:#fff !important; font-weight:700;
@@ -479,23 +472,6 @@
     .key-check.testing { color:var(--sub); }
     .key-check.ok { color:var(--teal-d); }
     .key-check.ng { color:#d4380d; }
-    .key-check.warn { color:#ad6800; }
-    /* 設定を持ち歩くリンク（設定ずみのときだけ出る） */
-    .attend-link-row { margin:14px 0 0; padding:11px 13px; background:#f6ffed; border:1px solid #b7eb8f;
-      border-radius:12px; }
-    .attend-link-row h3 { margin:0 0 4px; font-size:13px; color:#237804; }
-    .attend-link-row p { margin:0 0 8px; font-size:12px; color:#3f6600; line-height:1.7; }
-    .attend-link-row button { padding:7px 13px; font-size:12.5px; font-weight:700; cursor:pointer;
-      border:1px solid #52c41a; background:#fff; color:#237804; border-radius:8px; }
-    /* リンクから設定を戻したときの通知 */
-    .attend-toast { position:fixed; left:50%; transform:translateX(-50%); top:14px; z-index:9999;
-      max-width:min(92vw,520px); padding:11px 16px; border-radius:12px; font-size:13px; font-weight:700;
-      line-height:1.6; box-shadow:0 6px 20px rgba(0,0,0,.18); background:#fff; color:var(--ink);
-      border:1px solid var(--line); transition:opacity .4s; }
-    .attend-toast.ok { background:#f6ffed; border-color:#b7eb8f; color:#237804; }
-    .attend-toast.warn { background:#fff8e6; border-color:#ffd591; color:#7a4f01; }
-    .attend-toast.ng { background:#fff1f0; border-color:#ffa39e; color:#a8071a; }
-    .attend-toast.go { opacity:0; }
     .key-error { margin:8px 0 0; font-size:12.5px; color:#d4380d; font-weight:700; }
     .key-warn { margin:14px 0 16px; background:#fff8e6; border:1px solid #ffd591; border-radius:12px;
       padding:11px 13px; font-size:12px; color:#7a4f01; line-height:1.7; }
@@ -915,44 +891,6 @@
     </div>
   </div>
 
-  <!-- 出欠システムの設定。URLと書き込みキーはこの端末の中だけに保存する（当方は受け取れない）。
-       出欠データの保存先も主催者ご自身のGoogleスプレッドシートで、ドロッパーは中継しない。 -->
-  <div id="attend-modal" role="dialog" aria-modal="true" aria-labelledby="attendModalTitle">
-    <div class="ai-modal-card">
-      <h2 id="attendModalTitle" data-i18n="attendModalTitle">🙋 出欠システムの設定</h2>
-      <p class="ai-intro" data-i18n="attendModalIntro">案内文に「出欠を回答する」リンクを付けられます。出欠の回答は、主催者ご自身のGoogleスプレッドシートにだけ保存されます。</p>
-
-      <div class="ai-opt aiuse">
-        <h3 data-i18n="attendModalStepsTitle">まだ用意していない方へ</h3>
-        <p data-i18n="attendModalStepsDesc">スプレッドシートのコピーから公開まで、順番に案内します（15分ほど）。</p>
-        <a class="key-studio-btn" href="../attend/setup.html" target="_blank" rel="noopener" data-i18n="attendModalSetupBtn">出欠システムを用意する ↗</a>
-      </div>
-
-      <div class="key-field">
-        <label for="attendUrlInput" data-i18n="attendModalUrlLabel">🔗 ウェブアプリのURL（…/exec）</label>
-        <input type="url" id="attendUrlInput" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <div class="key-field">
-        <label for="attendKeyInput" data-i18n="attendModalKeyLabel">🔑 書き込みキー</label>
-        <input type="password" id="attendKeyInput" autocomplete="off" spellcheck="false">
-      </div>
-      <p class="key-check" id="attendCheck"></p>
-
-      <div class="ai-modal-btns">
-        <button type="button" id="attendCloseBtn" class="ai-btn-skip" data-i18n="attendModalClose">閉じる</button>
-        <button type="button" id="attendSaveBtn" data-i18n="attendModalSave">保存して確認</button>
-      </div>
-      <!-- 設定を覚えられない端末むけ。# のうしろに設定を載せたリンクを作り、ブックマークしてもらう。
-           # はサーバーに送られないが、ブックマークと履歴には残るので警告を必ず出すこと。 -->
-      <div class="attend-link-row" id="attendLinkRow" style="display:none">
-        <h3 data-i18n="attendModalLinkTitle">1タップで戻すリンク</h3>
-        <p data-i18n="attendModalLinkDesc">この端末が設定を覚えられないときは、このリンクをブックマークしておくと、次からは開くだけで設定が戻ります。</p>
-        <button type="button" id="attendLinkBtn" data-i18n="attendModalLinkBtn">リンクを作ってコピー</button>
-      </div>
-      <p class="attend-clear-row"><button type="button" id="attendClearBtn" data-i18n="attendModalClear">この端末から設定を消す</button></p>
-      <p class="ai-modal-foot" data-i18n="attendModalFoot">🔒 URLと書き込みキーはお使いの端末内（ブラウザ）だけに保存されます。書き込みキーは人に見せないでください。</p>
-    </div>
-  </div>
 
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>window.LANG = 'en';</script>

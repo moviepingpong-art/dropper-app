@@ -1018,7 +1018,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var BC = ja ? '】' : ']';
   var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
-  var attend = (f.attend_url || '').trim();
+  // 出欠のURLはこの時点では存在しない（出欠を作るのは主催者が表の中で決める）。
+  // 「出欠システムに保存」を押したカードだけ、メニューへの誘導を1行入れる。
+  var attend = !!f.attend_saved;
   if (channel === 'x') {
     L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
@@ -1026,7 +1028,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
     // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
     // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
-    if (attend) L.push('🙋 ' + (ja ? I18N.t('annAttendMenu') : I18N.t('annAttend') + ' ▶ ' + attend));
+    if (attend) L.push('🙋 ' + I18N.t('annAttendMenu'));
     else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
@@ -1050,11 +1052,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
-    if (attend) {
-      L.push('');
-      if (ja) { L.push('🙋 ' + I18N.t('annAttendMenu')); }
-      else { L.push('▼ ' + I18N.t('annAttend')); L.push(attend); }
-    }
+    if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
     if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     return L.join('\n');
@@ -1097,10 +1095,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   }
   // 出欠リンクはカレンダー追加リンクの上に置く。回答には締切があり、先に見てほしいのはこちら。
   // ja（LINE版）はリッチメニューに出欠ページを常設しているので、URLの代わりにメニュー誘導だけ出す。
-  if (attend) {
-    L.push('🙋 ' + (ja ? I18N.t('annAttendMenu') : I18N.t('annAttend') + ' ▶ ' + attend));
-    L.push('');
-  }
+  if (attend) { L.push('🙋 ' + I18N.t('annAttendMenu')); L.push(''); }
   if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
@@ -1212,7 +1207,7 @@ function wireAnnouncement_(li, cardApi) {
   var current = 'line';
   function regen() {
     var f = cardApi.read();
-    f.attend_url = li.__attendUrl || '';   // 出欠を作成ずみのときだけ入る
+    f.attend_saved = !!li.__attendSaved;   // 出欠システムに保存したカードだけ、案内文に出欠の行を出す
     ta.value = buildAnnouncement_(f, current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
@@ -1347,11 +1342,10 @@ function addCard(name) {
       '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
       '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
-      // 出欠システム連携。未設定なら「用意する」（設定を開く）、設定ずみなら「出欠を作る」。
+      // 出欠システム連携。押すと読み取り結果をクリップボードへ載せる（設定は持たない）。
       // 表示・非表示は wireAttendance_ が決める（v1は日本語版のみ）。
       '<div class="attend-wrap" style="display:none">' +
         '<button type="button" class="attend-btn"></button>' +
-        '<button type="button" class="attend-gear" title="' + I18N.t('attendSettings') + '" style="display:none">⚙</button>' +
         '<span class="attend-status"></span>' +
       '</div>' +
       '<div class="ann-wrap">' +
@@ -2203,15 +2197,25 @@ function attendReady_() {
   return ATTEND_AVAILABLE && typeof AttendanceHook !== 'undefined';
 }
 
-// カードの入力値から出欠イベントの中身を作る。要項リンクは保存ずみのときだけ付ける。
+// カードの入力値から、行事として保存する中身を作る。要項リンクは保存ずみのときだけ付ける。
+// detail は「あとから見返せるように」読み取り結果を残すためのもの。表の1セルに入るので、
+// 生のOCR文は入れず、整理ずみの項目だけにする。
 function attendPayload_(cardApi, fileId) {
   var f = cardApi.read();
   return {
     name: (f.taikai_mei || '').trim(),
     date: attendEventDate_(f.kaisai_dates),
     deadline: attendDeadline_(f.shimekiri),
+    place: (f.kaijo || '').trim(),
     items: attendEvents_(f.shiai_keishiki_by_day),
-    youkou: fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : ''
+    youkou: fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : '',
+    detail: {
+      kaijo_jusho: (f.kaijo_jusho || '').trim(),
+      kaikai_jikan: (f.kaikai_jikan || '').trim(),
+      schedule: f.shiai_keishiki_by_day || [],
+      key_info: (f.key_info || []).filter(function (it) { return it && (it.label || it.text); }),
+      note: (f.note || '').trim()
+    }
   };
 }
 
@@ -2219,24 +2223,15 @@ function wireAttendance_(li, cardApi) {
   var wrap = li.querySelector('.attend-wrap');
   if (!wrap || !attendReady_()) return;
   var btn = wrap.querySelector('.attend-btn');
-  var gear = wrap.querySelector('.attend-gear');
   var status = wrap.querySelector('.attend-status');
 
   wrap.style.display = 'block';
-  li.__attendRefresh = function () {
-    var made = !!li.__attendUrl;
-    var set = AttendanceHook.configured();
-    btn.textContent = made ? I18N.t('attendDone') : (set ? I18N.t('attendBtn') : I18N.t('attendSetupBtn'));
-    btn.disabled = made;
-    gear.style.display = set ? '' : 'none';
-  };
-  li.__attendRefresh();
+  btn.textContent = I18N.t('attendBtn');
 
-  gear.addEventListener('click', function () { openAttendModal_(); });
-
+  // 主催者の表には書き込まない。読み取った内容をクリップボードに載せて渡し、
+  // 表のサイドバー（出欠システム）の「貼り付けて取り込む」で取り込んでもらう。
+  // だから書き込みキーもデプロイIDも、この画面には要らない。
   btn.addEventListener('click', function () {
-    if (!AttendanceHook.configured()) { openAttendModal_(); return; }
-
     var item = null;
     for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
     var body = attendPayload_(cardApi, item && item.fileId);
@@ -2249,19 +2244,19 @@ function wireAttendance_(li, cardApi) {
       return;
     }
 
-    btn.disabled = true;
-    setAttendStatus_(status, '', I18N.t('attendCreating'));
-    AttendanceHook.createEvent(body).then(function (res) {
-      li.__attendUrl = res.url;
-      li.__attendRefresh();
-      setAttendStatus_(status, 'ok', res.existing ? I18N.t('attendExisting') : I18N.t('attendCreated'));
+    var token = AttendanceHook.saveToken(body);
+    if (!token) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
+
+    var done = function () {
+      li.__attendSaved = true;
+      setAttendStatus_(status, 'ok', I18N.t('attendCopied'));
       var panel = li.querySelector('.ann-panel');
-      if (panel && panel.__regen) panel.__regen();   // 開いている案内文にリンクを入れ直す
-      track('attend_create', {});
-    }).catch(function (e) {
-      setAttendStatus_(status, 'ng', (e && e.message) ? e.message : String(e));
-      btn.disabled = false;   // ★同じ画面で押しなおせる状態に戻す
-    });
+      if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
+      track('attend_copy', {});
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(token).then(done, function () { attendPromptCopy_(token); done(); });
+    } else { attendPromptCopy_(token); done(); }
   });
 }
 
@@ -2271,93 +2266,9 @@ function setAttendStatus_(el, cls, text) {
   el.textContent = text;
 }
 
-// 設定を変えたら、画面にある全カードのボタン表示を合わせる
-function refreshAttendUi_() {
-  var lis = list ? list.querySelectorAll('li') : [];
-  Array.prototype.forEach.call(lis, function (li) {
-    if (li.__attendRefresh) li.__attendRefresh();
-  });
-}
-
-// 出欠システムの設定（URL＋書き込みキー）。保存前に必ず疎通とキーを確かめる。
-function openAttendModal_() {
-  var modal = document.getElementById('attend-modal');
-  if (!modal || !attendReady_()) return;
-  var urlEl = document.getElementById('attendUrlInput');
-  var keyEl = document.getElementById('attendKeyInput');
-  var msgEl = document.getElementById('attendCheck');
-  var saveBtn = document.getElementById('attendSaveBtn');
-  var closeBtn = document.getElementById('attendCloseBtn');
-  var clearBtn = document.getElementById('attendClearBtn');
-
-  var linkRow = document.getElementById('attendLinkRow');
-  var linkBtn = document.getElementById('attendLinkBtn');
-
-  var cur = AttendanceHook.settings();
-  urlEl.value = cur.deployId ? AttendanceHook.apiUrlOf(cur.deployId) : '';
-  keyEl.value = cur.writeKey || '';
-  clearBtn.style.display = AttendanceHook.configured() ? '' : 'none';
-  // 設定を持ち歩くリンクは、設定できている時だけ出す
-  if (linkRow) linkRow.style.display = AttendanceHook.configured() ? '' : 'none';
-  if (linkBtn) linkBtn.textContent = I18N.t('attendModalLinkBtn');
-  setAttendMsg_(msgEl, '', '');
-  modal.classList.add('show');
-
-  var close = function () {
-    modal.classList.remove('show');
-    saveBtn.removeEventListener('click', onSave);
-    closeBtn.removeEventListener('click', close);
-    clearBtn.removeEventListener('click', onClear);
-    if (linkBtn) linkBtn.removeEventListener('click', onLink);
-  };
-  var onSave = function () {
-    saveBtn.disabled = true;
-    setAttendMsg_(msgEl, '', I18N.t('attendChecking'));
-    AttendanceHook.saveSettings({ deployId: urlEl.value, writeKey: keyEl.value }).then(function (res) {
-      saveBtn.disabled = false;
-      refreshAttendUi_();
-      // 端末に残せなかったときも、この画面を開いているあいだは使える（フック側が控えを持つ）。
-      // ただし開き直すと消えるので、それを伝えるために閉じずに出しておく。
-      if (!res.stored) { setAttendMsg_(msgEl, 'warn', I18N.t('attendNotStored')); return; }
-      setAttendMsg_(msgEl, 'ok', I18N.t('attendOk') + (res.org || ''));
-      setTimeout(close, 1200);
-    }).catch(function (e) {
-      saveBtn.disabled = false;
-      setAttendMsg_(msgEl, 'ng', (e && e.message) ? e.message : String(e));
-    });
-  };
-  var onClear = function () {
-    AttendanceHook.clear();
-    urlEl.value = '';
-    keyEl.value = '';
-    clearBtn.style.display = 'none';
-    if (linkRow) linkRow.style.display = 'none';
-    setAttendMsg_(msgEl, '', I18N.t('attendCleared'));
-    refreshAttendUi_();
-  };
-  // 設定を載せたリンクを作ってクリップボードへ。ブックマークしておけば1タップで戻せる。
-  // キーが入っているので、コピーしたことと「人に送らない」ことをその場で伝える。
-  var onLink = function () {
-    var link = AttendanceHook.settingsLink(location.origin + location.pathname);
-    if (!link) { setAttendMsg_(msgEl, 'ng', I18N.t('attendModalLinkNg')); return; }
-    var done = function () {
-      linkBtn.textContent = I18N.t('attendModalLinkCopied');
-      setAttendMsg_(msgEl, 'warn', I18N.t('attendModalLinkWarn'));
-      setTimeout(function () { linkBtn.textContent = I18N.t('attendModalLinkBtn'); }, 2400);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(done, function () { attendPromptCopy_(link); done(); });
-    } else { attendPromptCopy_(link); done(); }
-  };
-  saveBtn.addEventListener('click', onSave);
-  closeBtn.addEventListener('click', close);
-  clearBtn.addEventListener('click', onClear);
-  if (linkBtn) linkBtn.addEventListener('click', onLink);
-}
-
 // クリップボードが使えない端末のために、選択済みの状態で見せて手でコピーしてもらう
-function attendPromptCopy_(link) {
-  try { window.prompt(I18N.t('attendModalLinkBtn'), link); } catch (e) { /* noop */ }
+function attendPromptCopy_(text) {
+  try { window.prompt(I18N.t('attendCopied'), text); } catch (e) { /* noop */ }
 }
 
 function setAttendMsg_(el, cls, text) {
@@ -2635,27 +2546,4 @@ function focusHandoff_() {
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
 
-// 設定を載せたブックマークから開かれたら、その場で取り込む。
-// キーがアドレス欄に残らないよう、フック側が読み取り直後に # を消している。
-(function () {
-  if (!attendReady_()) return;
-  var p;
-  try { p = AttendanceHook.consumeSettingsHash(); } catch (e) { return; }
-  if (!p) return;
-  p.then(function (res) {
-    refreshAttendUi_();
-    attendToast_(I18N.t('attendFromLink') + (res.org || ''), res.stored ? 'ok' : 'warn');
-  }).catch(function (e) {
-    attendToast_((e && e.message) ? e.message : I18N.t('attendFromLinkNg'), 'ng');
-  });
-})();
 
-// リンクから戻したことを画面上部に短く出す（設定モーダルは開かない）
-function attendToast_(text, cls) {
-  var el = document.createElement('div');
-  el.className = 'attend-toast ' + (cls || '');
-  el.textContent = text;
-  document.body.appendChild(el);
-  setTimeout(function () { el.classList.add('go'); }, 3600);
-  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 4200);
-}
