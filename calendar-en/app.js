@@ -2249,12 +2249,20 @@ function wireAttendance_(li, cardApi) {
       return;
     }
 
-    /* ★ タブは押した瞬間に開くこと。
+    /* ★ ホーム画面から開いたときは、新しいタブを開かないこと。
+       ホーム画面のアプリは**ブラウザとは別の入れもの**で、記憶もログインも共有しない。
+       そこから window.open するとブラウザ側に飛び出し、出欠システムは
+       「どの団体か分からない」状態で開く。同じ画面で行けば、そのアプリの中で完結する。
+
+       ★ タブを開く場合は、押した瞬間に開くこと。
        要項の保存を待ってから window.open を呼ぶと、ポップアップブロックに止められる
        （クリップボードの「ユーザー操作中でないと書けない」とまったく同じ罠）。
        先に空のタブを開いておき、文字列ができてから行き先を入れる。 */
+    var solo = attendStandalone_();
     var win = null;
-    try { win = window.open('', '_blank'); } catch (e) { win = null; }
+    if (!solo) {
+      try { win = window.open('', '_blank'); } catch (e) { win = null; }
+    }
 
     if (!(item && item.fileId) && item && item.file && accessToken) {
       setAttendStatus_(status, '', I18N.t('attendSaving'));
@@ -2272,6 +2280,16 @@ function wireAttendance_(li, cardApi) {
       if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
       track('attend_copy', {});
     };
+
+    if (solo) {
+      prepare.then(function (t) {
+        done('attendMoving');    // 戻ってきたときのために、案内文はここで作っておく
+        location.href = AttendanceHook.adminUrl(t);
+      }, function () {
+        setAttendStatus_(status, 'ng', I18N.t('attendFailed'));
+      });
+      return;
+    }
 
     if (win) {
       prepare.then(function (t) {
@@ -2323,6 +2341,21 @@ async function attendEnsureYoukou_(item, f) {
   } catch (e) {
     // 保存に失敗しても止めない。カレンダー登録のときに改めて試される
   }
+}
+
+/**
+ * ホーム画面（またはPWA）から起動されているか。
+ * ここが true のときは新しいタブを開かない。ブラウザとは別の入れものなので、
+ * 飛び出した先には端末の記憶もGoogleのログインも無い。
+ */
+function attendStandalone_() {
+  try {
+    if (window.navigator && window.navigator.standalone === true) return true;   // iOS
+    if (!window.matchMedia) return false;
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
+        || window.matchMedia('(display-mode: minimal-ui)').matches;
+  } catch (e) { return false; }
 }
 
 function setAttendStatus_(el, cls, text) {
