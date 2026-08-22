@@ -1052,9 +1052,11 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
-    if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
     if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
+    // 出欠は**いちばん最後**に置く。読み終えたところに行動を置きたいので、
+    // リンク類より下。締切があるのは出欠のほうだが、順番より位置を優先する。
+    if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
     return L.join('\n');
   }
   // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
@@ -1093,11 +1095,12 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     });
     L.push('');
   }
-  // 出欠リンクはカレンダー追加リンクの上に置く。回答には締切があり、先に見てほしいのはこちら。
-  // ja（LINE版）はリッチメニューに出欠ページを常設しているので、URLの代わりにメニュー誘導だけ出す。
-  if (attend) { L.push('🙋 ' + I18N.t('annAttendMenu')); L.push(''); }
   if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
+  // 出欠は**いちばん最後**に置く。チャットでは末尾がいちばん目に入る位置で、
+  // ここに行動を1つだけ置きたい。ja（LINE版）はリッチメニューに出欠ページを
+  // 常設しているので、URLではなくメニューへの誘導だけを出す。
+  if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
 // ===== 案内文の画像書き出し =====
