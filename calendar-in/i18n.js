@@ -135,7 +135,9 @@
       // --- 出欠システム連携（出欠ドロッパー）---
       // v1は日本語版だけに出す（出欠ページ /attend/ が日本語のため）。app.js の ATTEND_AVAILABLE で制御。
       attendBtn: '🙋 出欠システムに保存',
-      attendCopied: '✓ コピーしました。表のサイドバー「行事」に貼り付けてください。',
+      attendOpened: '✓ 出欠システムを開きました。あちらの画面で受付を始めてください。',
+      attendCopied: '✓ コピーしました。出欠システムの管理画面に貼り付けてください。',
+      attendFailed: '出欠システムを開けませんでした。もう一度お試しください。',
       attendSaving: '要項を保存しています…',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
@@ -395,7 +397,9 @@
       msgDateEmptyB: ' event(s) without a date. Please enter a date or uncheck them.',
       // --- Attendance system (kept in sync; hidden in en/in until /attend/ is translated) ---
       attendBtn: '🙋 Save to attendance',
-      attendCopied: '✓ Copied. Paste it into the sheet sidebar.',
+      attendOpened: '✓ Opened the attendance system in a new tab.',
+      attendCopied: '✓ Copied. Paste it into the attendance admin page.',
+      attendFailed: 'Could not open the attendance system. Please try again.',
       attendSaving: 'Saving the document…',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
@@ -643,7 +647,9 @@
       msgDateEmptyB: ' event(s) mein date nahi hai. Date daalein ya unhe uncheck karein.',
       // --- Attendance system (sync ke liye rakha hai; en/in mein abhi chhupa hua hai) ---
       attendBtn: '🙋 Attendance mein save karein',
-      attendCopied: '✓ Copy ho gaya. Sheet ke sidebar mein paste karein.',
+      attendOpened: '✓ Attendance system naye tab mein khul gaya.',
+      attendCopied: '✓ Copy ho gaya. Attendance admin page mein paste karein.',
+      attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
       attendSaving: 'Document save ho raha hai…',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',

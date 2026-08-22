@@ -2233,9 +2233,8 @@ function wireAttendance_(li, cardApi) {
   wrap.style.display = 'block';
   btn.textContent = I18N.t('attendBtn');
 
-  // 主催者の表には書き込まない。読み取った内容をクリップボードに載せて渡し、
-  // 表のサイドバー（出欠システム）の「貼り付けて取り込む」で取り込んでもらう。
-  // だから書き込みキーもデプロイIDも、この画面には要らない。
+  // 出欠システムには書き込まない。読み取った内容を積んだ管理画面を開くだけで、
+  // 取り込むかどうかは向こうの画面が決める。だから書き込みキーもデプロイIDも、この画面には要らない。
   btn.addEventListener('click', function () {
     var item = null;
     for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
@@ -2250,6 +2249,13 @@ function wireAttendance_(li, cardApi) {
       return;
     }
 
+    /* ★ タブは押した瞬間に開くこと。
+       要項の保存を待ってから window.open を呼ぶと、ポップアップブロックに止められる
+       （クリップボードの「ユーザー操作中でないと書けない」とまったく同じ罠）。
+       先に空のタブを開いておき、文字列ができてから行き先を入れる。 */
+    var win = null;
+    try { win = window.open('', '_blank'); } catch (e) { win = null; }
+
     if (!(item && item.fileId) && item && item.file && accessToken) {
       setAttendStatus_(status, '', I18N.t('attendSaving'));
     }
@@ -2259,25 +2265,39 @@ function wireAttendance_(li, cardApi) {
       return AttendanceHook.saveToken(attendPayload_(cardApi, item && item.fileId));
     });
 
-    var done = function () {
+    var done = function (msg) {
       li.__attendSaved = true;
-      setAttendStatus_(status, 'ok', I18N.t('attendCopied'));
+      setAttendStatus_(status, 'ok', I18N.t(msg));
       var panel = li.querySelector('.ann-panel');
       if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
       track('attend_copy', {});
     };
-    var byHand = function (token) { attendPromptCopy_(token); done(); };
 
-    // ★ 押した瞬間の「ユーザー操作中」でないとクリップボードに書けない端末がある（iOS Safari）。
-    //   要項の保存を待つあいだに操作の権利が切れるので、**Promiseを渡せる ClipboardItem** を使う。
-    //   これなら待っているあいだも書き込みの権利が続く。使えない端末は writeText に落とす。
+    if (win) {
+      prepare.then(function (t) {
+        win.location.replace(AttendanceHook.adminUrl(t));
+        done('attendOpened');
+      }, function () {
+        try { win.close(); } catch (e) { /* noop */ }
+        setAttendStatus_(status, 'ng', I18N.t('attendFailed'));
+      });
+      return;
+    }
+
+    /* ここから下は、タブを開かせてもらえなかったときの逃げ道。
+       貼り付けてもらうので、クリップボードに載せる。
+       ★ 押した瞬間の「ユーザー操作中」でないと書けない端末がある（iOS Safari）。
+       要項の保存を待つあいだに権利が切れるので、**Promiseを渡せる ClipboardItem** を使う。 */
+    var copied = function () { done('attendCopied'); };
+    var byHand = function (token) { attendPromptCopy_(token); copied(); };
+
     if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
       var blob = prepare.then(function (t) { return new Blob([t], { type: 'text/plain' }); });
       navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })])
-        .then(done, function () { prepare.then(byHand); });
+        .then(copied, function () { prepare.then(byHand); });
     } else if (navigator.clipboard && navigator.clipboard.writeText) {
       prepare.then(function (t) {
-        navigator.clipboard.writeText(t).then(done, function () { byHand(t); });
+        navigator.clipboard.writeText(t).then(copied, function () { byHand(t); });
       });
     } else {
       prepare.then(byHand);
