@@ -2239,18 +2239,25 @@ function wireAttendance_(li, cardApi) {
   btn.addEventListener('click', function () {
     var item = null;
     for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
-    var body = attendPayload_(cardApi, item && item.fileId);
 
-    if (!body.name) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
+    // 先に形だけ見る。名前と種目が無ければ、要項を保存する前に止める
+    var probe = attendPayload_(cardApi, item && item.fileId);
+    if (!probe.name) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
     // 出欠ページは1項目=1種目で並ぶ。種目が取れないと選択肢を作れないので、先に手入力してもらう。
-    if (!body.items) {
+    if (!probe.items) {
       setAttendStatus_(status, 'ng', I18N.t('attendNoEvents'));
       cardApi.focusFormat();
       return;
     }
 
-    var token = AttendanceHook.saveToken(body);
-    if (!token) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
+    if (!(item && item.fileId) && item && item.file && accessToken) {
+      setAttendStatus_(status, '', I18N.t('attendSaving'));
+    }
+
+    // 要項をドライブに保存してから、そのリンク入りの文字列を作る
+    var prepare = attendEnsureYoukou_(item, cardApi.read()).then(function () {
+      return AttendanceHook.saveToken(attendPayload_(cardApi, item && item.fileId));
+    });
 
     var done = function () {
       li.__attendSaved = true;
@@ -2259,10 +2266,43 @@ function wireAttendance_(li, cardApi) {
       if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
       track('attend_copy', {});
     };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(token).then(done, function () { attendPromptCopy_(token); done(); });
-    } else { attendPromptCopy_(token); done(); }
+    var byHand = function (token) { attendPromptCopy_(token); done(); };
+
+    // ★ 押した瞬間の「ユーザー操作中」でないとクリップボードに書けない端末がある（iOS Safari）。
+    //   要項の保存を待つあいだに操作の権利が切れるので、**Promiseを渡せる ClipboardItem** を使う。
+    //   これなら待っているあいだも書き込みの権利が続く。使えない端末は writeText に落とす。
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      var blob = prepare.then(function (t) { return new Blob([t], { type: 'text/plain' }); });
+      navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })])
+        .then(done, function () { prepare.then(byHand); });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      prepare.then(function (t) {
+        navigator.clipboard.writeText(t).then(done, function () { byHand(t); });
+      });
+    } else {
+      prepare.then(byHand);
+    }
   });
+}
+
+/**
+ * 要項ファイルをドライブに保存して、item.fileId を埋める。
+ *
+ * もとは「Googleカレンダーに登録」の中でだけ保存していたので、カレンダーを使わない人は
+ * 要項リンクが空のままだった（出欠の回答画面に「要項を見る」が出ない）。
+ * カレンダーとは切り離して、出欠に保存するときにも保存する。
+ *
+ * 保存できなくても出欠の取り込みは続ける（要項ボタンが出ないだけ）。
+ * ログインしていないときは何もしない。
+ */
+async function attendEnsureYoukou_(item, f) {
+  if (!item || item.fileId || !item.file || !accessToken) return;
+  try {
+    var folderId = await ensureEventFolder_((f.kaisai_dates || [])[0], f.taikai_mei);
+    item.fileId = await uploadOriginal_(item.file, folderId);
+  } catch (e) {
+    // 保存に失敗しても止めない。カレンダー登録のときに改めて試される
+  }
 }
 
 function setAttendStatus_(el, cls, text) {

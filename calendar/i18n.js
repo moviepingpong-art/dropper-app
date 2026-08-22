@@ -136,6 +136,7 @@
       // v1は日本語版だけに出す（出欠ページ /attend/ が日本語のため）。app.js の ATTEND_AVAILABLE で制御。
       attendBtn: '🙋 出欠システムに保存',
       attendCopied: '✓ コピーしました。表のサイドバー「行事」に貼り付けてください。',
+      attendSaving: '要項を保存しています…',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
       annAttendMenu: '下のメニューの「出欠入力」から、出欠を回答してください。',
@@ -395,6 +396,7 @@
       // --- Attendance system (kept in sync; hidden in en/in until /attend/ is translated) ---
       attendBtn: '🙋 Save to attendance',
       attendCopied: '✓ Copied. Paste it into the sheet sidebar.',
+      attendSaving: 'Saving the document…',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
       warnNotice: 'A blinking box marks a spot worth double-checking. Items without a blink can still be wrong. Fix anything by hand, or switch the processing mode to "AI mode" and run it again.',
@@ -642,6 +644,7 @@
       // --- Attendance system (sync ke liye rakha hai; en/in mein abhi chhupa hua hai) ---
       attendBtn: '🙋 Attendance mein save karein',
       attendCopied: '✓ Copy ho gaya. Sheet ke sidebar mein paste karein.',
+      attendSaving: 'Document save ho raha hai…',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
       warnNotice: 'Blink karta box us jagah ko mark karta hai jise double-check karna chahiye. Bina blink wale items bhi galat ho sakte hain. Kisi bhi field ko haath se theek karein, ya processing mode ko "AI mode" par switch karke dobara run karein.',
