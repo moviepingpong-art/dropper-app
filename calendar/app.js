@@ -1052,8 +1052,8 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
-    if (gcal) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
-    if (maps) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
+    if (gcal && !attend) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
+    if (maps && !attend) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     // 出欠は**いちばん最後**に置く。読み終えたところに行動を置きたいので、
     // リンク類より下。締切があるのは出欠のほうだが、順番より位置を優先する。
     if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
@@ -1083,7 +1083,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     L.push('📍 ' + I18N.t('annVenue'));
     L.push(f.kaijo);
     if (f.kaijo_jusho) L.push(ja ? ('（' + f.kaijo_jusho + '）') : ('(' + f.kaijo_jusho + ')'));
-    if (maps) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
+    // 出欠を保存した回は、地図もカレンダーも**出欠の回答画面にボタンとして出る**。
+    // ここにURLを並べると長いリンク2本で本文が埋もれ、肝心の出欠が目立たなくなる
+    if (maps && !attend) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
     L.push('');
   }
   if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
@@ -1095,7 +1097,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     });
     L.push('');
   }
-  if (gcal) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
+  if (gcal && !attend) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   // 出欠は**いちばん最後**に置く。チャットでは末尾がいちばん目に入る位置で、
   // ここに行動を1つだけ置きたい。ja（LINE版）はリッチメニューに出欠ページを
