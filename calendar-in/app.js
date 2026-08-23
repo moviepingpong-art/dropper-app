@@ -4,12 +4,13 @@
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
 
-// 出欠システム連携（出欠ドロッパー）：主催者自身のGASウェブアプリにイベントを1件作り、
-// 案内文に「🙋 出欠を回答する」リンクを同梱する。URLと書き込みキーは端末の localStorage にだけ持つ。
-// 通信相手は主催者のGASだけで、Googleの権限は使わない＝OAuthスコープは増えない（attendance-hook.js）。
+// 出欠システム連携（出欠ドロッパー）：読み取った要項を出欠システムの管理画面に渡すだけ。
+// ドロッパーは何も書き込まないので、こちら側に設定は一切ない（attendance-hook.js）。
 // 旧クラブ運用モード（?club=hakusan の大会マスタ・シート書き出し）は、この仕組みに置き換えて撤去した。
-// v1は日本語版のみ出す（出欠ページ /attend/ が日本語のため）。en/in は3言語ぶんまとめて同期する。
-var ATTEND_AVAILABLE = (window.LANG !== 'en' && window.LANG !== 'in');
+// 出欠システムが3言語になったので、**どの言語版でも出す**。
+// ただし案内文の出欠の行は言語で変わる：ja はリッチメニューへの誘導、en/in はURL
+// （LINEが使えず、リッチメニューが無いので、URLを書かないと参加者が辿り着けない）。
+var ATTEND_AVAILABLE = true;
 
 // OAuthスコープ：drive.file（OCR用・アプリが作ったファイルのみ）＋ drive.appdata（フォルダID対応表の端末間共有）
 //              ＋ calendar.events（予定作成）
@@ -1036,9 +1037,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var BC = ja ? '】' : ']';
   var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
-  // 出欠のURLは案内文に載せない（リッチメニューに常設してあるため）。
-  // **出欠が本当に作られたカードだけ**、メニューへの誘導を1行入れる。
+  // **出欠が本当に作られたカードだけ**、出欠の行を1つ入れる。
   var attend = !!f.attend_saved;
+  var attendLine = annAttendLine_(f, ja);
   if (channel === 'x') {
     L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
@@ -1046,7 +1047,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
     // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
     // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
-    if (attend) L.push('🙋 ' + I18N.t('annAttendMenu'));
+    if (attend) L.push('🙋 ' + attendLine);
     else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
@@ -1074,7 +1075,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (maps && !attend) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     // 出欠は**いちばん最後**に置く。読み終えたところに行動を置きたいので、
     // リンク類より下。締切があるのは出欠のほうだが、順番より位置を優先する。
-    if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
+    if (attend) { L.push(''); L.push('🙋 ' + attendLine); }
     return L.join('\n');
   }
   // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
@@ -1120,9 +1121,21 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   // 出欠は**いちばん最後**に置く。チャットでは末尾がいちばん目に入る位置で、
   // ここに行動を1つだけ置きたい。ja（LINE版）はリッチメニューに出欠ページを
   // 常設しているので、URLではなくメニューへの誘導だけを出す。
-  if (attend) { L.push(''); L.push('🙋 ' + I18N.t('annAttendMenu')); }
+  if (attend) { L.push(''); L.push('🙋 ' + attendLine); }
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
+/* 案内文の出欠の行。**ことばで書きぶりが変わる。**
+   ja は LINE のリッチメニューに出欠ページを常設しているので、メニューへの誘導だけ。
+   en/in は LINE を使わず、リッチメニューという置き場が無いので、**URLを書く**。
+   書かないと参加者はどこからも出欠に辿り着けない。
+   このURLは団体につき1本で、行事が増えても変わらない（`?s=団体ID` のみ）。
+   出欠システムが渡してこなかったとき（古い管理画面など）は、URLの無い言い方に落とす。 */
+function annAttendLine_(f, ja) {
+  var url = String((f && f.attend_url) || '').trim();
+  if (ja) return I18N.t('annAttendMenu');
+  return url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
+}
+
 // ===== 案内文の画像書き出し =====
 // LINE・WhatsApp・Instagram はテキストより画像の方が回る。画像なら貼り付け先で折り返しが崩れず、
 // クレジットも焼き込まれるので消せない。ライブラリは足さない（Canvasだけで描く）。
@@ -1226,7 +1239,7 @@ function wireAnnounceGate_(li) {
   var make = li.querySelector('.ann-make');
   var skip = li.querySelector('.ann-skip');
   if (!make || !skip) return;
-  if (!attendReady_()) return;              // en/in は今までどおり最初から出す
+  if (!attendReady_()) return;              // 出欠が使えない状況なら、案内文は最初から出す
 
   make.style.display = 'none';
   skip.style.display = '';
@@ -1288,6 +1301,7 @@ function wireAnnouncement_(li, cardApi) {
        送っただけでは、向こうの画面で受付を始めずに閉じた場合に案内文が嘘になる
        （「メニューの出欠入力から」と書いてあるのに、そこには何も無い）。 */
     f.attend_saved = !!li.__attendReady;
+    f.attend_url = li.__attendUrl || '';
     ta.value = buildAnnouncement_(f, current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
@@ -2304,10 +2318,12 @@ var ATTEND_DONE_STORE = 'dropperAttendDone';
 var ATTEND_DONE_MS = 10 * 60 * 1000;   // 10分。古い印を拾って別の行事に付けないため
 var attendPending_ = null;             // 送り出したカード（同じタブに残っているとき）
 
-function attendMarkReady_(li) {
+function attendMarkReady_(li, url) {
   if (!li || li.__attendReady) return;
   if (attendPending_ === li) attendPending_ = null;   // 使い終わった覚えは捨てる
   li.__attendReady = true;
+  // 出欠を入力するURL。ja は使わない（リッチメニューがある）が、受け取りは1本にしておく
+  li.__attendUrl = String(url || '');
   var status = li.querySelector('.attend-status');
   setAttendStatus_(status, 'ok', I18N.t('attendDone'));
   annShow_(li, true);                              // ここで案内文のボタンが現れる
@@ -2344,7 +2360,7 @@ function attendTakeDone_() {
   var o = null;
   try { o = JSON.parse(raw); } catch (e) { o = null; }
   if (!o || !o.name || Date.now() - (o.at || 0) > ATTEND_DONE_MS) return;
-  attendMarkReady_(attendPick_(o.name, o.date));
+  attendMarkReady_(attendPick_(o.name, o.date), o.url);
 }
 
 (function wireAttendDone_() {
@@ -2352,7 +2368,7 @@ function attendTakeDone_() {
     if (e.origin !== location.origin) return;          // 同じ出どころからだけ受ける
     var d = e.data;
     if (!d || d.type !== 'attend-created') return;
-    attendMarkReady_(attendPick_(d.name, d.date));
+    attendMarkReady_(attendPick_(d.name, d.date), d.url);
   });
   // 同じ画面で行って戻ってきた場合。戻り方が読み直しでも、履歴からの復帰でも拾えるようにする
   window.addEventListener('pageshow', attendTakeDone_);
