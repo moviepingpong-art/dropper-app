@@ -136,6 +136,7 @@
       // v1は日本語版だけに出す（出欠ページ /attend/ が日本語のため）。app.js の ATTEND_AVAILABLE で制御。
       attendBtn: '🙋 出欠システムに保存',
       attendOpened: '✓ 出欠システムを開きました。あちらの画面で受付を始めてください。',
+      attendMoving: '出欠システムに移ります…',
       attendCopied: '✓ コピーしました。出欠システムの管理画面に貼り付けてください。',
       attendFailed: '出欠システムを開けませんでした。もう一度お試しください。',
       attendSaving: '要項を保存しています…',
@@ -398,6 +399,7 @@
       // --- Attendance system (kept in sync; hidden in en/in until /attend/ is translated) ---
       attendBtn: '🙋 Save to attendance',
       attendOpened: '✓ Opened the attendance system in a new tab.',
+      attendMoving: 'Going to the attendance system…',
       attendCopied: '✓ Copied. Paste it into the attendance admin page.',
       attendFailed: 'Could not open the attendance system. Please try again.',
       attendSaving: 'Saving the document…',
@@ -648,6 +650,7 @@
       // --- Attendance system (sync ke liye rakha hai; en/in mein abhi chhupa hua hai) ---
       attendBtn: '🙋 Attendance mein save karein',
       attendOpened: '✓ Attendance system naye tab mein khul gaya.',
+      attendMoving: 'Attendance system par ja rahe hain…',
       attendCopied: '✓ Copy ho gaya. Attendance admin page mein paste karein.',
       attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
       attendSaving: 'Document save ho raha hai…',
