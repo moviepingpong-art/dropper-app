@@ -146,7 +146,11 @@
       attendSaving: '要項を保存しています…',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
+      // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
+      // en/in はリッチメニューが無いのでURLを書く（annAttendUrl）
       annAttendMenu: '下のメニューの「出欠入力」から、出欠を回答してください。',
+      annAttendUrl: '出欠を回答する',
+      annAttendNoUrl: '出欠の回答をお願いします。',
       // --- 要チェック（採点係）＆AI ---
       warnNotice: '点滅している枠は「特に注意したい箇所」の目印です。点滅していない項目にも誤りがある場合があります。気になる項目はそのまま手で直すか、処理モードを「AIモード」に変えて読み取り直してください。',
       warnMultiDayEvents: '複数日開催です。日ごとの種目や、練習日が混じっていないかご確認ください。',
@@ -413,6 +417,9 @@
       attendSaving: 'Saving the document…',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
+      annAttendMenu: 'Please reply from “Attendance” in the menu below.',
+      annAttendUrl: 'Reply to the attendance',
+      annAttendNoUrl: 'Please reply to the attendance.',
       warnNotice: 'A blinking box marks a spot worth double-checking. Items without a blink can still be wrong. Fix anything by hand, or switch the processing mode to "AI mode" and run it again.',
       warnMultiDayEvents: 'Multi-day event. Please check the events per day, and whether a practice day slipped in.',
       warnManyDates: 'Many dates found. Please check that deadline or practice days are not mixed in.',
@@ -668,6 +675,9 @@
       attendSaving: 'Document save ho raha hai…',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
+      annAttendMenu: 'Neeche menu mein “Attendance” se jawab dein.',
+      annAttendUrl: 'Attendance ka jawab dein',
+      annAttendNoUrl: 'Attendance ka jawab dein.',
       warnNotice: 'Blink karta box us jagah ko mark karta hai jise double-check karna chahiye. Bina blink wale items bhi galat ho sakte hain. Kisi bhi field ko haath se theek karein, ya processing mode ko "AI mode" par switch karke dobara run karein.',
       warnMultiDayEvents: 'Multi-day event hai. Har din ke events, aur kahin practice day to mix nahi hua, check karein.',
       warnManyDates: 'Kaafi dates mili hain. Deadline ya practice day mix to nahi hue, check karein.',
