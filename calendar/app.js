@@ -1214,6 +1214,41 @@ function annRenderImage_(text) {
   });
 }
 
+/* 案内文は、出欠ができるまで出さない。
+   先に作って配ると「下のメニューの『出欠入力』から」の行き先が無い案内文になる。
+
+   **出欠が使えない言語（en/in）では隠さない。** あちらには出欠そのものが無く、
+   隠すと案内文が永久に出てこなくなる。
+
+   出欠をとらない行事のために、逃げ道を1つ置く。押し間違いではなく、
+   自分で選んで出すぶんには止める理由が無い。 */
+function wireAnnounceGate_(li) {
+  var make = li.querySelector('.ann-make');
+  var skip = li.querySelector('.ann-skip');
+  if (!make || !skip) return;
+  if (!attendReady_()) return;              // en/in は今までどおり最初から出す
+
+  make.style.display = 'none';
+  skip.style.display = '';
+  skip.querySelector('.ann-skip-btn').addEventListener('click', function () {
+    annShow_(li, false);
+  });
+}
+
+/** 案内文のボタンを出す。出欠ができて出たときだけ、目が行くように光らせる。 */
+function annShow_(li, blink) {
+  var make = li.querySelector('.ann-make');
+  var skip = li.querySelector('.ann-skip');
+  if (!make) return;
+  if (skip) skip.style.display = 'none';
+  if (make.style.display !== 'none') return;
+  make.style.display = '';
+  if (blink) {
+    make.classList.add('new');
+    setTimeout(function () { make.classList.remove('new'); }, 6000);
+  }
+}
+
 /* カレンダー登録の配線（カード生成後に呼ぶ）。
    このボタンは**このカード1枚だけ**を登録する。まとめて登録は無い。 */
 function wireRegister_(li, cardApi) {
@@ -1396,10 +1431,15 @@ function addCard(name) {
         '</div>' +
         '<span class="cal-status"></span>' +
         '<span class="attend-status"></span>' +
-        // ③案内文は仕上げ。①②と行を分けて、あとから押すものだと形で見せる
+        /* ③案内文は仕上げ。**出欠ができるまで出さない**（wireAnnounceGate_）。
+           先に配ると「メニューの出欠入力から」の行き先が無い案内文になるため。
+           出欠をとらない行事のために、下に逃げ道を1つ置く。 */
         '<div class="ann-make">' +
           '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
         '</div>' +
+        '<p class="ann-skip" style="display:none">' +
+          '<button type="button" class="ann-skip-btn">' + I18N.t('annSkipAttend') + '</button>' +
+        '</p>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
             '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
@@ -1667,6 +1707,7 @@ function addCard(name) {
   li.__cardApi = cardApi;           // 外からこのカードを引けるようにする
   wireRegister_(li, cardApi);       // カレンダー登録（このカード1枚ぶん）
   wireAttendance_(li, cardApi);     // 出欠システムへ（このカード1枚ぶん）
+  wireAnnounceGate_(li);            // 案内文は出欠ができてから出す
   wireAnnouncement_(li, cardApi);   // 案内文パネルの配線
   return cardApi;
 }
@@ -2265,9 +2306,11 @@ var attendPending_ = null;             // 送り出したカード（同じタ�
 
 function attendMarkReady_(li) {
   if (!li || li.__attendReady) return;
+  if (attendPending_ === li) attendPending_ = null;   // 使い終わった覚えは捨てる
   li.__attendReady = true;
   var status = li.querySelector('.attend-status');
   setAttendStatus_(status, 'ok', I18N.t('attendDone'));
+  annShow_(li, true);                              // ここで案内文のボタンが現れる
   var panel = li.querySelector('.ann-panel');
   if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
 }
@@ -2285,6 +2328,14 @@ function attendFindCard_(name, date) {
   return null;
 }
 
+/* どのカードの話かを決める。**名前と開催日での突き合わせを先に見る。**
+   送り出したカードの覚え（attendPending_）を先に見ると、2枚目・3枚目のときに
+   古い覚えのほうを掴んでしまう（実際にそうなった）。覚えは、突き合わせが
+   できなかったときの受け皿として使う。 */
+function attendPick_(name, date) {
+  return attendFindCard_(name, date) || attendPending_;
+}
+
 function attendTakeDone_() {
   var raw = '';
   try { raw = localStorage.getItem(ATTEND_DONE_STORE) || ''; } catch (e) { raw = ''; }
@@ -2293,7 +2344,7 @@ function attendTakeDone_() {
   var o = null;
   try { o = JSON.parse(raw); } catch (e) { o = null; }
   if (!o || !o.name || Date.now() - (o.at || 0) > ATTEND_DONE_MS) return;
-  attendMarkReady_(attendPending_ || attendFindCard_(o.name, o.date));
+  attendMarkReady_(attendPick_(o.name, o.date));
 }
 
 (function wireAttendDone_() {
@@ -2301,7 +2352,7 @@ function attendTakeDone_() {
     if (e.origin !== location.origin) return;          // 同じ出どころからだけ受ける
     var d = e.data;
     if (!d || d.type !== 'attend-created') return;
-    attendMarkReady_(attendPending_ || attendFindCard_(d.name, d.date));
+    attendMarkReady_(attendPick_(d.name, d.date));
   });
   // 同じ画面で行って戻ってきた場合。戻り方が読み直しでも、履歴からの復帰でも拾えるようにする
   window.addEventListener('pageshow', attendTakeDone_);
