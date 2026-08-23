@@ -114,6 +114,8 @@
       note: '※読み取りはGoogleのOCRで変換して必要項目を抽出します。{doc}はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。',
       // --- 登録ボタン ---
       registerBtn: 'Googleカレンダーに登録',
+      regBusy: '登録しています…',
+      regDone: '✓ 登録ずみ',
       // --- メッセージ（ログイン・読み込み） ---
       msgSigningIn: 'Googleにログインしています…',
       msgLoginFailed: 'ログインに失敗しました',
@@ -134,9 +136,10 @@
       msgDateEmptyB: ' 件あります。日付を入力するか、チェックを外してください。',
       // --- 出欠システム連携（出欠ドロッパー）---
       // v1は日本語版だけに出す（出欠ページ /attend/ が日本語のため）。app.js の ATTEND_AVAILABLE で制御。
-      attendBtn: '🙋 出欠システムに保存',
+      attendBtn: '🙋 出欠システムへ',
       attendOpened: '✓ 出欠システムを開きました。あちらの画面で受付を始めてください。',
       attendMoving: '出欠システムに移ります…',
+      attendPickOne: '出欠を受け付ける行事を、1枚だけ選んでください。',
       attendCopied: '✓ コピーしました。出欠システムの管理画面に貼り付けてください。',
       attendFailed: '出欠システムを開けませんでした。もう一度お試しください。',
       attendSaving: '要項を保存しています…',
@@ -380,6 +383,8 @@
       pickBtn: 'Choose a file',
       note: 'The file is converted with Google OCR to pull out the key details. Your {doc} is saved to the DropperFiles folder in your Google Drive and linked to the calendar event.',
       registerBtn: 'Add to Google Calendar',
+      regBusy: 'Adding…',
+      regDone: '✓ Added',
       msgSigningIn: 'Signing in with Google…',
       msgLoginFailed: 'Sign-in failed.',
       msgLoginCancelled: 'Sign-in was cancelled.',
@@ -397,9 +402,10 @@
       msgDateEmptyA: 'There are ',
       msgDateEmptyB: ' event(s) without a date. Please enter a date or uncheck them.',
       // --- Attendance system (kept in sync; hidden in en/in until /attend/ is translated) ---
-      attendBtn: '🙋 Save to attendance',
+      attendBtn: '🙋 To the attendance system',
       attendOpened: '✓ Opened the attendance system in a new tab.',
       attendMoving: 'Going to the attendance system…',
+      attendPickOne: 'Please tick exactly one card.',
       attendCopied: '✓ Copied. Paste it into the attendance admin page.',
       attendFailed: 'Could not open the attendance system. Please try again.',
       attendSaving: 'Saving the document…',
@@ -631,6 +637,8 @@
       pickBtn: 'File choose karein',
       note: 'File ko Google OCR se convert karke zaroori details nikaali jaati hain. Aapka {doc} aapke Google Drive ke DropperFiles folder mein save hota hai aur calendar event se link ho jaata hai.',
       registerBtn: 'Google Calendar mein add karein',
+      regBusy: 'Add ho raha hai…',
+      regDone: '✓ Add ho gaya',
       msgSigningIn: 'Google se sign in ho raha hai…',
       msgLoginFailed: 'Sign-in fail ho gaya.',
       msgLoginCancelled: 'Sign-in cancel ho gaya.',
@@ -648,9 +656,10 @@
       msgDateEmptyA: '',
       msgDateEmptyB: ' event(s) mein date nahi hai. Date daalein ya unhe uncheck karein.',
       // --- Attendance system (sync ke liye rakha hai; en/in mein abhi chhupa hua hai) ---
-      attendBtn: '🙋 Attendance mein save karein',
+      attendBtn: '🙋 Attendance system par jayein',
       attendOpened: '✓ Attendance system naye tab mein khul gaya.',
       attendMoving: 'Attendance system par ja rahe hain…',
+      attendPickOne: 'Sirf ek card select karein.',
       attendCopied: '✓ Copy ho gaya. Attendance admin page mein paste karein.',
       attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
       attendSaving: 'Document save ho raha hai…',

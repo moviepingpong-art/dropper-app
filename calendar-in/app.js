@@ -44,25 +44,62 @@ if (list) {
 }
 var bar = document.getElementById('bar');
 var msg = document.getElementById('msg');
-var regBtn = document.getElementById('reg');
+var regBtn = document.getElementById('attendBar');   // 下のバーは「出欠システムへ」になった
 
-/* 登録ボタンの有効・無効を、登録対象の数から決める。
-   チェックを全部外すと押しても「登録する項目がありません」と言われるだけなので、
-   押せないことを見た目で示す。予定表ドロッパーの updateCount_ と同じ考え方。
+/* ボタンの有効・無効を、いまの状態から決めなおす。
+   押しても「対象がありません」と言われるだけのボタンは、押せないことを見た目で示す。
+   予定表ドロッパーの updateCount_ と同じ考え方。
 
-   **regBtn.disabled = false と直接書かず、必ずこれを通すこと。**
+   **disabled = false と直接書かず、必ずこれを通すこと。**
    直接 false にすると、対象が0件でも押せる状態に戻ってしまう。
-   登録処理中の disabled = true だけは、この関数を通さず直接指定してよい。 */
-function syncRegBtn_() {
-  if (!regBtn) return;
-  var n = 0;
-  for (var i = 0; i < items.length; i++) {
-    var it = items[i];
-    if (it && it.card && !it.registered && it.card.isChecked()) n++;
+   処理中の disabled = true だけは、この関数を通さず直接指定してよい。 */
+function setEnabled_(el, on) {
+  if (!el) return;
+  el.disabled = !on;
+  el.style.opacity = on ? '' : '.45';
+  el.style.cursor = on ? '' : 'not-allowed';
+}
+
+/* 画面下のバー（出欠システムへ）を出す。カードが1枚でもあれば出す。
+   出欠が使えない言語では、置くものが無いので出さない。 */
+function showBar_() {
+  if (!bar) return;
+  var has = list && list.children && list.children.length;   // items ではなく画面の枚数で見る
+  bar.style.display = (has && attendReady_()) ? 'flex' : 'none';
+}
+
+/* 画面に出ているカードを、items の中身と結びつけて返す。
+   items は読み取りの流れ（processOne）で積まれるが、カードだけ先にできることもある。
+   **画面を正とする**ほうが、ボタンの出し分けを間違えない。 */
+function cards_() {
+  var out = [];
+  var kids = (list && list.children) || [];
+  for (var i = 0; i < kids.length; i++) {
+    var api = kids[i].__cardApi;
+    if (!api) continue;
+    var found = null;
+    for (var j = 0; j < items.length; j++) { if (items[j].card === api) found = items[j]; }
+    out.push(found || { card: api, file: null, fileId: null, mimeType: '' });
   }
-  regBtn.disabled = (n === 0);
-  regBtn.style.opacity = n ? '' : '.45';
-  regBtn.style.cursor = n ? '' : 'not-allowed';
+  return out;
+}
+
+function syncRegBtn_() {
+  var checked = 0;
+  var all = cards_();
+  for (var i = 0; i < all.length; i++) {
+    var it = all[i];
+    if (!it || !it.card) continue;
+    if (it.card.isChecked()) checked++;
+    // カードごとの「カレンダーに登録」。登録ずみなら押させない
+    var cal = it.card.el && it.card.el.querySelector('.cal-btn');
+    if (cal && !cal.__busy) {
+      setEnabled_(cal, !it.registered);
+      cal.textContent = I18N.t(it.registered ? 'regDone' : 'registerBtn');
+    }
+  }
+  // 下のバーの「出欠システムへ」。1枚も選ばれていなければ押させない
+  setEnabled_(regBtn, checked > 0);
 }
 var loginBtn = document.getElementById('loginBtn');
 var pickBtn = document.getElementById('pickBtn');
@@ -461,7 +498,7 @@ function applyType(key) {
 ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
 ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
 drop.addEventListener('drop', function (e) { popAnim(); handleFiles(e.dataTransfer.files); });
-regBtn.addEventListener('click', onRegisterClick);
+wireAttendBar_();   // 下のバーは「出欠システムへ」。カレンダー登録はカードごとに移した
 
 // 最初に「Googleでログイン」ボタンをタップ → ポップアップが正しく開く（タップ直後のため）
 // ログイン成功で作業エリアを表示。以降はログイン済みなのでファイル選択でポップアップ問題は起きない。
@@ -553,7 +590,7 @@ async function handleFiles(fileList) {
   for (var i = 0; i < files.length; i++) { await processOne(files[i]); }
   track('extract_ok', { count: items.length - before, mode: aiMode });
   unpopAnim();   // 結果カード（登録画面）が出たので拡大を解除して元に戻す
-  if (items.length) bar.style.display = 'flex';
+  showBar_();
   syncRegBtn_();
 }
 
@@ -1196,6 +1233,25 @@ function annRenderImage_(text) {
   });
 }
 
+/* カレンダー登録の配線（カード生成後に呼ぶ）。
+   このボタンは**このカード1枚だけ**を登録する。まとめて登録は無い。 */
+function wireRegister_(li, cardApi) {
+  var btn = li.querySelector('.cal-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var item = null;
+    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
+    if (!item) { item = { card: cardApi, file: null, fileId: null, mimeType: '' }; items.push(item); }
+    btn.__busy = true;                 // 処理中は syncRegBtn_ に文言を戻させない
+    setEnabled_(btn, false);
+    btn.textContent = I18N.t('regBusy');
+    Promise.resolve(onRegisterClick([item])).then(function () {
+      btn.__busy = false;
+      syncRegBtn_();
+    });
+  });
+}
+
 // 案内文パネルの配線（カード生成後に呼ぶ）
 function wireAnnouncement_(li, cardApi) {
   var panel = li.querySelector('.ann-panel');
@@ -1347,14 +1403,13 @@ function addCard(name) {
       '<button type="button" class="ai-recheck" style="font-size:13px;padding:5px 10px;border:1px solid #36cfc9;background:#e6fffb;color:#006d75;border-radius:6px;cursor:pointer">' + I18N.t('aiCheckCard') + '</button>' +
       '<span class="ai-status" style="margin-left:8px;font-size:12px;color:#555"></span>' +
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
-      // 出欠システム連携。押すと読み取り結果をクリップボードへ載せる（設定は持たない）。
-      // 表示・非表示は wireAttendance_ が決める（v1は日本語版のみ）。
-      '<div class="attend-wrap" style="display:none">' +
-        '<button type="button" class="attend-btn"></button>' +
-        '<span class="attend-status"></span>' +
-      '</div>' +
+      // カレンダー登録と案内文は、この2つで1組。**このカードだけ**を扱う。
       '<div class="ann-wrap">' +
-        '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
+        '<div class="ann-row">' +
+          '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
+          '<button type="button" class="cal-btn">' + I18N.t('registerBtn') + '</button>' +
+          '<span class="cal-status"></span>' +
+        '</div>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
             '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
@@ -1619,8 +1674,10 @@ function addCard(name) {
     readKeyInfo: function () { return readKeyInfo_(); }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
-  wireAttendance_(li, cardApi);     // 出欠システム連携の配線（案内文より先に配線する）
+  li.__cardApi = cardApi;           // バーからこのカードを引けるようにする
+  wireRegister_(li, cardApi);       // カレンダー登録（このカード1枚ぶん）
   wireAnnouncement_(li, cardApi);   // 案内文パネルの配線
+  showBar_();                       // カードが出たらバーも出す（出し忘れを防ぐ）
   return cardApi;
 }
 
@@ -2053,14 +2110,19 @@ function dayRowHtml_(n, formatLabel) {
 function setVal(li, k, v) { var el = li.querySelector('[data-k="' + k + '"]'); if (el) el.value = v || ''; }
 function getVal(li, k) { var el = li.querySelector('[data-k="' + k + '"]'); return el ? el.value : ''; }
 
-/* ===== 登録 ===== */
-function onRegisterClick() {
-  regBtn.disabled = true;
-  doRegister().catch(function (e) { setMsg(I18N.t('msgError') + (e && e.message ? e.message : e)); syncRegBtn_(); });
+/* ===== 登録 =====
+   ボタンはカードの中にあり、**そのカード1枚だけ**を登録する。
+   まとめて登録は無くなったが、doRegister は配列を受けるままにしてある
+   （メッセージの組み立てが件数を前提にしているのと、戻したくなったときのため）。 */
+function onRegisterClick(targets) {
+  return doRegister(targets).catch(function (e) {
+    setMsg(I18N.t('msgError') + (e && e.message ? e.message : e));
+    syncRegBtn_();
+  });
 }
-async function doRegister() {
+async function doRegister(targets) {
   await ensureToken();
-  var targets = items.filter(function (it) { return it.card.isChecked() && !it.registered; });
+  targets = (targets || []).filter(function (it) { return it && !it.registered; });
   if (!targets.length) { setMsg(I18N.t('msgNoItems')); syncRegBtn_(); return; }
 
   // ② 登録前チェック：チェック済みで開催日が空のカードがあれば警告して中断
@@ -2224,20 +2286,29 @@ function attendPayload_(cardApi, fileId) {
   };
 }
 
-function wireAttendance_(li, cardApi) {
-  var wrap = li.querySelector('.attend-wrap');
-  if (!wrap || !attendReady_()) return;
-  var btn = wrap.querySelector('.attend-btn');
-  var status = wrap.querySelector('.attend-status');
-
-  wrap.style.display = 'block';
+/* 出欠システムへ渡すボタン。画面の下に**1つだけ**置いてある。
+   カードごとではなく「チェックの入った1枚」を送る。出欠は行事1件につき1つなので、
+   まとめて送っても向こうで1件ずつ確認することになり、かえって手数が増える。 */
+function wireAttendBar_() {
+  var btn = document.getElementById('attendBar');
+  var status = document.getElementById('attendMsg');
+  if (!btn) return;
+  if (!attendReady_()) { if (bar) bar.style.display = 'none'; return; }
   btn.textContent = I18N.t('attendBtn');
 
-  // 出欠システムには書き込まない。読み取った内容を積んだ管理画面を開くだけで、
-  // 取り込むかどうかは向こうの画面が決める。だから書き込みキーもデプロイIDも、この画面には要らない。
   btn.addEventListener('click', function () {
-    var item = null;
-    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
+    var picked = cards_().filter(function (it) { return it.card.isChecked(); });
+    if (picked.length !== 1) { setAttendStatus_(status, 'ng', I18N.t('attendPickOne')); return; }
+    attendSend_(picked[0], status);
+  });
+}
+
+/* 出欠システムには書き込まない。読み取った内容を積んだ管理画面を開くだけで、
+   取り込むかどうかは向こうの画面が決める。だから書き込みキーもデプロイIDも、この画面には要らない。 */
+function attendSend_(item, status) {
+  var cardApi = item.card;
+  var li = cardApi.el;
+  (function () {
 
     // 先に形だけ見る。名前と種目が無ければ、要項を保存する前に止める
     var probe = attendPayload_(cardApi, item && item.fileId);
@@ -2320,7 +2391,7 @@ function wireAttendance_(li, cardApi) {
     } else {
       prepare.then(byHand);
     }
-  });
+  })();
 }
 
 /**
@@ -2501,7 +2572,7 @@ function applyHandoff_() {
     // file は無い（LINE側が読み取った結果だけを受け取っている）。
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });
-    if (bar) bar.style.display = 'flex';
+    showBar_();
     syncRegBtn_();
 
     // **作業画面を開く。** #work は既定で display:none で、通常はログイン成功時に初めて開く。

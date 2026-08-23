@@ -436,12 +436,7 @@
     #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
       background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
     #key-modal.show { display:flex; }
-    /* ===== 出欠システム（連携ボタンと設定モーダル） ===== */
-    .attend-wrap { margin:8px 0 0; }
-    .attend-btn { font-size:13px; padding:6px 12px; border:1px solid #ffa940; background:#fff7e6;
-      color:#ad4e00; border-radius:6px; cursor:pointer; font-family:inherit; }
-    .attend-btn:hover:not(:disabled) { background:#ffe7ba; }
-    .attend-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
+    /* ===== 出欠システム（画面下の1本） ===== */
     .attend-status { margin-left:8px; font-size:12px; color:#555; }
     .attend-status.ok { color:#389e0d; font-weight:700; }
     .attend-status.ng { color:#cf1322; font-weight:700; }
@@ -503,6 +498,14 @@
     }
     /* 案内文ジェネレーター */
     .ann-wrap { margin-top:10px; }
+    /* 「案内文を作る」と「カレンダーに登録」は同じ大きさで横に並べる */
+    .ann-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .cal-btn { font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
+      border:1px solid transparent; color:#fff; font-family:inherit;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%); box-shadow:none; }
+    .cal-btn:hover:not(:disabled) { filter:brightness(1.05); }
+    .cal-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
+    .cal-status { font-size:12px; color:#555; }
     .ann-btn { font-size:13px; font-weight:700; padding:6px 12px; border:1px solid var(--teal); background:var(--teal); color:#fff; border-radius:8px; cursor:pointer; }
     .ann-btn:hover { filter:brightness(1.05); }
     .ann-panel { margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:12px; background:#fbfffe; }
@@ -620,7 +623,8 @@
     </div>
     <p class="note" id="ocrNote" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
     <ul id="list"></ul>
-    <div id="bar" style="display:none"><button id="reg" data-i18n="registerBtn">Googleカレンダーに登録</button></div>
+    <!-- 下のバーは「出欠システムへ」。カレンダー登録はカードごとに移した -->
+    <div id="bar" style="display:none"><button id="attendBar" data-i18n="attendBtn">🙋 出欠システムへ</button><span id="attendMsg" class="attend-status"></span></div>
     <div id="msg"></div>
     </div>
   </main>
