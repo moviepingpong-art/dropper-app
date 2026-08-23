@@ -486,14 +486,22 @@
     .ann-make { margin-top:10px; }
     .ann-make .ann-btn { width:100%; padding:9px 12px; }
     /* 出欠ができて現れた瞬間だけ光らせる。**鳴りっぱなしにしない**（6秒で止める）。
-       目の負担になるので、動きを減らす設定の人には出さない。 */
+       ★ ボタン自体の色を振る。前は外へ広がる輪だけだったが、輪の色（teal）が
+       ボタンの地の色と同じで、白いカードの上ではほとんど見えなかった。
+       黄色に振ると、地の teal と補色の関係になって「点滅」として目に入る。 */
     @keyframes annPop {
-      0%   { box-shadow:0 0 0 0 rgba(6,182,164,.55); }
-      70%  { box-shadow:0 0 0 12px rgba(6,182,164,0); }
-      100% { box-shadow:0 0 0 0 rgba(6,182,164,0); }
+      0%, 100% { background:var(--teal); border-color:var(--teal); color:#fff;
+                 box-shadow:0 0 0 0 rgba(255,210,63,0); }
+      50%      { background:var(--yellow); border-color:var(--yellow); color:var(--ink);
+                 box-shadow:0 0 0 6px rgba(255,210,63,.45); }
     }
-    .ann-make.new .ann-btn { animation:annPop 1.2s ease-out 5; }
-    @media (prefers-reduced-motion: reduce) { .ann-make.new .ann-btn { animation:none; } }
+    .ann-make.new .ann-btn { animation:annPop .7s ease-in-out 8; }
+    /* 動きを減らす設定の人には**動かさない**。ただし何も出さないと、新しく現れたことが
+       伝わらないまま消える。色を変えて置いておく（6秒後に new が外れて地の色に戻る）。 */
+    @media (prefers-reduced-motion: reduce) {
+      .ann-make.new .ann-btn { animation:none; background:var(--yellow);
+                               border-color:var(--yellow); color:var(--ink); }
+    }
     /* 出欠をとらない行事のための逃げ道。押し間違いではなく、自分で選ぶぶんには止めない */
     .ann-skip { margin:10px 0 0; }
     .ann-skip-btn { font-size:12.5px; font-family:inherit; background:none; border:none; padding:0;
