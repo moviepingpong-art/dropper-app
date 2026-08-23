@@ -191,7 +191,11 @@
     .keyinfo-text { grid-area:text; font-size:13px; padding:6px 9px; border:2px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
     .keyinfo-label:focus, .keyinfo-text:focus { outline:none; border-color:var(--teal); }
 
-    #bar { margin-top:18px; display:flex; gap:8px; align-items:center; }
+    /* 下のバー。知らせの文はボタンの横に押し込めず、**必ず次の行**に出す。
+       スマホ幅でボタンと取り合うと、どちらも読めなくなる。 */
+    #bar { margin-top:18px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    #attendBar { flex:0 0 auto; }
+    #attendMsg { flex:1 1 100%; margin-left:0; }
     button {
       font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
       padding:13px 26px; border-radius:14px; border:none; cursor:pointer; color:#fff;
@@ -498,14 +502,20 @@
     }
     /* 案内文ジェネレーター */
     .ann-wrap { margin-top:10px; }
-    /* 「案内文を作る」と「カレンダーに登録」は同じ大きさで横に並べる */
-    .ann-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    /* 「案内文を作る」と「カレンダーに登録」は同じ大きさで横に並べる。
+       ★ 折り返させない。スマホの幅で縦に積むと、2つの関係が見えなくなる。
+       幅が足りないときは、折り返すのではなく**両方を縮めて**並びを保つ。 */
+    .ann-row { display:flex; gap:8px; align-items:stretch; flex-wrap:nowrap; }
+    .ann-row .ann-btn, .ann-row .cal-btn { flex:1 1 0; min-width:0; white-space:nowrap; }
     .cal-btn { font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
       border:1px solid transparent; color:#fff; font-family:inherit;
       background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%); box-shadow:none; }
     .cal-btn:hover:not(:disabled) { filter:brightness(1.05); }
     .cal-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
-    .cal-status { font-size:12px; color:#555; }
+    .cal-status { display:block; margin-top:6px; font-size:12px; color:#555; }
+    @media (max-width:420px){
+      .ann-row .ann-btn, .ann-row .cal-btn { font-size:12px; padding:7px 6px; }
+    }
     .ann-btn { font-size:13px; font-weight:700; padding:6px 12px; border:1px solid var(--teal); background:var(--teal); color:#fff; border-radius:8px; cursor:pointer; }
     .ann-btn:hover { filter:brightness(1.05); }
     .ann-panel { margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:12px; background:#fbfffe; }

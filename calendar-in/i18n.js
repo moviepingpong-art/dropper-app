@@ -113,7 +113,7 @@
       // --- 注意書き ---
       note: '※読み取りはGoogleのOCRで変換して必要項目を抽出します。{doc}はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。',
       // --- 登録ボタン ---
-      registerBtn: 'Googleカレンダーに登録',
+      registerBtn: '📅 カレンダーに登録',
       regBusy: '登録しています…',
       regDone: '✓ 登録ずみ',
       // --- メッセージ（ログイン・読み込み） ---
@@ -382,7 +382,7 @@
       dropSub: 'PDF and images (JPEG/PNG) supported. You can drop several files at once.',
       pickBtn: 'Choose a file',
       note: 'The file is converted with Google OCR to pull out the key details. Your {doc} is saved to the DropperFiles folder in your Google Drive and linked to the calendar event.',
-      registerBtn: 'Add to Google Calendar',
+      registerBtn: '📅 Add to Calendar',
       regBusy: 'Adding…',
       regDone: '✓ Added',
       msgSigningIn: 'Signing in with Google…',
@@ -636,7 +636,7 @@
       dropSub: 'PDF aur images (JPEG/PNG) supported hain. Aap ek saath kai files bhi drop kar sakte hain.',
       pickBtn: 'File choose karein',
       note: 'File ko Google OCR se convert karke zaroori details nikaali jaati hain. Aapka {doc} aapke Google Drive ke DropperFiles folder mein save hota hai aur calendar event se link ho jaata hai.',
-      registerBtn: 'Google Calendar mein add karein',
+      registerBtn: '📅 Calendar mein add',
       regBusy: 'Add ho raha hai…',
       regDone: '✓ Add ho gaya',
       msgSigningIn: 'Google se sign in ho raha hai…',
