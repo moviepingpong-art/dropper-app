@@ -1408,8 +1408,8 @@ function addCard(name) {
         '<div class="ann-row">' +
           '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
           '<button type="button" class="cal-btn">' + I18N.t('registerBtn') + '</button>' +
-          '<span class="cal-status"></span>' +
         '</div>' +
+        '<span class="cal-status"></span>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
             '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
