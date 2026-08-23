@@ -42,9 +42,7 @@ if (list) {
     if (t && t.type === 'checkbox' && t.closest && t.closest('.chk')) syncRegBtn_();
   });
 }
-var bar = document.getElementById('bar');
 var msg = document.getElementById('msg');
-var regBtn = document.getElementById('attendBar');   // 下のバーは「出欠システムへ」になった
 
 /* ボタンの有効・無効を、いまの状態から決めなおす。
    押しても「対象がありません」と言われるだけのボタンは、押せないことを見た目で示す。
@@ -58,14 +56,6 @@ function setEnabled_(el, on) {
   el.disabled = !on;
   el.style.opacity = on ? '' : '.45';
   el.style.cursor = on ? '' : 'not-allowed';
-}
-
-/* 画面下のバー（出欠システムへ）を出す。カードが1枚でもあれば出す。
-   出欠が使えない言語では、置くものが無いので出さない。 */
-function showBar_() {
-  if (!bar) return;
-  var has = list && list.children && list.children.length;   // items ではなく画面の枚数で見る
-  bar.style.display = (has && attendReady_()) ? 'flex' : 'none';
 }
 
 /* 画面に出ているカードを、items の中身と結びつけて返す。
@@ -85,12 +75,10 @@ function cards_() {
 }
 
 function syncRegBtn_() {
-  var checked = 0;
   var all = cards_();
   for (var i = 0; i < all.length; i++) {
     var it = all[i];
     if (!it || !it.card) continue;
-    if (it.card.isChecked()) checked++;
     // カードごとの「カレンダーに登録」。登録ずみなら押させない
     var cal = it.card.el && it.card.el.querySelector('.cal-btn');
     if (cal && !cal.__busy) {
@@ -98,8 +86,6 @@ function syncRegBtn_() {
       cal.textContent = I18N.t(it.registered ? 'regDone' : 'registerBtn');
     }
   }
-  // 下のバーの「出欠システムへ」。1枚も選ばれていなければ押させない
-  setEnabled_(regBtn, checked > 0);
 }
 var loginBtn = document.getElementById('loginBtn');
 var pickBtn = document.getElementById('pickBtn');
@@ -495,7 +481,6 @@ function applyType(key) {
 ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
 ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
 drop.addEventListener('drop', function (e) { popAnim(); handleFiles(e.dataTransfer.files); });
-wireAttendBar_();   // 下のバーは「出欠システムへ」。カレンダー登録はカードごとに移した
 
 // 最初に「Googleでログイン」ボタンをタップ → ポップアップが正しく開く（タップ直後のため）
 // ログイン成功で作業エリアを表示。以降はログイン済みなのでファイル選択でポップアップ問題は起きない。
@@ -587,7 +572,6 @@ async function handleFiles(fileList) {
   for (var i = 0; i < files.length; i++) { await processOne(files[i]); }
   track('extract_ok', { count: items.length - before, mode: aiMode });
   unpopAnim();   // 結果カード（登録画面）が出たので拡大を解除して元に戻す
-  showBar_();
   syncRegBtn_();
 }
 
@@ -1052,8 +1036,8 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var BC = ja ? '】' : ']';
   var RG = ja ? '〜' : ' – ';   // 期間の区切り
   var L = [];
-  // 出欠のURLはこの時点では存在しない（出欠を作るのは主催者が表の中で決める）。
-  // 「出欠システムに保存」を押したカードだけ、メニューへの誘導を1行入れる。
+  // 出欠のURLは案内文に載せない（リッチメニューに常設してあるため）。
+  // **出欠が本当に作られたカードだけ**、メニューへの誘導を1行入れる。
   var attend = !!f.attend_saved;
   if (channel === 'x') {
     L.push(emoji + name);
@@ -1265,7 +1249,10 @@ function wireAnnouncement_(li, cardApi) {
   var current = 'line';
   function regen() {
     var f = cardApi.read();
-    f.attend_saved = !!li.__attendSaved;   // 出欠システムに保存したカードだけ、案内文に出欠の行を出す
+    /* ★ 「送った」ではなく「**本当に作られた**」ときだけ出欠の行を出す。
+       送っただけでは、向こうの画面で受付を始めずに閉じた場合に案内文が嘘になる
+       （「メニューの出欠入力から」と書いてあるのに、そこには何も無い）。 */
+    f.attend_saved = !!li.__attendReady;
     ta.value = buildAnnouncement_(f, current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
@@ -1402,11 +1389,17 @@ function addCard(name) {
       '<p class="ai-anyfield" style="font-size:11px;color:#888;margin:4px 0 0">' + I18N.t('aiAnyFieldNote') + '</p>' +
       // カレンダー登録と案内文は、この2つで1組。**このカードだけ**を扱う。
       '<div class="ann-wrap">' +
+        // ①カレンダーに登録　②出欠システムへ　を横並びに。押す順に左から置く
         '<div class="ann-row">' +
-          '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
           '<button type="button" class="cal-btn">' + I18N.t('registerBtn') + '</button>' +
+          '<button type="button" class="attend-btn" style="display:none"></button>' +
         '</div>' +
         '<span class="cal-status"></span>' +
+        '<span class="attend-status"></span>' +
+        // ③案内文は仕上げ。①②と行を分けて、あとから押すものだと形で見せる
+        '<div class="ann-make">' +
+          '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
+        '</div>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
             '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
@@ -1671,10 +1664,10 @@ function addCard(name) {
     readKeyInfo: function () { return readKeyInfo_(); }
   };
   li.__cardApi = cardApi;   // runAiRecheck_からli経由でcardApiを参照できるようにする
-  li.__cardApi = cardApi;           // バーからこのカードを引けるようにする
+  li.__cardApi = cardApi;           // 外からこのカードを引けるようにする
   wireRegister_(li, cardApi);       // カレンダー登録（このカード1枚ぶん）
+  wireAttendance_(li, cardApi);     // 出欠システムへ（このカード1枚ぶん）
   wireAnnouncement_(li, cardApi);   // 案内文パネルの配線
-  showBar_();                       // カードが出たらバーも出す（出し忘れを防ぐ）
   return cardApi;
 }
 
@@ -2257,6 +2250,65 @@ function attendEventDate_(dates) {
 // 失敗しても要項を入れ直させない（＝再ドロップでカレンダー予定が重複する事故を避ける）。
 // ボタンは必ず押しなおせる状態に戻すこと。
 
+/* ===== 出欠ができたことを受け取る =====
+   出欠を作るのは向こうの画面（attend/admin.html）。作られたかどうかは、こちらでは分からない。
+   同じ出どころなので、向こうから知らせてもらう。
+
+     別タブで開いた場合 … postMessage（opener 経由）
+     同じ画面で移った場合 … localStorage に置いた印を、戻ってきたときに読む
+
+   **両方いる。** ホーム画面のアプリでは同じ画面で移るので opener が無く、
+   ふつうのブラウザでは別タブなので戻ったときの読み直しが起きない。 */
+var ATTEND_DONE_STORE = 'dropperAttendDone';
+var ATTEND_DONE_MS = 10 * 60 * 1000;   // 10分。古い印を拾って別の行事に付けないため
+var attendPending_ = null;             // 送り出したカード（同じタブに残っているとき）
+
+function attendMarkReady_(li) {
+  if (!li || li.__attendReady) return;
+  li.__attendReady = true;
+  var status = li.querySelector('.attend-status');
+  setAttendStatus_(status, 'ok', I18N.t('attendDone'));
+  var panel = li.querySelector('.ann-panel');
+  if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
+}
+
+// 名前と開催日で、どのカードの話かを見分ける（同じ画面で移った場合は目印が消えているため）
+function attendFindCard_(name, date) {
+  var all = cards_();
+  for (var i = 0; i < all.length; i++) {
+    var f = all[i].card.read();
+    var d = (f.kaisai_dates || [])[0] || '';
+    if (String(f.taikai_mei || '').trim() === String(name || '').trim() && (!date || d === date)) {
+      return all[i].card.el;
+    }
+  }
+  return null;
+}
+
+function attendTakeDone_() {
+  var raw = '';
+  try { raw = localStorage.getItem(ATTEND_DONE_STORE) || ''; } catch (e) { raw = ''; }
+  if (!raw) return;
+  try { localStorage.removeItem(ATTEND_DONE_STORE); } catch (e) { /* noop */ }
+  var o = null;
+  try { o = JSON.parse(raw); } catch (e) { o = null; }
+  if (!o || !o.name || Date.now() - (o.at || 0) > ATTEND_DONE_MS) return;
+  attendMarkReady_(attendPending_ || attendFindCard_(o.name, o.date));
+}
+
+(function wireAttendDone_() {
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin) return;          // 同じ出どころからだけ受ける
+    var d = e.data;
+    if (!d || d.type !== 'attend-created') return;
+    attendMarkReady_(attendPending_ || attendFindCard_(d.name, d.date));
+  });
+  // 同じ画面で行って戻ってきた場合。戻り方が読み直しでも、履歴からの復帰でも拾えるようにする
+  window.addEventListener('pageshow', attendTakeDone_);
+  window.addEventListener('focus', attendTakeDone_);
+  attendTakeDone_();
+})();
+
 function attendReady_() {
   return ATTEND_AVAILABLE && typeof AttendanceHook !== 'undefined';
 }
@@ -2283,20 +2335,21 @@ function attendPayload_(cardApi, fileId) {
   };
 }
 
-/* 出欠システムへ渡すボタン。画面の下に**1つだけ**置いてある。
-   カードごとではなく「チェックの入った1枚」を送る。出欠は行事1件につき1つなので、
-   まとめて送っても向こうで1件ずつ確認することになり、かえって手数が増える。 */
-function wireAttendBar_() {
-  var btn = document.getElementById('attendBar');
-  var status = document.getElementById('attendMsg');
-  if (!btn) return;
-  if (!attendReady_()) { if (bar) bar.style.display = 'none'; return; }
-  btn.textContent = I18N.t('attendBtn');
+/* 出欠システムへ渡すボタン。**カードごと**に置く（対象がそのカードに決まる）。
+   カレンダー登録の右隣に並べ、色を変えて役割の違いを見せる。 */
+function wireAttendance_(li, cardApi) {
+  var btn = li.querySelector('.attend-btn');
+  var status = li.querySelector('.attend-status');
+  if (!btn || !attendReady_()) return;
 
+  btn.style.display = '';
+  btn.textContent = I18N.t('attendBtn');
   btn.addEventListener('click', function () {
-    var picked = cards_().filter(function (it) { return it.card.isChecked(); });
-    if (picked.length !== 1) { setAttendStatus_(status, 'ng', I18N.t('attendPickOne')); return; }
-    attendSend_(picked[0], status);
+    var item = null;
+    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) item = items[i]; }
+    if (!item) { item = { card: cardApi, file: null, fileId: null, mimeType: '' }; items.push(item); }
+    attendPending_ = li;                     // 帰ってきたとき、どのカードの話か分かるように
+    attendSend_(item, status);
   });
 }
 
@@ -2342,10 +2395,7 @@ function attendSend_(item, status) {
     });
 
     var done = function (msg) {
-      li.__attendSaved = true;
       setAttendStatus_(status, 'ok', I18N.t(msg));
-      var panel = li.querySelector('.ann-panel');
-      if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
       track('attend_copy', {});
     };
 
@@ -2569,7 +2619,6 @@ function applyHandoff_() {
     // file は無い（LINE側が読み取った結果だけを受け取っている）。
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });
-    showBar_();
     syncRegBtn_();
 
     // **作業画面を開く。** #work は既定で display:none で、通常はログイン成功時に初めて開く。
@@ -2661,7 +2710,7 @@ function focusHandoff_() {
   hide(document.getElementById('ocrNote'));         // 読み取り方法の注記
   hide(document.getElementById('mode-banner'));     // AIモードの帯
 
-  if (!hidden.length || !bar || !bar.parentNode) return;
+  if (!hidden.length || !msg || !msg.parentNode) return;
 
   // ===== 結果カードと登録ボタンの「下」に、他の道具への案内を置く =====
   // 上に置くとカードが押し下げられて本来の用件が見えなくなる。
@@ -2703,10 +2752,9 @@ function focusHandoff_() {
   box.appendChild(links);
   box.appendChild(btn);
 
-  // **#msg より後ろに入れること。** HTMLの並びは list → bar → msg で、
-  // 登録後の「N件を登録しました／カレンダーで確認する」は #msg に出る。
-  // bar の直後に入れると、この案内が登録ボタンとメッセージの間に割り込んでしまう。
-  var after = (msg && msg.parentNode) ? msg : bar;
+  // **#msg より後ろに入れること。** 登録後の「N件を登録しました／カレンダーで確認する」は
+  // #msg に出る。その前に入れると、この案内が登録の知らせに割り込んでしまう。
+  var after = msg;
   after.parentNode.insertBefore(box, after.nextSibling);
 }
 

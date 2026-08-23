@@ -165,11 +165,6 @@
     .keyinfo-text { grid-area:text; font-size:13px; padding:6px 9px; border:2px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); }
     .keyinfo-label:focus, .keyinfo-text:focus { outline:none; border-color:var(--teal); }
 
-    /* 下のバー。知らせの文はボタンの横に押し込めず、**必ず次の行**に出す。
-       スマホ幅でボタンと取り合うと、どちらも読めなくなる。 */
-    #bar { margin-top:18px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    #attendBar { flex:0 0 auto; }
-    #attendMsg { flex:1 1 100%; margin-left:0; }
     button {
       font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
       padding:13px 26px; border-radius:14px; border:none; cursor:pointer; color:#fff;
@@ -414,8 +409,13 @@
     #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
       background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
     #key-modal.show { display:flex; }
-    /* ===== 出欠システム（画面下の1本） ===== */
-    .attend-status { margin-left:8px; font-size:12px; color:#555; }
+    /* ===== 出欠システム ===== */
+    /* カレンダー登録の右隣。**色を変えて役割の違いを見せる**（緑＝Google、橙＝出欠） */
+    .attend-btn { font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
+      border:1px solid transparent; color:#fff; font-family:inherit;
+      background:linear-gradient(100deg,#f97316,#fb923c); box-shadow:none; }
+    .attend-btn:hover:not(:disabled) { filter:brightness(1.05); }
+    .attend-status { display:block; margin-top:6px; font-size:12px; color:#555; }
     .attend-status.ok { color:#389e0d; font-weight:700; }
     .attend-status.ng { color:#cf1322; font-weight:700; }
     .attend-clear-row { margin:10px 0 0; text-align:center; }
@@ -480,7 +480,10 @@
        ★ 折り返させない。スマホの幅で縦に積むと、2つの関係が見えなくなる。
        幅が足りないときは、折り返すのではなく**両方を縮めて**並びを保つ。 */
     .ann-row { display:flex; gap:8px; align-items:stretch; flex-wrap:nowrap; }
-    .ann-row .ann-btn, .ann-row .cal-btn { flex:1 1 0; min-width:0; white-space:nowrap; }
+    .ann-row .cal-btn, .ann-row .attend-btn { flex:1 1 0; min-width:0; white-space:nowrap; }
+    /* 案内文は①②のあとの仕上げ。行を分け、幅いっぱいにして最後の一手だと分かるようにする */
+    .ann-make { margin-top:10px; }
+    .ann-make .ann-btn { width:100%; padding:9px 12px; }
     .cal-btn { font-size:13px; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer;
       border:1px solid transparent; color:#fff; font-family:inherit;
       background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%); box-shadow:none; }
@@ -488,7 +491,7 @@
     .cal-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
     .cal-status { display:block; margin-top:6px; font-size:12px; color:#555; }
     @media (max-width:420px){
-      .ann-row .ann-btn, .ann-row .cal-btn { font-size:12px; padding:7px 6px; }
+      .ann-row .cal-btn, .ann-row .attend-btn { font-size:12px; padding:7px 6px; }
     }
     .ann-btn { font-size:13px; font-weight:700; padding:6px 12px; border:1px solid var(--teal); background:var(--teal); color:#fff; border-radius:8px; cursor:pointer; }
     .ann-btn:hover { filter:brightness(1.05); }
@@ -589,8 +592,6 @@
     </div>
     <p class="note" id="ocrNote" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
     <ul id="list"></ul>
-    <!-- 下のバーは「出欠システムへ」。カレンダー登録はカードごとに移した -->
-    <div id="bar" style="display:none"><button id="attendBar" data-i18n="attendBtn">🙋 出欠システムへ</button><span id="attendMsg" class="attend-status"></span></div>
     <div id="msg"></div>
     </div>
   </main>
