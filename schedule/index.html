@@ -55,34 +55,6 @@
       background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 55%,var(--yellow) 120%);
       -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
     }
-    /* 「完全無料」。ヒーロー上の小さなバッジから、AI無料枠の帯の中の見出しへ移した。
-       キャッチより一段大きくして、帯に入って最初に目に入るようにする。
-       イベントドロッパー側（calendar/index.html）と同じ見た目にすること。 */
-    .idle-free {
-      display:inline-block; margin:0 0 12px; padding:8px 20px;
-      font-family:'Mochiy Pop One',sans-serif; font-weight:400; letter-spacing:.04em;
-      font-size:clamp(24px,6vw,34px); line-height:1.25; color:#fff;
-      background:linear-gradient(100deg,#16a34a,#22c55e);
-      border-radius:14px; box-shadow:0 8px 22px rgba(34,197,94,.38);
-    }
-    /* AI無料枠の帯。「Googleアカウントに眠っている無料枠をこの道具に回す」を大きく見せる。
-       改行は辞書側の \n で表す（i18n は textContent で流し込むため <br> は使えない）。
-       すぐ下の注記（.idle-note）は必ず残すこと。キーが要るツールだと誤解されるのを防ぐ。
-       イベントドロッパー側（calendar/index.html）と同じ見た目にすること。 */
-    .idle-band { margin:0 0 16px; padding:18px 20px; border-radius:18px; text-align:left;
-      background:linear-gradient(135deg,#ecfeff,#f0fdf4); border:2px solid #a7f3d0; }
-    .idle-catch { margin:0; font-family:'Mochiy Pop One',sans-serif; font-weight:400;
-      font-size:clamp(19px,4.4vw,26px); line-height:1.45; color:var(--teal-d); white-space:pre-line; }
-    .idle-sub { margin:10px 0 0; font-size:13.5px; line-height:1.85; color:var(--ink); }
-    .idle-badges { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 0; }
-    .idle-badge { font-size:12px; font-weight:700; color:var(--teal-d);
-      background:rgba(6,182,164,.13); border-radius:999px; padding:5px 13px; white-space:nowrap; }
-    .idle-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:13px 0 0; }
-    .idle-btn { font-family:inherit; font-size:14px; font-weight:700; color:#fff; border:none;
-      border-radius:999px; padding:11px 22px; cursor:pointer;
-      background:linear-gradient(100deg,var(--teal),var(--lime-d)); box-shadow:0 6px 16px rgba(6,182,164,.32); }
-    .idle-btn:hover { transform:translateY(-2px); box-shadow:0 9px 22px rgba(6,182,164,.4); }
-    .idle-note { margin:0; font-size:11.5px; line-height:1.7; color:var(--sub); }
     /* ===== ドロッパーの切り替えタブ（イベント / 予定表） =====
        イベントドロッパー側（calendar/index.html）と同じ見た目にすること。 */
     .tool-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 6px; }
@@ -371,24 +343,6 @@
 </head>
 <body>
   <header>
-    <!-- Googleアカウントに眠っているAIの無料枠を、この道具に回してもらうための帯。
-         ボタンはAI利用ポップアップを開くだけ（説明を飛ばす経路は増やさない）。
-         .idle-note（キー無しでも使える）は外さないこと。AIモードは任意である。 -->
-    <div class="idle-band">
-      <p class="idle-free" data-i18n="freeBadge">完全無料</p>
-      <p class="idle-catch" data-i18n="idleCatch">眠ったままのAI無料枠、
-ここで使いませんか。</p>
-      <p class="idle-sub" data-i18n="idleSub">Googleアカウントには、毎日戻ってくるAIの無料枠があります。使わなければ、そのまま消えるだけ。クレカ不要・0円・約3分で、この道具の読み取りに回せます。</p>
-      <div class="idle-badges">
-        <span class="idle-badge" data-i18n="aiBadgeCard">💳 クレカ登録なし</span>
-        <span class="idle-badge" data-i18n="aiBadgeFree">🆓 無料枠内なら0円</span>
-        <span class="idle-badge" data-i18n="aiBadgeTime">⏱ 取得は約3分</span>
-      </div>
-      <div class="idle-actions">
-        <button type="button" id="idleBtn" class="idle-btn" data-i18n="idleBtn">AIモードを見る</button>
-        <p class="idle-note" data-i18n="idleNote">※ キーが無くても、この道具はそのまま使えます。AIモードは任意です。</p>
-      </div>
-    </div>
     <!-- どのドロッパーを使うかのタブ。選択中は .on（リンクにしない）。
          イベント側のリンク先は schedule-i18n.js が言語に合わせて張り替える。 -->
     <nav class="tool-tabs">

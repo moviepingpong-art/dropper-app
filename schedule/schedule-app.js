@@ -109,7 +109,6 @@ el('aiUseBtn').addEventListener('click', async function () {
 el('modeNormal').addEventListener('click', function () { setMode(false); });
 el('modeAi').addEventListener('click', function () { openAiModal(); });
 // ヘッダーのAI無料枠の帯。開くのは同じポップアップ（説明を飛ばす経路は増やさない）。
-if (el('idleBtn')) el('idleBtn').addEventListener('click', function () { openAiModal(); });
 setMode(false);   // 既定は通常モード。案内文もここで入る
 
 /* ===== APIキー ===== */
