@@ -373,9 +373,6 @@ function updateAiRecheckVisibility_() {
   if (skip) skip.addEventListener('click', chooseHybrid_);
   if (use) use.addEventListener('click', chooseAi_);
   if (settings) settings.addEventListener('click', openAiModal_);   // 再選択（いつでも変更可）
-  // ヘッダーのAI無料枠の帯。開くのは同じポップアップ（説明を飛ばす経路は増やさない）。
-  var idle = document.getElementById('idleBtn');
-  if (idle) idle.addEventListener('click', openAiModal_);
 })();
 
 
