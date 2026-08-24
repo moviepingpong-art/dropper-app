@@ -149,7 +149,7 @@
       // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
       // en/in はリッチメニューが無いのでURLを書く（annAttendUrl）
       annAttendMenu: '下のメニューの「出欠入力」から、出欠を回答してください。',
-      annAttendUrl: '出欠を回答する',
+      annAttendUrl: '出欠入力はこちら',
       annAttendNoUrl: '出欠の回答をお願いします。',
       // --- 要チェック（採点係）＆AI ---
       warnNotice: '点滅している枠は「特に注意したい箇所」の目印です。点滅していない項目にも誤りがある場合があります。気になる項目はそのまま手で直すか、処理モードを「AIモード」に変えて読み取り直してください。',
@@ -254,6 +254,7 @@
       // --- 案内文ジェネレーター ---
       annBtn: '📣 案内文を作る',
       annTabLine: 'LINE',
+      annTabLineOfficial: 'LINE公式', annTabLineGroup: 'LINEグループ',
       annTabX: 'X',
       annTabPlain: '汎用',
       annCopy: 'コピー',
@@ -418,7 +419,7 @@
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
       annAttendMenu: 'Please reply from “Attendance” in the menu below.',
-      annAttendUrl: 'Reply to the attendance',
+      annAttendUrl: 'Answer here',
       annAttendNoUrl: 'Please reply to the attendance.',
       warnNotice: 'A blinking box marks a spot worth double-checking. Items without a blink can still be wrong. Fix anything by hand, or switch the processing mode to "AI mode" and run it again.',
       warnMultiDayEvents: 'Multi-day event. Please check the events per day, and whether a practice day slipped in.',
@@ -515,6 +516,7 @@
       // --- Announcement generator ---
       annBtn: '📣 Create announcement',
       annTabLine: 'WhatsApp',
+      annTabLineOfficial: 'LINE (official)', annTabLineGroup: 'LINE (group)',
       annTabX: 'X',
       annTabPlain: 'General',
       annCopy: 'Copy',
@@ -676,7 +678,7 @@
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
       annAttendMenu: 'Neeche menu mein “Attendance” se jawab dein.',
-      annAttendUrl: 'Attendance ka jawab dein',
+      annAttendUrl: 'Jawab yahan dein',
       annAttendNoUrl: 'Attendance ka jawab dein.',
       warnNotice: 'Blink karta box us jagah ko mark karta hai jise double-check karna chahiye. Bina blink wale items bhi galat ho sakte hain. Kisi bhi field ko haath se theek karein, ya processing mode ko "AI mode" par switch karke dobara run karein.',
       warnMultiDayEvents: 'Multi-day event hai. Har din ke events, aur kahin practice day to mix nahi hua, check karein.',
@@ -771,6 +773,7 @@
       // --- Announcement generator (Hinglish・要ネイティブ確認) ---
       annBtn: '📣 Announcement banayein',
       annTabLine: 'WhatsApp',
+      annTabLineOfficial: 'LINE (official)', annTabLineGroup: 'LINE (group)',
       annTabX: 'X',
       annTabPlain: 'General',
       annCopy: 'Copy',
