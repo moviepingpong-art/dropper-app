@@ -1039,7 +1039,11 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var L = [];
   // **出欠が本当に作られたカードだけ**、出欠の行を1つ入れる。
   var attend = !!f.attend_saved;
-  var attendLine = annAttendLine_(f, ja);
+  // 出欠の行はタブごとに変わる。**空文字が返ることがある**（Xと汎用）ので、
+  // 以下の分岐は attend ではなく attendLine で見る。
+  // 出欠の行を出さない回は、地図とカレンダーのリンクを落とす理由も無くなる
+  // （落としていたのは「回答画面にボタンとして出るから」なので、そこへ行けないなら話が別）。
+  var attendLine = attend ? annAttendLine_(f, ja, channel) : '';
   if (channel === 'x') {
     L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
@@ -1047,7 +1051,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
     // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
     // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
-    if (attend) L.push('🙋 ' + attendLine);
+    if (attendLine) L.push('🙋 ' + attendLine);
     else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
@@ -1071,11 +1075,11 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
-    if (gcal && !attend) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
-    if (maps && !attend) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
+    if (gcal && !attendLine) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
+    if (maps && !attendLine) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     // 出欠は**いちばん最後**に置く。読み終えたところに行動を置きたいので、
     // リンク類より下。締切があるのは出欠のほうだが、順番より位置を優先する。
-    if (attend) { L.push(''); L.push('🙋 ' + attendLine); }
+    if (attendLine) { L.push(''); L.push('🙋 ' + attendLine); }
     return L.join('\n');
   }
   // channel === 'line'（既定：LINE/WhatsApp等のチャット向け）
@@ -1104,7 +1108,7 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (f.kaijo_jusho) L.push(ja ? ('（' + f.kaijo_jusho + '）') : ('(' + f.kaijo_jusho + ')'));
     // 出欠を保存した回は、地図もカレンダーも**出欠の回答画面にボタンとして出る**。
     // ここにURLを並べると長いリンク2本で本文が埋もれ、肝心の出欠が目立たなくなる
-    if (maps && !attend) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
+    if (maps && !attendLine) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
     L.push('');
   }
   if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
@@ -1116,24 +1120,52 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     });
     L.push('');
   }
-  if (gcal && !attend) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
+  if (gcal && !attendLine) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   // 出欠は**いちばん最後**に置く。チャットでは末尾がいちばん目に入る位置で、
   // ここに行動を1つだけ置きたい。ja（LINE版）はリッチメニューに出欠ページを
   // 常設しているので、URLではなくメニューへの誘導だけを出す。
-  if (attend) { L.push(''); L.push('🙋 ' + attendLine); }
+  if (attendLine) { L.push(''); L.push('🙋 ' + attendLine); }
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
-/* 案内文の出欠の行。**ことばで書きぶりが変わる。**
-   ja は LINE のリッチメニューに出欠ページを常設しているので、メニューへの誘導だけ。
-   en/in は LINE を使わず、リッチメニューという置き場が無いので、**URLを書く**。
-   書かないと参加者はどこからも出欠に辿り着けない。
-   このURLは団体につき1本で、行事が増えても変わらない（`?s=団体ID` のみ）。
-   出欠システムが渡してこなかったとき（古い管理画面など）は、URLの無い言い方に落とす。 */
-function annAttendLine_(f, ja) {
+/* 案内文の出欠の行。**渡す相手ごとに書きぶりが変わる。**
+   日本語は転送先で道が違うので、タブで分けている。
+     LINE公式    … リッチメニューに出欠を常設しているので、メニューへ案内する
+     LINEグループ … メニューが無い。まとめた1本のURLを書かないと辿り着けない
+     X           … **公開の場なので載せない。** このURLは団体につき1本で、
+                    開けば名簿がそのまま見える。誰でも読める場所に置くものではない
+     汎用        … 用途が決まらないので載せない（空約束になるより出さない）
+   en/in は LINE を使わずリッチメニューという置き場が無いので、どの相手でもURLを書く。
+   URLは団体につき1本で、行事が増えても変わらない（`?s=団体ID` のみ）。
+   出欠システムが渡してこなかったとき（古い管理画面など）は、URLの無い言い方に落とす。
+   **空文字を返すことがある。** 呼ぶ側は、空なら出欠の行そのものを出さないこと。 */
+function annAttendLine_(f, ja, channel) {
   var url = String((f && f.attend_url) || '').trim();
-  if (ja) return I18N.t('annAttendMenu');
-  return url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
+  var withUrl = url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
+  if (!ja) return withUrl;
+  if (channel === 'line') return I18N.t('annAttendMenu');
+  if (channel === 'group') return withUrl;
+  return '';
+}
+
+/* 案内文のタブ。**日本語だけ LINE を2つに分ける。**
+   公式アカウントへの転送とグループLINEへの転送では、出欠への道が違うため（上を参照）。
+   en/in は LINE を使わない（タブ名も WhatsApp）ので、この区別を出さない。
+   既定はグループ。日々の連絡はグループへ流すほうが多い。 */
+function annDefaultChannel_() {
+  return (window.LANG !== 'en' && window.LANG !== 'in') ? 'group' : 'line';
+}
+
+function annTabsHtml_() {
+  var ja = (window.LANG !== 'en' && window.LANG !== 'in');
+  var list = ja
+    ? [['line', 'annTabLineOfficial'], ['group', 'annTabLineGroup'], ['x', 'annTabX'], ['plain', 'annTabPlain']]
+    : [['line', 'annTabLine'], ['x', 'annTabX'], ['plain', 'annTabPlain']];
+  var def = annDefaultChannel_();
+  return list.map(function (it) {
+    return '<button type="button" class="ann-tab' + (it[0] === def ? ' on' : '') + '" data-ch="' + it[0] + '">'
+      + I18N.t(it[1]) + '</button>';
+  }).join('');
 }
 
 // ===== 案内文の画像書き出し =====
@@ -1152,7 +1184,12 @@ function annStripUrls_(text) {
   var lines = String(text || '').split('\n');
   var out = [];
   for (var i = 0; i < lines.length; i++) {
-    if (/https?:\/\//.test(lines[i])) continue;
+    if (/https?:\/\//.test(lines[i])) {
+      // 出欠の行だけは消さずに、URLの無い言い方へ落とす。画像の中のURLはタップできないが、
+      // 行ごと消すと「出欠をお願いします」という肝心の依頼まで消えてしまう
+      if (/^🙋/.test(lines[i])) out.push('🙋 ' + I18N.t('annAttendNoUrl'));
+      continue;
+    }
     if (/^\s*▼/.test(lines[i]) && i + 1 < lines.length && /https?:\/\//.test(lines[i + 1])) continue;
     out.push(lines[i]);
   }
@@ -1294,7 +1331,7 @@ function wireAnnouncement_(li, cardApi) {
   var waBtn = panel.querySelector('.ann-wa');
   var lineBtn = panel.querySelector('.ann-line');
   var imgBtn = panel.querySelector('.ann-img');
-  var current = 'line';
+  var current = annDefaultChannel_();
   function regen() {
     var f = cardApi.read();
     /* ★ 「送った」ではなく「**本当に作られた**」ときだけ出欠の行を出す。
@@ -1312,7 +1349,7 @@ function wireAnnouncement_(li, cardApi) {
   });
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
-      current = t.getAttribute('data-ch') || 'line';
+      current = t.getAttribute('data-ch') || annDefaultChannel_();
       tabs.forEach(function (x) { x.classList.remove('on'); });
       t.classList.add('on');
       regen();
@@ -1456,9 +1493,7 @@ function addCard(name) {
         '</p>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
-            '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
-            '<button type="button" class="ann-tab" data-ch="x">' + I18N.t('annTabX') + '</button>' +
-            '<button type="button" class="ann-tab" data-ch="plain">' + I18N.t('annTabPlain') + '</button>' +
+            annTabsHtml_() +
           '</div>' +
           '<textarea class="ann-text" rows="12" spellcheck="false"></textarea>' +
           '<label class="ann-credit"><input type="checkbox" class="ann-credit-chk"><span>' + I18N.t('annCreditToggle') + '</span></label>' +
