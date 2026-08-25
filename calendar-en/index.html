@@ -485,6 +485,8 @@
        ★ 出欠が使える言語では、**出欠ができるまで出さない**（app.js の wireAnnounceGate_）。 */
     .ann-make { margin-top:10px; }
     .ann-make .ann-btn { width:100%; padding:9px 12px; }
+    /* 要項の保存を待っているあいだ（app.js の openPanel_）。文言だけでは押せないことが伝わらない */
+    .ann-make .ann-btn:disabled { opacity:.6; cursor:default; }
     /* 出欠をとらない行事のための逃げ道。押し間違いではなく、自分で選ぶぶんには止めない */
     .ann-skip { margin:10px 0 0; }
     .ann-skip-btn { font-size:12.5px; font-family:inherit; background:none; border:none; padding:0;
@@ -495,6 +497,18 @@
     .cal-btn:hover:not(:disabled) { filter:brightness(1.05); }
     .cal-btn:disabled { background:#f6ffed; border-color:#b7eb8f; color:#389e0d; cursor:default; }
     .cal-status { display:block; margin-top:6px; font-size:12px; color:#555; }
+    /* 要項をどこに保存したかの1行（app.js の youkouNote_）。保存中と保存後を兼ねる。
+       ★ 保存中は輪を回して「動いている」ことを見せる。ここで数秒待たせるため、
+          何も動かないと止まったように見える。prefers-reduced-motion では回さず、色だけで示す。 */
+    .youkou-note { display:block; margin:6px 0 0; font-size:12px; color:#555; line-height:1.6;
+      overflow-wrap:anywhere; }
+    .youkou-note.busy { color:#006d75; }
+    .youkou-note.busy::before { content:''; display:inline-block; width:10px; height:10px;
+      margin-right:6px; vertical-align:-1px; border:2px solid #b5f5ec; border-top-color:#13c2c2;
+      border-radius:50%; animation:youkouSpin .8s linear infinite; }
+    .youkou-note.ok a { color:#389e0d; font-weight:700; }
+    @keyframes youkouSpin { to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion:reduce){ .youkou-note.busy::before { animation:none; } }
     @media (max-width:420px){
       .ann-row .cal-btn, .ann-row .attend-btn { font-size:12px; padding:7px 6px; }
     }
@@ -882,10 +896,10 @@
   </script>
   <!-- ?v= はキャッシュ対策のバージョン番号。中身を更新したら4本とも同じ値に書き換えること
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260829"></script>
+  <script src="i18n.js?v=20260830"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260816"></script>
-  <script src="app.js?v=20260829"></script>
+  <script src="app.js?v=20260830"></script>
 </body>
 </html>

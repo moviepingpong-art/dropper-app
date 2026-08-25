@@ -809,6 +809,68 @@ async function ensureEventFolder_(kaisaiDate, taikaiMei) {
   return nameId;
 }
 
+// 保存先を人が読める形にする（画面に「ここに保存しました」と出すため）。
+// **ensureEventFolder_ と同じ名前の作り方をここでも使う。** 片方だけ直すと、
+// 画面に出る道順と、ドライブにできる実物がずれる。
+function folderPath_(kaisaiDate, taikaiMei) {
+  var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
+  var names = folderNames_(m);
+  var parts = [names.year];
+  if (names.month) parts.push(names.month);
+  parts.push(sanitizeFolderName_(taikaiMei));
+  return parts.join(' / ');
+}
+
+/* カードの上に出す「どこに保存したか」の1行。保存中と保存後を、この1本で兼ねる。
+   **saveYoukou_ からだけ呼ぶこと。** 経路ごとに書くと、保存したのに何も出ない道ができる。
+   大会名がそのまま入るので、リンクの文字は textContent で入れる（innerHTML にしない）。 */
+function youkouNote_(li, cls, text, href) {
+  if (!li) return;
+  var el = li.querySelector('.youkou-note');
+  if (!el) return;
+  el.className = 'youkou-note' + (cls ? ' ' + cls : '');
+  if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = '';
+  el.textContent = '';
+  if (href) {
+    var a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = text;
+    el.appendChild(a);
+  } else {
+    el.textContent = text;
+  }
+}
+
+/* 要項をドライブへ保存する**唯一の入口**。
+   カレンダー登録・出欠システムへ・案内文を作る、の3つの経路すべてがここを通る。
+   経路ごとに保存していたころは、保存先の表示を足すのに3か所直す必要があった。
+
+   保存先は**主催者自身のマイドライブ**（ログインしている本人のドライブ）の
+   `<年> Tournaments／<月>／大会名／`。当方はサーバーを持たないので、他には残らない。
+
+   すでに保存済み・元ファイルが無い（LINEから ?d= で来たカード）・未ログイン、
+   のときは何もしない。呼ぶ側は毎回そのまま呼んでよい。 */
+async function saveYoukou_(item, f) {
+  if (!item || item.fileId || !item.file || !accessToken) return;
+  var li = (item.card && item.card.el) || null;
+  var date = (f.kaisai_dates || [])[0];
+  youkouNote_(li, 'busy', I18N.t('youkouSaving'));
+  try {
+    var folderId = await ensureEventFolder_(date, f.taikai_mei);
+    item.fileId = await uploadOriginal_(item.file, folderId);
+    item.folderId = folderId;
+    youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),
+                'https://drive.google.com/drive/folders/' + folderId);
+  } catch (e) {
+    // 「保存しています…」を出したままにしない。失敗の中身は呼んだ側が知らせる
+    youkouNote_(li, '', '');
+    throw e;
+  }
+}
+
 // 元ファイルを保存して残す → ファイルIDを返す。
 // multipart（メタデータ＋本体の手組み）で400になるため、よりシンプルで確実な方式に変更：
 //  (1) メディアのみアップロード（本体だけ送る／手組みの境界・改行が不要）→ ファイルID取得
@@ -1189,9 +1251,10 @@ function annShow_(li) {
 function annOpen_(li) {
   var panel = li.querySelector('.ann-panel');
   if (!panel) return;
+  // 要項の保存待ちも含めて、開く手順は wireAnnouncement_ の openPanel_ に1本化してある
+  if (panel.__open) { panel.__open(); return; }
   panel.style.display = 'block';
   if (panel.__regen) panel.__regen();
-  if (panel.__ensureYoukou) panel.__ensureYoukou();
 }
 
 /** 案内文のボタンを「済んだ」表示に変える。押せば開き直せるので、ボタン自体は残す。 */
@@ -1230,7 +1293,6 @@ function wireAnnouncement_(li, cardApi) {
   var shareBtn = panel.querySelector('.ann-share');
   var lineBtn = panel.querySelector('.ann-line');
   var current = 'line';
-  var lastGen = '';   // 最後に自動生成した本文。これと違えば、利用者が手を入れている
 
   /** このカードに対応する items[] の1件。要項のファイルIDはここが持っている */
   function itemOf_() {
@@ -1238,17 +1300,35 @@ function wireAnnouncement_(li, cardApi) {
     return null;
   }
 
-  /* 要項をドライブへ保存する。**案内文を開いた時点で走らせる。**
-     以前は「出欠システムへ」を押したときだけ保存していたので、出欠をとらない行事では
-     ドライブに残らず、案内文に要項リンクを出せなかった。
-     保存は待たせない。先に今ある内容で描き、URLが取れたら作り直す。 */
-  function ensureYoukouThenRegen_() {
+  /* 案内文を開く。**要項の保存が終わるのを待ってから開く。**
+
+     以前は先に今ある内容で開いてしまい、保存が終わってから要項の行を差し込んでいた。
+     いちど出した案内文が目の前で書き換わるので、先にコピーした人は
+     **要項リンクの無いほうを配ってしまう**。だから出す前に揃える。
+
+     待つあいだは何も起きていないように見えるため、ボタンを「作成中…」にし、
+     カードには「保存しています…」を出す（saveYoukou_ の youkouNote_）。
+
+     保存が要らないとき（すでに保存済み／元ファイルが無い／未ログイン）は今までどおり即座に開く。
+     保存に失敗したときも開く（要項の行が出ないだけ。そこで詰ませない）。 */
+  function openPanel_() {
     var it = itemOf_();
-    if (!it || it.fileId || !it.file || !accessToken) return;
-    attendEnsureYoukou_(it, cardApi.read()).then(function () {
-      // 保存を待つ間に本文を手直しされていたら、描き直さない（打った字を消してしまうため）
-      if (it.fileId && ta.value === lastGen) regen();
-    }, function () { /* 保存に失敗しても案内文は出す（要項の行が出ないだけ） */ });
+    var needSave = !!(it && !it.fileId && it.file && accessToken);
+    if (!needSave) { showPanel_(); return; }
+    var label = btn.textContent;
+    btn.disabled = true;                  // 処理中の disabled は直接指定してよい（setEnabled_ の項）
+    btn.textContent = I18N.t('annBusy');
+    var back = function () {
+      btn.disabled = false;
+      btn.textContent = label;
+      showPanel_();
+    };
+    attendEnsureYoukou_(it, cardApi.read()).then(back, back);
+  }
+
+  function showPanel_() {
+    panel.style.display = 'block';
+    regen();   // 開くたびに現在の入力値から作り直す（手直し反映）
   }
 
   function regen() {
@@ -1263,16 +1343,14 @@ function wireAnnouncement_(li, cardApi) {
     f.attend_saved = !!li.__attendReady;
     f.attend_url = li.__attendUrl || '';
     ta.value = buildAnnouncementBody_(f, current, li.getAttribute('data-type'));
-    lastGen = ta.value;   // 手直しされたかどうかの目印
     syncLineBtn_();
   }
-  panel.__regen = regen;                        // 他のカードからも作り直せるようにしておく
-  panel.__ensureYoukou = ensureYoukouThenRegen_;  // annOpen_（外から開くとき）にも走らせる
+  panel.__regen = regen;      // 他のカードからも作り直せるようにしておく
+  panel.__open = openPanel_;  // annOpen_（外から開くとき）も同じ手順を通す
   btn.addEventListener('click', function () {
+    if (btn.disabled) return;   // 保存を待っている最中は受け付けない
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-    panel.style.display = 'block';
-    regen();   // 開くたびに現在の入力値から作り直す（手直し反映）
-    ensureYoukouThenRegen_();
+    openPanel_();
   });
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
@@ -1357,6 +1435,9 @@ function addCard(name) {
         '</div>' +
         '<span class="cal-status"></span>' +
         '<span class="attend-status"></span>' +
+        /* どこに保存したかを、そのカードの上で知らせる（saveYoukou_ が書き込む）。
+           上の3つのボタンのどれで保存しても、出るのはこの1行。 */
+        '<p class="youkou-note" style="display:none"></p>' +
         /* ③案内文は仕上げ。**出欠ができるまで出さない**（wireAnnounceGate_）。
            先に配ると「メニューの出欠入力から」の行き先が無い案内文になるため。
            出欠をとらない行事のために、下に逃げ道を1つ置く。 */
@@ -2098,13 +2179,9 @@ async function doRegister(targets) {
       if (!f.taikai_mei) throw new Error('大会名が空です');
       if (!f.kaisai_dates.length) throw new Error('開催日が空です');
       // 案X：登録した瞬間に、確定した 年/月/大会名 フォルダを作って要項を保存する。
+      await saveYoukou_(targets[i], f);
       var fileId = targets[i].fileId;
-      if (!fileId && targets[i].file) {
-        var folderId = await ensureEventFolder_(f.kaisai_dates[0], f.taikai_mei);
-        fileId = await uploadOriginal_(targets[i].file, folderId);
-        targets[i].fileId = fileId;
-        lastFolderId = folderId;
-      }
+      if (targets[i].folderId) lastFolderId = targets[i].folderId;
       await createEvent(f, fileId, targets[i].mimeType);   // 要項ファイルを添付
       targets[i].registered = true;              // 登録済み（再実行でスキップ・ファイルは保持）
       targets[i].card.setStatus(I18N.t('stRegistered'), 'ok');
@@ -2363,9 +2440,8 @@ function attendSend_(item, status) {
       try { win = window.open('', '_blank'); } catch (e) { win = null; }
     }
 
-    if (!(item && item.fileId) && item && item.file && accessToken) {
-      setAttendStatus_(status, '', I18N.t('attendSaving'));
-    }
+    // 「保存しています…」はここでは出さない。saveYoukou_ がカードの .youkou-note に出す
+    // （3つの経路で同じ見え方にするため。ここにも書くと同じ文が2つ並ぶ）。
 
     // 要項をドライブに保存してから、そのリンク入りの文字列を作る
     var prepare = attendEnsureYoukou_(item, cardApi.read()).then(function () {
@@ -2420,23 +2496,17 @@ function attendSend_(item, status) {
 }
 
 /**
- * 要項ファイルをドライブに保存して、item.fileId を埋める。
+ * 要項をドライブに保存する（中身は saveYoukou_）。**失敗しても止めない**ぶん。
  *
  * もとは「Googleカレンダーに登録」の中でだけ保存していたので、カレンダーを使わない人は
  * 要項リンクが空のままだった（出欠の回答画面に「要項を見る」が出ない）。
- * カレンダーとは切り離して、出欠に保存するときにも保存する。
+ * カレンダーとは切り離して、出欠に渡すときと案内文を作るときにも保存する。
  *
  * 保存できなくても出欠の取り込みは続ける（要項ボタンが出ないだけ）。
- * ログインしていないときは何もしない。
+ * カレンダー登録のときに改めて試される。
  */
 async function attendEnsureYoukou_(item, f) {
-  if (!item || item.fileId || !item.file || !accessToken) return;
-  try {
-    var folderId = await ensureEventFolder_((f.kaisai_dates || [])[0], f.taikai_mei);
-    item.fileId = await uploadOriginal_(item.file, folderId);
-  } catch (e) {
-    // 保存に失敗しても止めない。カレンダー登録のときに改めて試される
-  }
+  try { await saveYoukou_(item, f); } catch (e) { /* 止めない */ }
 }
 
 /**
