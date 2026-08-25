@@ -2368,6 +2368,24 @@ function attendReady_() {
   return ATTEND_AVAILABLE && typeof AttendanceHook !== 'undefined';
 }
 
+/* 最初の画面から出欠システムへ行けるようにする。
+   要項をドロップしないとカードの「🙋 出欠システムへ」は出ないので、
+   **集計だけ見たい人の行き先が無かった**。
+
+   ★ 管理リンクの代わりにはならない。合鍵を端末に覚えさせてある場合だけそのまま開き、
+     覚えていなければ向こうの画面で「すでに団体をお持ちの方」を出すことになる。
+   ★ ホーム画面のアプリからは別タブにしない。飛び出すとブラウザ側で開き、
+     記憶を共有しないので「どの団体か分からない」状態になる（attendStandalone_ の項）。 */
+function wireAttendEntry_() {
+  var box = document.getElementById('attend-entry');
+  var link = document.getElementById('attendEntryBtn');
+  if (!box || !link || !attendReady_()) return;
+
+  if (attendStandalone_()) link.removeAttribute('target');
+  link.addEventListener('click', function () { track('attend_entry', {}); });
+  box.style.display = '';
+}
+
 // カードの入力値から、行事として保存する中身を作る。要項リンクは保存ずみのときだけ付ける。
 // detail は「あとから見返せるように」読み取り結果を残すためのもの。表の1セルに入るので、
 // 生のOCR文は入れず、整理ずみの項目だけにする。
@@ -2807,5 +2825,6 @@ function focusHandoff_() {
 }
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
+(function () { try { wireAttendEntry_(); } catch (e) {} })();
 
 

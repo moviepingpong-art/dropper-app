@@ -99,6 +99,11 @@
       guideLink: '📖 使い方ガイド ↗',
       loginBtn: 'Googleでログイン',
       loginNote: '{ev}の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
+      /* 最初の画面から出欠システムへ行く入口（app.js の wireAttendEntry_）。
+         ★ **ログイン不要**と明言すること。上のGoogleログインの下に置くので、
+           書かないと「先にログインしないと押せない」と思われる。 */
+      attendEntryBtn: '🙋 出欠システムの管理へ',
+      attendEntryNote: 'メンバーの出欠を集める画面です。Googleログインは要りません。この端末に管理リンクを覚えさせてあれば、そのまま開きます。初めての方は、向こうの画面で団体をつくれます。',
       // --- 競技セレクタ ---
       stepSport: '① 競技を選ぶ：',
       stepDrop: '② {doc}ファイルをドロップ',
@@ -376,6 +381,8 @@
       guideLink: '📖 User guide ↗',
       loginBtn: 'Sign in with Google',
       loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
+      attendEntryBtn: '🙋 Go to the attendance admin',
+      attendEntryNote: 'Where you collect replies from your members. No Google sign-in needed. If this device remembers your admin link, it opens straight away. New here? You can create a group on that page.',
       stepSport: '① Select sport:',
       stepDrop: '② Drop the {doc} file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
@@ -629,6 +636,8 @@
       guideLink: '📖 Guide ↗',
       loginBtn: 'Google se sign in karein',
       loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
+      attendEntryBtn: '🙋 Attendance admin par jayein',
+      attendEntryNote: 'Yahan members ke jawab jama karte hain. Google login ki zaroorat nahi. Agar is device par aapka admin link yaad hai to seedha khul jayega. Naye hain? Wahin par group bana sakte hain.',
       stepSport: '① Sport chunein:',
       stepDrop: '② {doc} file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',
