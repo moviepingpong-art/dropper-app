@@ -2430,17 +2430,31 @@ function wireAttendEntry_() {
   var link = document.getElementById('attendEntryBtn');
   if (!box || !link || !attendReady_()) return;
 
-  /* 合鍵を持っていれば、行き先に付けて渡す（`admin.html#k=…`）。
+  /* ★ 合鍵の有無で**別の入口になる**。
+       持っていない → 「団体をつくる」。向こうの画面が作成の欄を出す
+       持っている   → 「管理へ」。`#k=` を付けてそのまま開く
+
      ★ `?s=` は要らない。管理画面は合鍵だけで認証する（api の authOrg）。
      ★ `#` のうしろはサーバーに送られないので、アクセスログにも Referer にも残らない。
-     ★ 持っていなければ素のURL。向こうで「すでに団体をお持ちの方」が出る。
-     合鍵はログイン後の syncAttendKey_ で戻ることがあるので、この関数は**何度呼んでもよい**。 */
+     ★ 合鍵はログイン後の syncAttendKey_ で戻ることがあり、別のタブで団体をつくることも
+       あるので、この関数は**何度呼んでも正しい**ように書く（毎回いまの合鍵を見て描き直す）。 */
   var key = attendKeyLocal_();
+  var note = document.getElementById('attendEntryNote');
+
   link.href = ATTEND_ADMIN_URL + (key ? '#k=' + encodeURIComponent(key) : '');
+  link.textContent = I18N.t(key ? 'attendEntryBtn' : 'attendMakeBtn');
+  if (note) note.textContent = I18N.t(key ? 'attendEntryNote' : 'attendMakeNote');
 
   if (attendStandalone_()) link.removeAttribute('target');
   if (!link.__wired) {
-    link.addEventListener('click', function () { track('attend_entry', {}); });
+    link.addEventListener('click', function () {
+      track('attend_entry', { has_key: attendKeyLocal_() ? 1 : 0 });
+    });
+    /* 別のタブで団体をつくって戻ってきたら、その場で「管理へ」に変わってほしい。
+       同じオリジンなので localStorage はもう入っている。読み直しを待たせない。 */
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') wireAttendEntry_();
+    });
     link.__wired = true;            // 読み直すたびに増やさない
   }
   box.style.display = '';
