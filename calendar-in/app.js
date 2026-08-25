@@ -1165,8 +1165,11 @@ function wireAnnounceGate_(li) {
 
   make.style.display = 'none';
   skip.style.display = '';
+  // 押した時点で作って開く。ボタンを出すだけだと、もう一度押させることになる
   skip.querySelector('.ann-skip-btn').addEventListener('click', function () {
     annShow_(li);
+    annMarkDone_(li);
+    annOpen_(li);
   });
 }
 
@@ -1188,6 +1191,13 @@ function annOpen_(li) {
   if (!panel) return;
   panel.style.display = 'block';
   if (panel.__regen) panel.__regen();
+  if (panel.__ensureYoukou) panel.__ensureYoukou();
+}
+
+/** 案内文のボタンを「済んだ」表示に変える。押せば開き直せるので、ボタン自体は残す。 */
+function annMarkDone_(li) {
+  var mk = li.querySelector('.ann-btn');
+  if (mk) mk.textContent = I18N.t('annBtnDone');
 }
 
 /* カレンダー登録の配線（カード生成後に呼ぶ）。
@@ -1220,12 +1230,32 @@ function wireAnnouncement_(li, cardApi) {
   var shareBtn = panel.querySelector('.ann-share');
   var lineBtn = panel.querySelector('.ann-line');
   var current = 'line';
+  var lastGen = '';   // 最後に自動生成した本文。これと違えば、利用者が手を入れている
+
+  /** このカードに対応する items[] の1件。要項のファイルIDはここが持っている */
+  function itemOf_() {
+    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) return items[i]; }
+    return null;
+  }
+
+  /* 要項をドライブへ保存する。**案内文を開いた時点で走らせる。**
+     以前は「出欠システムへ」を押したときだけ保存していたので、出欠をとらない行事では
+     ドライブに残らず、案内文に要項リンクを出せなかった。
+     保存は待たせない。先に今ある内容で描き、URLが取れたら作り直す。 */
+  function ensureYoukouThenRegen_() {
+    var it = itemOf_();
+    if (!it || it.fileId || !it.file || !accessToken) return;
+    attendEnsureYoukou_(it, cardApi.read()).then(function () {
+      // 保存を待つ間に本文を手直しされていたら、描き直さない（打った字を消してしまうため）
+      if (it.fileId && ta.value === lastGen) regen();
+    }, function () { /* 保存に失敗しても案内文は出す（要項の行が出ないだけ） */ });
+  }
+
   function regen() {
     var f = cardApi.read();
     // 要項のURL。ドライブに保存したときだけ入る（カレンダー登録か出欠保存のあと）。
     // fileId はカードではなく items[] が持っているので、ここで引き当てる
-    var it = null;
-    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) it = items[i]; }
+    var it = itemOf_();
     f.youkou = (it && it.fileId) ? ('https://drive.google.com/file/d/' + it.fileId + '/view') : '';
     /* ★ 「送った」ではなく「**本当に作られた**」ときだけ出欠の行を出す。
        送っただけでは、向こうの画面で受付を始めずに閉じた場合に案内文が嘘になる
@@ -1233,13 +1263,16 @@ function wireAnnouncement_(li, cardApi) {
     f.attend_saved = !!li.__attendReady;
     f.attend_url = li.__attendUrl || '';
     ta.value = buildAnnouncementBody_(f, current, li.getAttribute('data-type'));
+    lastGen = ta.value;   // 手直しされたかどうかの目印
     syncLineBtn_();
   }
-  panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
+  panel.__regen = regen;                        // 他のカードからも作り直せるようにしておく
+  panel.__ensureYoukou = ensureYoukouThenRegen_;  // annOpen_（外から開くとき）にも走らせる
   btn.addEventListener('click', function () {
     if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     regen();   // 開くたびに現在の入力値から作り直す（手直し反映）
+    ensureYoukouThenRegen_();
   });
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
@@ -2205,8 +2238,7 @@ function attendMarkReady_(li, url) {
   // 出欠ができたら、案内文は**押させずにこちらで作って開く**。
   // ボタンは残すが（閉じたあと開き直せるように）、文言は済んだことを示すものに変える。
   annShow_(li);
-  var mk = li.querySelector('.ann-btn');
-  if (mk) mk.textContent = I18N.t('annBtnDone');
+  annMarkDone_(li);
   annOpen_(li);
 }
 
