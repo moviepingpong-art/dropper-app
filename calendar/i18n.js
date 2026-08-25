@@ -105,6 +105,10 @@
            ログインは要らないが、合鍵の持ち回り（syncAttendKey_）にログインが要る。 */
       attendEntryBtn: '🙋 出欠システムの管理へ',
       attendEntryNote: 'メンバーの出欠を集める画面です。Googleでログインしておくと、機種を替えても同じ団体が開きます。',
+      /* まだ団体が無いとき。**この文言は「つくる」側**で、上の2つと入れ替わる。
+         用意するものを先に言う（名簿を手元に置いてから始めてもらうため）。 */
+      attendMakeBtn: '＋ 出欠の団体をつくる',
+      attendMakeNote: 'メンバーの出欠を集めるなら、最初に団体をつくります。要るのは団体名とお名前だけです。',
       // --- 競技セレクタ ---
       stepSport: '① 競技を選ぶ：',
       stepDrop: '② {doc}ファイルをドロップ',
@@ -384,6 +388,8 @@
       loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
       attendEntryBtn: '🙋 Go to the attendance admin',
       attendEntryNote: 'Where you collect replies from your members. Sign in with Google and it still opens on your next device.',
+      attendMakeBtn: '＋ Set up attendance',
+      attendMakeNote: 'To collect replies from your members, first create a group. All you need is a name and your members.',
       stepSport: '① Select sport:',
       stepDrop: '② Drop the {doc} file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
@@ -639,6 +645,8 @@
       loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
       attendEntryBtn: '🙋 Attendance admin par jayein',
       attendEntryNote: 'Yahan members ke jawab jama karte hain. Google se login rahenge to naye device par bhi wahi group khulega.',
+      attendMakeBtn: '＋ Attendance shuru karein',
+      attendMakeNote: 'Members ke jawab jama karne ke liye pehle ek group banayein. Sirf group ka naam aur members chahiye.',
       stepSport: '① Sport chunein:',
       stepDrop: '② {doc} file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',

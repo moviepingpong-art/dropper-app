@@ -653,11 +653,15 @@
            （出欠を止めるときに、カードのボタンとここが一緒に消えるように）。
          ★ ホーム画面のアプリからは別タブにしない（飛び出すと団体が分からなくなる）。
            app.js が target を外す。 -->
+    <!-- ★ 合鍵を持っているかどうかで、**出る文言と行き先が入れ替わる**（app.js の wireAttendEntry_）。
+         持っていない → 「団体をつくる」。持っている → 「管理へ」（`#k=` 付き）。
+         枠は1つだけにしてある。2つ並べると縦が伸び、スマホで画面の外に出る。
+         ★ 「つくる」は合鍵が無いときだけ出す。**二重に団体をつくらせないため**——
+           二つめができると、配ったURLが古いほうを指したままになる（出欠システム側の警告）。 -->
     <div id="attend-entry" class="attend-entry" style="display:none">
       <a id="attendEntryBtn" class="attend-entry-btn" target="_blank" rel="noopener"
-         href="https://app.dropper-tools.com/attend/admin.html"
-         data-i18n="attendEntryBtn">🙋 出欠システムの管理へ</a>
-      <p class="note" data-i18n="attendEntryNote"></p>
+         href="https://app.dropper-tools.com/attend/admin.html"></a>
+      <p class="note" id="attendEntryNote"></p>
     </div>
   </main>
 
@@ -943,10 +947,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260834"></script>
+  <script src="i18n.js?v=20260835"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260834"></script>
+  <script src="app.js?v=20260835"></script>
 </body>
 </html>
