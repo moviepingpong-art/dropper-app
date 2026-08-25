@@ -109,6 +109,10 @@
          用意するものを先に言う（名簿を手元に置いてから始めてもらうため）。 */
       attendMakeBtn: '＋ 出欠の団体をつくる',
       attendMakeNote: 'メンバーの出欠を集めるなら、最初に団体をつくります。要るのは団体名とお名前だけです。',
+      /* ログイン前に団体をつくらせない理由の説明。**なぜ要るのかを言う**——
+         ただ「ログインしてください」だけだと、Google非依存の出欠システムなのに
+         なぜ求められるのか分からない。 */
+      attendMakeLogin: 'まずGoogleでログインしてください。合鍵をあなたのドライブに預けるので、機種を替えても同じ団体が開きます。',
       // --- 競技セレクタ ---
       stepSport: '① 競技を選ぶ：',
       stepDrop: '② {doc}ファイルをドロップ',
@@ -390,6 +394,7 @@
       attendEntryNote: 'Where you collect replies from your members. Sign in with Google and it still opens on your next device.',
       attendMakeBtn: '＋ Set up attendance',
       attendMakeNote: 'To collect replies from your members, first create a group. All you need is a name and your members.',
+      attendMakeLogin: 'Please sign in with Google first. We keep your key in your own Drive, so the same group opens on your next device.',
       stepSport: '① Select sport:',
       stepDrop: '② Drop the {doc} file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
@@ -647,6 +652,7 @@
       attendEntryNote: 'Yahan members ke jawab jama karte hain. Google se login rahenge to naye device par bhi wahi group khulega.',
       attendMakeBtn: '＋ Attendance shuru karein',
       attendMakeNote: 'Members ke jawab jama karne ke liye pehle ek group banayein. Sirf group ka naam aur members chahiye.',
+      attendMakeLogin: 'Pehle Google se login karein. Aapki key aapki hi Drive mein rakhi jati hai, isliye naye device par bhi wahi group khulega.',
       stepSport: '① Sport chunein:',
       stepDrop: '② {doc} file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',

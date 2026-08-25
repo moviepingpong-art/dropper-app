@@ -542,6 +542,9 @@ function ensureTokenClient() {
       if (resp && resp.access_token) {
         accessToken = resp.access_token;
         if (pendingAuth) { pendingAuth.resolve(accessToken); pendingAuth = null; }
+        /* 出欠の入口をログイン後の姿に直す。**syncAttendKey_ より先に呼ぶこと**——
+           あちらは通信に失敗すると途中で抜けるので、ボタンが押せないまま残る。 */
+        try { wireAttendEntry_(); } catch (e) { /* noop */ }
         // 出欠の合鍵を端末間で持ち回る。**待たない**（登録の邪魔をしない）
         setTimeout(function () { syncAttendKey_(); }, 0);
       } else {
@@ -2440,14 +2443,35 @@ function wireAttendEntry_() {
        あるので、この関数は**何度呼んでも正しい**ように書く（毎回いまの合鍵を見て描き直す）。 */
   var key = attendKeyLocal_();
   var note = document.getElementById('attendEntryNote');
+  /* ★ 団体をつくるのは**ログインしてから**（2026-08-26）。
+     ログイン前につくると、合鍵はこの端末の localStorage にしか残らない。
+     次にログインするまでドライブへ預けられず、その間に端末を失うと戻せない
+     （管理リンクの表示はもう無い）。ドロッパーはどのみちログインして使うので、
+     順番を入れ替えるだけで隙間が消える。
+     ★ すでに合鍵を持っている人は素通し。**出欠システム自体にログインは要らない**ので、
+       集計を見るためだけにGoogleを求めない。 */
+  var needLogin = !key && !accessToken;
 
   link.href = ATTEND_ADMIN_URL + (key ? '#k=' + encodeURIComponent(key) : '');
   link.textContent = I18N.t(key ? 'attendEntryBtn' : 'attendMakeBtn');
-  if (note) note.textContent = I18N.t(key ? 'attendEntryNote' : 'attendMakeNote');
+  link.classList.toggle('need-login', needLogin);
+  link.setAttribute('aria-disabled', needLogin ? 'true' : 'false');
+  if (note) {
+    note.textContent = I18N.t(key ? 'attendEntryNote' : (needLogin ? 'attendMakeLogin' : 'attendMakeNote'));
+  }
 
   if (attendStandalone_()) link.removeAttribute('target');
   if (!link.__wired) {
-    link.addEventListener('click', function () {
+    link.addEventListener('click', function (e) {
+      /* ログインが要るときは、行かせずに**ログインへ回す**。
+         押した流れのまま google の要求を出すので、ポップアップに止められない
+         （await を挟むと止められる。CLAUDE.md の「押した瞬間」の項）。 */
+      if (this.classList.contains('need-login')) {
+        e.preventDefault();
+        var lb = document.getElementById('loginBtn');
+        if (lb) lb.click();
+        return;
+      }
       track('attend_entry', { has_key: attendKeyLocal_() ? 1 : 0 });
     });
     /* 別のタブで団体をつくって戻ってきたら、その場で「管理へ」に変わってほしい。
