@@ -254,7 +254,7 @@
       // --- 案内文ジェネレーター ---
       annBtn: '📣 案内文を作る',
       annTabLine: 'LINE',
-      annTabLineOfficial: 'LINE公式', annTabLineGroup: 'LINEグループ',
+      annTabLineOfficial: 'LINE｜リッチメニュー用', annTabLineGroup: 'LINE｜WEBリンク用',
       annTabX: 'X',
       annTabPlain: '汎用',
       annCopy: 'コピー',
@@ -516,7 +516,7 @@
       // --- Announcement generator ---
       annBtn: '📣 Create announcement',
       annTabLine: 'WhatsApp',
-      annTabLineOfficial: 'LINE (official)', annTabLineGroup: 'LINE (group)',
+      annTabLineOfficial: 'LINE (rich menu)', annTabLineGroup: 'LINE (web link)',
       annTabX: 'X',
       annTabPlain: 'General',
       annCopy: 'Copy',
@@ -773,7 +773,7 @@
       // --- Announcement generator (Hinglish・要ネイティブ確認) ---
       annBtn: '📣 Announcement banayein',
       annTabLine: 'WhatsApp',
-      annTabLineOfficial: 'LINE (official)', annTabLineGroup: 'LINE (group)',
+      annTabLineOfficial: 'LINE (rich menu)', annTabLineGroup: 'LINE (web link)',
       annTabX: 'X',
       annTabPlain: 'General',
       annCopy: 'Copy',
