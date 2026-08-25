@@ -143,7 +143,11 @@
       annSkipAttend: 'この行事の出欠をとらずに案内文を作成する',
       attendCopied: '✓ コピーしました。出欠システムの管理画面に貼り付けてください。',
       attendFailed: '出欠システムを開けませんでした。もう一度お試しください。',
-      attendSaving: '要項を保存しています…',
+      /* 要項をドライブに保存するときの、カード上の1行（app.js の youkouNote_）。
+         カレンダー登録・出欠システムへ・案内文を作る、の3経路で同じものが出る。
+         {path} は保存先の道順（例：2026 Tournaments / 09 / 第3回◯◯大会）。 */
+      youkouSaving: '📄 {doc}を保存しています…',
+      youkouSavedTo: '📁 {path} に保存しました',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
       // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
@@ -252,6 +256,8 @@
       keyInfoInclude: 'カレンダーの説明に含める',
       // --- 案内文ジェネレーター ---
       annBtn: '📣 案内文を作る',
+      // 要項の保存を待っているあいだのボタン文言。待つ理由は app.js の openPanel_ を参照
+      annBusy: '作成中…',
       annBtnDone: '✓ 案内文を作成しました',
       annTabLine: 'LINE',
       annTabX: 'X',
@@ -407,7 +413,8 @@
       annSkipAttend: 'Write the announcement without attendance',
       attendCopied: '✓ Copied. Paste it into the attendance admin page.',
       attendFailed: 'Could not open the attendance system. Please try again.',
-      attendSaving: 'Saving the document…',
+      youkouSaving: '📄 Saving the {doc}…',
+      youkouSavedTo: '📁 Saved to {path}',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
       annAttendUrl: 'Answer here',
@@ -506,6 +513,7 @@
       keyInfoInclude: 'Include in calendar description',
       // --- Announcement generator ---
       annBtn: '📣 Create announcement',
+      annBusy: 'Preparing…',
       annBtnDone: '✓ Announcement ready',
       annTabLine: 'WhatsApp',
       annTabX: 'X',
@@ -658,7 +666,8 @@
       annSkipAttend: 'Attendance ke bina announcement banayein',
       attendCopied: '✓ Copy ho gaya. Attendance admin page mein paste karein.',
       attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
-      attendSaving: 'Document save ho raha hai…',
+      youkouSaving: '📄 {doc} save ho raha hai…',
+      youkouSavedTo: '📁 {path} mein save ho gaya',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
       annAttendUrl: 'Jawab yahan dein',
@@ -755,6 +764,7 @@
       keyInfoInclude: 'Calendar description me shaamil karein',
       // --- Announcement generator (Hinglish・要ネイティブ確認) ---
       annBtn: '📣 Announcement banayein',
+      annBusy: 'Ban raha hai…',
       annBtnDone: '✓ Announcement taiyaar',
       annTabLine: 'WhatsApp',
       annTabX: 'X',
