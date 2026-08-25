@@ -485,23 +485,6 @@
        ★ 出欠が使える言語では、**出欠ができるまで出さない**（app.js の wireAnnounceGate_）。 */
     .ann-make { margin-top:10px; }
     .ann-make .ann-btn { width:100%; padding:9px 12px; }
-    /* 出欠ができて現れた瞬間だけ光らせる。**鳴りっぱなしにしない**（6秒で止める）。
-       ★ ボタン自体の色を振る。前は外へ広がる輪だけだったが、輪の色（teal）が
-       ボタンの地の色と同じで、白いカードの上ではほとんど見えなかった。
-       黄色に振ると、地の teal と補色の関係になって「点滅」として目に入る。 */
-    @keyframes annPop {
-      0%, 100% { background:var(--teal); border-color:var(--teal); color:#fff;
-                 box-shadow:0 0 0 0 rgba(255,210,63,0); }
-      50%      { background:var(--yellow); border-color:var(--yellow); color:var(--ink);
-                 box-shadow:0 0 0 6px rgba(255,210,63,.45); }
-    }
-    .ann-make.new .ann-btn { animation:annPop .7s ease-in-out 8; }
-    /* 動きを減らす設定の人には**動かさない**。ただし何も出さないと、新しく現れたことが
-       伝わらないまま消える。色を変えて置いておく（6秒後に new が外れて地の色に戻る）。 */
-    @media (prefers-reduced-motion: reduce) {
-      .ann-make.new .ann-btn { animation:none; background:var(--yellow);
-                               border-color:var(--yellow); color:var(--ink); }
-    }
     /* 出欠をとらない行事のための逃げ道。押し間違いではなく、自分で選ぶぶんには止めない */
     .ann-skip { margin:10px 0 0; }
     .ann-skip-btn { font-size:12.5px; font-family:inherit; background:none; border:none; padding:0;
@@ -899,10 +882,10 @@
   </script>
   <!-- ?v= はキャッシュ対策のバージョン番号。中身を更新したら4本とも同じ値に書き換えること
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260826"></script>
+  <script src="i18n.js?v=20260827"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260816"></script>
-  <script src="app.js?v=20260826"></script>
+  <script src="app.js?v=20260827"></script>
 </body>
 </html>
