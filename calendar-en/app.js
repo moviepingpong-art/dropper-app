@@ -1233,6 +1233,7 @@ function wireAnnouncement_(li, cardApi) {
     f.attend_saved = !!li.__attendReady;
     f.attend_url = li.__attendUrl || '';
     ta.value = buildAnnouncementBody_(f, current, li.getAttribute('data-type'));
+    syncLineBtn_();
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
   btn.addEventListener('click', function () {
@@ -1262,14 +1263,19 @@ function wireAnnouncement_(li, cardApi) {
     if (navigator.share) { shareBtn.addEventListener('click', function () { navigator.share({ text: ta.value }).catch(function () {}); }); }
     else { shareBtn.style.display = 'none'; }
   }
+  /* 「LINEで送る」は **LINEタブのときだけ**出す。X・汎用の文面をLINEに送る道は要らない。
+     日本語版のみでもある（en/in は LINE を使わない。index.html は3フォルダ同一に保つので、
+     出し分けはここで行う）。タブを切り替えるたびに regen() から呼ばれる。 */
+  function syncLineBtn_() {
+    if (!lineBtn) return;
+    var ja = (window.LANG !== 'en' && window.LANG !== 'in');
+    lineBtn.style.display = (ja && current === 'line') ? '' : 'none';
+  }
   if (lineBtn) {
-    // LINEボタンは日本語版のみ。en/in では出さない（index.html は3フォルダ同一を保つため、ここで制御する）。
-    if (window.LANG === 'en' || window.LANG === 'in') { lineBtn.style.display = 'none'; }
-    else {
-      lineBtn.addEventListener('click', function () {
-        window.open('https://line.me/R/msg/text/?' + encodeURIComponent(ta.value), '_blank', 'noopener');
-      });
-    }
+    lineBtn.addEventListener('click', function () {
+      window.open('https://line.me/R/msg/text/?' + encodeURIComponent(ta.value), '_blank', 'noopener');
+    });
+    syncLineBtn_();
   }
 }
 
