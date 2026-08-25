@@ -837,6 +837,19 @@ async function uploadOriginal_(file, folderId) {
     });
   } catch (e) { /* 名前変更・移動の失敗は無視（ファイルはマイドライブ直下に残る） */ }
 
+  // このファイルのURLは**主催者以外の人に渡る**。案内文（X・汎用）に載り、
+  // カレンダー予定の説明にも入り、出欠の回答画面の「要項を見る」もここを指す。
+  // 共有設定が無いと、受け取った人は全員「アクセス権が必要です」で止まる。
+  // drive.file はアプリが作ったファイルの権限を変えられるので、ここで開けておく。
+  // best-effort：失敗しても保存自体は成功させる（主催者本人は開けるため）。
+  try {
+    await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions?fields=id', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } catch (e) { /* 共有の失敗は無視。主催者だけが開ける状態で残る */ }
+
   return fileId;
 }
 
@@ -995,26 +1008,6 @@ function annHashtag_(typeKey) {
   }
   return '';
 }
-// ===== 案内文のクレジット行 =====
-// 案内文はLINE/WhatsAppのグループに貼られて多くの人の目に触れる。その末尾に一行入れることで、
-// 告知文そのものが実例つきの導線になる。既定はONで、利用者が外せる。
-var ANN_CREDIT_STORE = 'dropper_ann_credit';
-// キーが無い＝初回利用者は ON 扱い（'0' のときだけ OFF）。
-function annCreditOn_() {
-  try { return localStorage.getItem(ANN_CREDIT_STORE) !== '0'; } catch (e) { return true; }
-}
-function setAnnCreditOn_(on) {
-  try { localStorage.setItem(ANN_CREDIT_STORE, on ? '1' : '0'); } catch (e) {}
-}
-// 本体（buildAnnouncementBody_）は3チャネルとも途中 return するうえ、line は末尾の空白を落として返す。
-// クレジットは各チャネルの中ではなく、組み立てが終わったこの最終段で1回だけ足す。
-// 付けるかどうかは呼び出し側から渡す（本体を localStorage に依存させないため）。
-function buildAnnouncement_(f, channel, typeKey, withCredit) {
-  var body = buildAnnouncementBody_(f, channel, typeKey);
-  if (!withCredit) return body;
-  // Xタブは字数が厳しいので短縮版を使う
-  return body + '\n\n' + I18N.t(channel === 'x' ? 'annCreditShort' : 'annCredit');
-}
 function buildAnnouncementBody_(f, channel, typeKey) {
   var emoji = typeCfg_(typeKey).annEmoji || '🏓';   // 種類別の先頭絵文字（sports=🏓 / general=🎉）
   // 会期で開催する種類（展示会など）は、日を1件ずつ並べず「初日〜最終日」の1行にまとめる
@@ -1024,6 +1017,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   var dates = (f.kaisai_dates || []).slice().sort();
   var maps = annMapsLink_(f);
   var gcal = annGcalLink_(f);
+  // 要項（ドライブに保存した元ファイル）。**X と汎用にだけ載せる。**
+  // LINEは出欠の回答画面に「要項を見る」ボタンが出るので、本文に並べる必要がない。
+  var youkou = String(f.youkou || '').trim();
   var tag = annHashtag_(typeKey);
   var keyInfo = (f.key_info || []).filter(function (it) { return (it.label || it.text); });
   // 言語別の記号（ja=全角、en/in=半角）。ja出力は従来どおり。
@@ -1043,15 +1039,17 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   // 以下の分岐は attend ではなく attendLine で見る。
   // 出欠の行を出さない回は、地図とカレンダーのリンクを落とす理由も無くなる
   // （落としていたのは「回答画面にボタンとして出るから」なので、そこへ行けないなら話が別）。
-  var attendLine = attend ? annAttendLine_(f, ja, channel) : '';
+  var attendLine = attend ? annAttendLine_(f, channel) : '';
   if (channel === 'x') {
     L.push(emoji + name);
     if (dates.length) L.push('📅' + annDateRange_(dates));
     if (f.kaijo) L.push('📍' + f.kaijo);
     if (f.shimekiri) L.push('📝' + I18N.t('annDeadline') + f.shimekiri);
-    // Xは字数が厳しい。URLを2本入れると本文が押し出されるので、出欠がある回はそちらを優先し
-    // カレンダー追加リンクを落とす（出欠は締切があり、案内の目的そのものであるため）。
+    // Xは字数が厳しい（本文＋URLで280字）。**URLは1本だけ**にする。
+    // 優先順は 出欠 → 要項 → カレンダー。要項はその行事の一次情報で、
+    // カレンダー追加より知りたい人が多い。
     if (attendLine) L.push('🙋 ' + attendLine);
+    else if (youkou) L.push('📄 ' + I18N.t('annYoukou') + ' ▶ ' + youkou);
     else if (gcal) L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal);
     if (tag) L.push(tag);
     return L.join('\n');
@@ -1075,6 +1073,8 @@ function buildAnnouncementBody_(f, channel, typeKey) {
       var lbl = (it.label || '').trim(), txt = (it.text || '').trim();
       L.push((lbl ? lbl + CL : '') + txt);
     });
+    // 汎用は字数の制限が無いので、あるものは全部出す
+    if (youkou) { L.push(''); L.push('▼ ' + I18N.t('annYoukou')); L.push(youkou); }
     if (gcal && !attendLine) { L.push(''); L.push('▼ ' + I18N.t('annAddCal')); L.push(gcal); }
     if (maps && !attendLine) { L.push('▼ ' + I18N.t('annMap')); L.push(maps); }
     // 出欠は**いちばん最後**に置く。読み終えたところに行動を置きたいので、
@@ -1120,6 +1120,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     });
     L.push('');
   }
+  // 要項は**出欠の行が無い回だけ**出す。出欠があるときは回答画面に「要項を見る」ボタンが出るので、
+  // 本文にURLを並べると同じものが2か所になり、肝心の出欠が埋もれる。
+  if (youkou && !attendLine) { L.push('📄 ' + I18N.t('annYoukou') + ' ▶ ' + youkou); L.push(''); }
   if (gcal && !attendLine) { L.push('📆 ' + I18N.t('annAddCal') + ' ▶ ' + gcal); L.push(''); }
   if (tag) L.push(tag);
   // 出欠は**いちばん最後**に置く。チャットでは末尾がいちばん目に入る位置で、
@@ -1128,144 +1131,22 @@ function buildAnnouncementBody_(f, channel, typeKey) {
   if (attendLine) { L.push(''); L.push('🙋 ' + attendLine); }
   return L.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
-/* 案内文の出欠の行。**渡す相手ごとに書きぶりが変わる。**
-   日本語は転送先で道が違うので、タブで分けている。
-     リッチメニュー用（line）… 公式アカウントのリッチメニューに出欠を常設しているので、
-                              メニューへ案内する。URLは書かない
-     WEBリンク用（group）   … グループLINEなど、メニューが無いところへ渡すぶん。
-                              まとめた1本のURLを書かないと辿り着けない
-     X           … **公開の場なので載せない。** このURLは団体につき1本で、
-                    開けば名簿がそのまま見える。誰でも読める場所に置くものではない
-     汎用        … 用途が決まらないので載せない（空約束になるより出さない）
-   en/in は LINE を使わずリッチメニューという置き場が無いので、どの相手でもURLを書く。
+/* 案内文の出欠の行。**渡す相手ごとに変わる。ことばでは決めない。**
+
+     LINE（`line`）… まとめた1本のURLを書く。ここが主な配り先
+     X（`x`）      … **載せない。公開の場だから。** このURLは団体につき1本で、
+                     開けば名簿がそのまま見える。誰でも読める場所に置くものではない
+     汎用（`plain`）… 用途が決まらないので載せない（空約束になるより出さない）
+
+   2026-08-25 まではリッチメニューへの誘導文（`annAttendMenu`）を出す道もあったが、
+   LINE公式アカウントの運用をやめたので消した。**いまはWebのURL1本で回す。**
    URLは団体につき1本で、行事が増えても変わらない（`?s=団体ID` のみ）。
    出欠システムが渡してこなかったとき（古い管理画面など）は、URLの無い言い方に落とす。
    **空文字を返すことがある。** 呼ぶ側は、空なら出欠の行そのものを出さないこと。 */
-function annAttendLine_(f, ja, channel) {
+function annAttendLine_(f, channel) {
+  if (channel === 'x' || channel === 'plain') return '';
   var url = String((f && f.attend_url) || '').trim();
-  var withUrl = url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
-  if (!ja) return withUrl;
-  if (channel === 'line') return I18N.t('annAttendMenu');
-  if (channel === 'group') return withUrl;
-  return '';
-}
-
-/* 案内文のタブ。**日本語だけ LINE を2つに分ける。**
-   リッチメニューのある公式アカウントへ転送するのか、グループなどへリンクで渡すのかで、
-   出欠への道が違うため（上を参照）。**タブ名は1つで意味が完結する形にする**
-   （見出しでまとめると、スマホで折り返したときにどこまでがLINE用か分からなくなる）。
-   en/in は LINE を使わない（タブ名も WhatsApp）ので、この区別を出さない。
-   既定はWEBリンク用。日々の連絡はグループへ流すほうが多い。 */
-function annDefaultChannel_() {
-  return (window.LANG !== 'en' && window.LANG !== 'in') ? 'group' : 'line';
-}
-
-function annTabsHtml_() {
-  var ja = (window.LANG !== 'en' && window.LANG !== 'in');
-  var list = ja
-    ? [['line', 'annTabLineOfficial'], ['group', 'annTabLineGroup'], ['x', 'annTabX'], ['plain', 'annTabPlain']]
-    : [['line', 'annTabLine'], ['x', 'annTabX'], ['plain', 'annTabPlain']];
-  var def = annDefaultChannel_();
-  return list.map(function (it) {
-    return '<button type="button" class="ann-tab' + (it[0] === def ? ' on' : '') + '" data-ch="' + it[0] + '">'
-      + I18N.t(it[1]) + '</button>';
-  }).join('');
-}
-
-// ===== 案内文の画像書き出し =====
-// LINE・WhatsApp・Instagram はテキストより画像の方が回る。画像なら貼り付け先で折り返しが崩れず、
-// クレジットも焼き込まれるので消せない。ライブラリは足さない（Canvasだけで描く）。
-var ANN_IMG_W = 1080;      // SNSで扱いやすい幅
-var ANN_IMG_PAD = 72;
-var ANN_IMG_FS = 34;       // 本文の文字サイズ
-var ANN_IMG_LH = 60;       // 行送り
-var ANN_IMG_FONT = '"Zen Maru Gothic","Hiragino Maru Gothic ProN",sans-serif';
-
-// 画像の中のURLはタップできない。237字の中継リンクが画面を占領するだけなので落とす。
-// リンクは共有時のテキスト側が担う（navigator.share に files と text を両方渡す）。
-// 「▼ カレンダーに追加」のような、次行のURLを指す見出しも一緒に落とす（残すと空約束になる）。
-function annStripUrls_(text) {
-  var lines = String(text || '').split('\n');
-  var out = [];
-  for (var i = 0; i < lines.length; i++) {
-    if (/https?:\/\//.test(lines[i])) {
-      // 出欠の行だけは消さずに、URLの無い言い方へ落とす。画像の中のURLはタップできないが、
-      // 行ごと消すと「出欠をお願いします」という肝心の依頼まで消えてしまう
-      if (/^🙋/.test(lines[i])) out.push('🙋 ' + I18N.t('annAttendNoUrl'));
-      continue;
-    }
-    if (/^\s*▼/.test(lines[i]) && i + 1 < lines.length && /https?:\/\//.test(lines[i + 1])) continue;
-    out.push(lines[i]);
-  }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
-}
-
-// 1行を幅に収まるよう折り返す。日本語は空白が無いので、語で入らなければ1文字ずつ詰める。
-// 絵文字はサロゲートペアなので Array.from で分ける（[j] で切ると壊れる）。
-function annWrap_(ctx, line, maxW) {
-  if (!line) return [''];
-  var out = [], cur = '';
-  var tokens = line.match(/\s+|\S+/g) || [];
-  for (var i = 0; i < tokens.length; i++) {
-    var tk = tokens[i];
-    if (ctx.measureText(cur + tk).width <= maxW) { cur += tk; continue; }
-    if (cur.replace(/\s+$/, '')) { out.push(cur.replace(/\s+$/, '')); cur = ''; }
-    if (/^\s+$/.test(tk)) continue;
-    var chars = Array.from(tk);
-    for (var j = 0; j < chars.length; j++) {
-      if (cur && ctx.measureText(cur + chars[j]).width > maxW) { out.push(cur); cur = ''; }
-      cur += chars[j];
-    }
-  }
-  out.push(cur.replace(/\s+$/, ''));
-  return out;
-}
-
-// 案内文テキスト → PNG の Blob。Webフォントの読み込みを待ってから描く
-// （待たずに描くと、画面と違う既定フォントで焼き付いてしまう）。
-function annRenderImage_(text) {
-  var body = annStripUrls_(text);
-  // 末尾のクレジット行は下部の帯に焼き込むので、本文からは外す（同じ文が2回出てしまうため）。
-  [I18N.t('annCredit'), I18N.t('annCreditShort')].forEach(function (c) {
-    if (c && body.slice(-c.length) === c) body = body.slice(0, -c.length).replace(/\s+$/, '');
-  });
-  var credit = I18N.t('annCredit').replace(/^—\s*/, '');
-  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-  return ready.catch(function () {}).then(function () {
-    var maxW = ANN_IMG_W - ANN_IMG_PAD * 2;
-    var probe = document.createElement('canvas').getContext('2d');
-    probe.font = '500 ' + ANN_IMG_FS + 'px ' + ANN_IMG_FONT;
-    var rows = [];
-    body.split('\n').forEach(function (ln) { rows = rows.concat(annWrap_(probe, ln, maxW)); });
-
-    var footH = 132;                       // 下部のクレジット帯
-    var topBar = 14;                       // 上端のアクセント線
-    var h = topBar + ANN_IMG_PAD + rows.length * ANN_IMG_LH + ANN_IMG_PAD + footH;
-    var cv = document.createElement('canvas');
-    cv.width = ANN_IMG_W; cv.height = Math.max(h, 640);
-    var ctx = cv.getContext('2d');
-
-    ctx.fillStyle = '#ffffff';                       // --paper
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.fillStyle = '#06b6a4';                       // --teal
-    ctx.fillRect(0, 0, cv.width, topBar);
-
-    ctx.fillStyle = '#0f3d3a';                       // --ink
-    ctx.font = '500 ' + ANN_IMG_FS + 'px ' + ANN_IMG_FONT;
-    ctx.textBaseline = 'top';
-    var y = topBar + ANN_IMG_PAD;
-    rows.forEach(function (r) { ctx.fillText(r, ANN_IMG_PAD, y); y += ANN_IMG_LH; });
-
-    // クレジット帯。画像に焼き込むので、本文と違って消せない。
-    var fy = cv.height - footH;
-    ctx.fillStyle = '#06b6a4';
-    ctx.fillRect(0, fy, cv.width, footH);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 30px ' + ANN_IMG_FONT;
-    ctx.fillText(credit, ANN_IMG_PAD, fy + 46);
-
-    return new Promise(function (resolve) { cv.toBlob(resolve, 'image/png'); });
-  });
+  return url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
 }
 
 /* 案内文は、出欠ができるまで出さない。
@@ -1285,22 +1166,28 @@ function wireAnnounceGate_(li) {
   make.style.display = 'none';
   skip.style.display = '';
   skip.querySelector('.ann-skip-btn').addEventListener('click', function () {
-    annShow_(li, false);
+    annShow_(li);
   });
 }
 
-/** 案内文のボタンを出す。出欠ができて出たときだけ、目が行くように光らせる。 */
-function annShow_(li, blink) {
+/** 案内文のボタンを出す。 */
+function annShow_(li) {
   var make = li.querySelector('.ann-make');
   var skip = li.querySelector('.ann-skip');
   if (!make) return;
   if (skip) skip.style.display = 'none';
   if (make.style.display !== 'none') return;
   make.style.display = '';
-  if (blink) {
-    make.classList.add('new');
-    setTimeout(function () { make.classList.remove('new'); }, 6000);
-  }
+}
+
+/** 案内文を、押させずに開く。出欠から戻ってきたときに使う。
+    以前はボタンを点滅させて「押してください」と促していたが、
+    どうせ全員が押すので、こちらで開いてしまうほうが手数が1つ減る。 */
+function annOpen_(li) {
+  var panel = li.querySelector('.ann-panel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  if (panel.__regen) panel.__regen();
 }
 
 /* カレンダー登録の配線（カード生成後に呼ぶ）。
@@ -1331,19 +1218,21 @@ function wireAnnouncement_(li, cardApi) {
   var tabs = panel.querySelectorAll('.ann-tab');
   var copyBtn = panel.querySelector('.ann-copy');
   var shareBtn = panel.querySelector('.ann-share');
-  var creditChk = panel.querySelector('.ann-credit-chk');
-  var waBtn = panel.querySelector('.ann-wa');
   var lineBtn = panel.querySelector('.ann-line');
-  var imgBtn = panel.querySelector('.ann-img');
-  var current = annDefaultChannel_();
+  var current = 'line';
   function regen() {
     var f = cardApi.read();
+    // 要項のURL。ドライブに保存したときだけ入る（カレンダー登録か出欠保存のあと）。
+    // fileId はカードではなく items[] が持っているので、ここで引き当てる
+    var it = null;
+    for (var i = 0; i < items.length; i++) { if (items[i].card === cardApi) it = items[i]; }
+    f.youkou = (it && it.fileId) ? ('https://drive.google.com/file/d/' + it.fileId + '/view') : '';
     /* ★ 「送った」ではなく「**本当に作られた**」ときだけ出欠の行を出す。
        送っただけでは、向こうの画面で受付を始めずに閉じた場合に案内文が嘘になる
        （「メニューの出欠入力から」と書いてあるのに、そこには何も無い）。 */
     f.attend_saved = !!li.__attendReady;
     f.attend_url = li.__attendUrl || '';
-    ta.value = buildAnnouncement_(f, current, li.getAttribute('data-type'), creditChk ? creditChk.checked : true);
+    ta.value = buildAnnouncementBody_(f, current, li.getAttribute('data-type'));
   }
   panel.__regen = regen;   // 他のカードからも作り直せるようにしておく（クレジット切替の同期用）
   btn.addEventListener('click', function () {
@@ -1353,7 +1242,7 @@ function wireAnnouncement_(li, cardApi) {
   });
   tabs.forEach(function (t) {
     t.addEventListener('click', function () {
-      current = t.getAttribute('data-ch') || annDefaultChannel_();
+      current = t.getAttribute('data-ch') || 'line';
       tabs.forEach(function (x) { x.classList.remove('on'); });
       t.classList.add('on');
       regen();
@@ -1373,27 +1262,6 @@ function wireAnnouncement_(li, cardApi) {
     if (navigator.share) { shareBtn.addEventListener('click', function () { navigator.share({ text: ta.value }).catch(function () {}); }); }
     else { shareBtn.style.display = 'none'; }
   }
-  // クレジットのON/OFF。保存先は端末に1つなので、切り替えたらページ内の全カードに反映する。
-  // 合わせないと、2枚目以降のチェック表示と本文が実態とズレる。
-  if (creditChk) {
-    creditChk.checked = annCreditOn_();
-    creditChk.addEventListener('change', function () {
-      setAnnCreditOn_(creditChk.checked);
-      var panels = document.querySelectorAll('.ann-panel');
-      for (var i = 0; i < panels.length; i++) {
-        var c = panels[i].querySelector('.ann-credit-chk');
-        if (c) c.checked = creditChk.checked;
-        // 開いているパネルだけ作り直す。閉じているものは開くときに regen される。
-        if (panels[i].style.display !== 'none' && panels[i].__regen) panels[i].__regen();
-      }
-    });
-  }
-  // 直行ボタン。本文はクリック時点の textarea から取る（利用者の手直しを反映するため）。
-  if (waBtn) {
-    waBtn.addEventListener('click', function () {
-      window.open('https://wa.me/?text=' + encodeURIComponent(ta.value), '_blank', 'noopener');
-    });
-  }
   if (lineBtn) {
     // LINEボタンは日本語版のみ。en/in では出さない（index.html は3フォルダ同一を保つため、ここで制御する）。
     if (window.LANG === 'en' || window.LANG === 'in') { lineBtn.style.display = 'none'; }
@@ -1402,42 +1270,6 @@ function wireAnnouncement_(li, cardApi) {
         window.open('https://line.me/R/msg/text/?' + encodeURIComponent(ta.value), '_blank', 'noopener');
       });
     }
-  }
-  // 画像で書き出す。共有できる端末は「画像＋本文テキスト」を一緒に渡す
-  // （画像からURLを落としているため、リンクはテキスト側が担う）。
-  // 共有に対応していない端末では PNG をダウンロードする。どちらも通らないときだけ失敗表示。
-  if (imgBtn) {
-    imgBtn.addEventListener('click', function () {
-      var old = imgBtn.textContent;
-      var restore = function (key) {
-        imgBtn.textContent = I18N.t(key);
-        setTimeout(function () { imgBtn.textContent = old; imgBtn.disabled = false; }, 1800);
-      };
-      imgBtn.disabled = true;
-      imgBtn.textContent = I18N.t('annImgMaking');
-      annRenderImage_(ta.value).then(function (blob) {
-        if (!blob) { restore('annImgFail'); return; }
-        var name = 'dropper-' + Date.now() + '.png';
-        var file = null;
-        try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
-        if (file && navigator.share && navigator.canShare) {
-          if (navigator.canShare({ files: [file], text: ta.value })) {
-            navigator.share({ files: [file], text: ta.value }).catch(function () {});
-            restore('annImgDone'); return;
-          }
-          if (navigator.canShare({ files: [file] })) {
-            navigator.share({ files: [file] }).catch(function () {});
-            restore('annImgDone'); return;
-          }
-        }
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-        restore('annImgDone');
-      }, function () { restore('annImgFail'); });
-    });
   }
 }
 
@@ -1497,16 +1329,15 @@ function addCard(name) {
         '</p>' +
         '<div class="ann-panel" style="display:none">' +
           '<div class="ann-tabs">' +
-            annTabsHtml_() +
+            '<button type="button" class="ann-tab on" data-ch="line">' + I18N.t('annTabLine') + '</button>' +
+            '<button type="button" class="ann-tab" data-ch="x">' + I18N.t('annTabX') + '</button>' +
+            '<button type="button" class="ann-tab" data-ch="plain">' + I18N.t('annTabPlain') + '</button>' +
           '</div>' +
           '<textarea class="ann-text" rows="12" spellcheck="false"></textarea>' +
-          '<label class="ann-credit"><input type="checkbox" class="ann-credit-chk"><span>' + I18N.t('annCreditToggle') + '</span></label>' +
           '<div class="ann-actions">' +
             '<button type="button" class="ann-copy">' + I18N.t('annCopy') + '</button>' +
             '<button type="button" class="ann-share">' + I18N.t('annShare') + '</button>' +
-            '<button type="button" class="ann-wa">' + I18N.t('annWaBtn') + '</button>' +
             '<button type="button" class="ann-line">' + I18N.t('annLineBtn') + '</button>' +
-            '<button type="button" class="ann-img">' + I18N.t('annImgBtn') + '</button>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -2365,9 +2196,12 @@ function attendMarkReady_(li, url) {
   li.__attendUrl = String(url || '');
   var status = li.querySelector('.attend-status');
   setAttendStatus_(status, 'ok', I18N.t('attendDone'));
-  annShow_(li, true);                              // ここで案内文のボタンが現れる
-  var panel = li.querySelector('.ann-panel');
-  if (panel && panel.__regen) panel.__regen();   // 案内文に出欠の行を入れる
+  // 出欠ができたら、案内文は**押させずにこちらで作って開く**。
+  // ボタンは残すが（閉じたあと開き直せるように）、文言は済んだことを示すものに変える。
+  annShow_(li);
+  var mk = li.querySelector('.ann-btn');
+  if (mk) mk.textContent = I18N.t('annBtnDone');
+  annOpen_(li);
 }
 
 // 名前と開催日で、どのカードの話かを見分ける（同じ画面で移った場合は目印が消えているため）
