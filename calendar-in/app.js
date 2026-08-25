@@ -542,6 +542,8 @@ function ensureTokenClient() {
       if (resp && resp.access_token) {
         accessToken = resp.access_token;
         if (pendingAuth) { pendingAuth.resolve(accessToken); pendingAuth = null; }
+        // 出欠の合鍵を端末間で持ち回る。**待たない**（登録の邪魔をしない）
+        setTimeout(function () { syncAttendKey_(); }, 0);
       } else {
         if (pendingAuth) { pendingAuth.reject(new Error(I18N.t('msgLoginCancelled'))); pendingAuth = null; }
       }
@@ -621,7 +623,11 @@ async function ocrViaDrive(file) {
 // これにより、スマホとPCなど別端末でも同じ 年/月/大会名 フォルダを再利用できる。
 var CHILD_FOLDER_CACHE_KEY = 'dropperChildFolders';   // { "親ID/子名": "子ID", ... }
 var APPDATA_FILE_NAME = 'dropper-folders.json';       // appDataFolder上の対応表ファイル名
-var appDataFileId_ = null;                            // その対応表ファイルのID（一度見つけたら保持）
+/* 出欠システムの合鍵も同じ領域に預ける（2026-08-25〜）。
+   **ファイルを分ける。** 上は「フォルダの道→ID」の表で、こちらは合鍵。
+   1つのファイルに混ぜると、どちらの都合で壊れたのか分からなくなる。 */
+var APPDATA_ATTEND_NAME = 'dropper-attend.json';
+var appDataFileId_ = {};                              // { ファイル名: そのファイルのID }（見つけたら保持）
 var childFolderMap_ = null;                           // メモリ上の対応表（読み込み後に保持）
 
 // --- localStorage（手元キャッシュ・フォールバック用） ---
@@ -635,9 +641,9 @@ function saveLocalCache_(map) {
 
 // --- appDataFolder（端末間で共有される保存先） ---
 // appDataFolder内は files.list で検索できる特別な領域。対応表ファイルのIDを探す（無ければ null）。
-async function findAppDataFile_() {
+async function findAppDataFile_(name) {
   try {
-    var q = encodeURIComponent("name='" + APPDATA_FILE_NAME + "'");
+    var q = encodeURIComponent("name='" + name + "'");
     var r = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=' + q + '&fields=files(id)', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
@@ -652,11 +658,11 @@ async function findAppDataFile_() {
 }
 
 // appDataFolderから対応表を読む（無ければ空オブジェクト）。ファイルIDは appDataFileId_ に保持。
-async function readAppDataMap_() {
+async function readAppDataMap_(name) {
   try {
-    if (!appDataFileId_) appDataFileId_ = await findAppDataFile_();
-    if (!appDataFileId_) return {};
-    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + appDataFileId_ + '?alt=media', {
+    if (!appDataFileId_[name]) appDataFileId_[name] = await findAppDataFile_(name);
+    if (!appDataFileId_[name]) return {};
+    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + appDataFileId_[name] + '?alt=media', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
     if (r.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
@@ -669,13 +675,13 @@ async function readAppDataMap_() {
 }
 
 // 対応表を appDataFolder に書き戻す（既存ファイルがあれば更新、無ければ新規作成）。best-effort。
-async function writeAppDataMap_(map) {
+async function writeAppDataMap_(name, map) {
   var body = JSON.stringify(map);
   try {
-    if (!appDataFileId_) appDataFileId_ = await findAppDataFile_();
-    if (appDataFileId_) {
+    if (!appDataFileId_[name]) appDataFileId_[name] = await findAppDataFile_(name);
+    if (appDataFileId_[name]) {
       // 既存ファイルの中身を更新（media アップロード）
-      var u = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + appDataFileId_ + '?uploadType=media', {
+      var u = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + appDataFileId_[name] + '?uploadType=media', {
         method: 'PATCH',
         headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
         body: body
@@ -685,7 +691,7 @@ async function writeAppDataMap_(map) {
     }
     // 新規作成：multipart で メタデータ（appDataFolder配下）＋本体 を一度に送る
     var boundary = 'dropper' + Date.now();
-    var meta = { name: APPDATA_FILE_NAME, parents: ['appDataFolder'] };
+    var meta = { name: name, parents: ['appDataFolder'] };
     var multipart =
       '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
       '\r\n--' + boundary + '\r\nContent-Type: application/json\r\n\r\n' + body +
@@ -696,7 +702,7 @@ async function writeAppDataMap_(map) {
       body: multipart
     });
     if (c.status === 401) { accessToken = null; throw new Error(I18N.t('msgSessionExpired')); }
-    if (c.ok) { appDataFileId_ = (await c.json()).id; }
+    if (c.ok) { appDataFileId_[name] = (await c.json()).id; }
   } catch (e) {
     if (e && e.message === I18N.t('msgSessionExpired')) throw e;
     // 書き込み失敗は致命的でない（localStorageが手元に残る）。次回リトライされる。
@@ -708,7 +714,7 @@ async function writeAppDataMap_(map) {
 async function getChildFolderMap_() {
   if (childFolderMap_) return childFolderMap_;
   var local = loadLocalCache_();
-  var remote = await readAppDataMap_();
+  var remote = await readAppDataMap_(APPDATA_FILE_NAME);
   var merged = {};
   var k;
   for (k in local) if (Object.prototype.hasOwnProperty.call(local, k)) merged[k] = local[k];
@@ -721,7 +727,50 @@ async function getChildFolderMap_() {
 async function saveChildFolderMap_(map) {
   childFolderMap_ = map;
   saveLocalCache_(map);
-  await writeAppDataMap_(map);
+  await writeAppDataMap_(APPDATA_FILE_NAME, map);
+}
+
+/* ===== 出欠システムの合鍵を、端末をまたいで持ち回る =====
+
+   出欠システムの合鍵は**サーバーに SHA-256 しか無く、復元できない**。
+   これまでの在り処は「この端末の localStorage」と「主催者が保存した管理リンク」の2つで、
+   管理リンクを控えていないまま機種を替えると、名簿も回答も二度と開けなかった。
+
+   ★ ドロッパーと出欠システムは**同じオリジン**（app.dropper-tools.com）なので、
+     `dropperAdminKey` は両方から読める。それを appDataFolder に預けて端末間で配る。
+   ★ スコープは増やさない。`drive.appdata` は 2026-07-19 に承認ずみのものをそのまま使う。
+   ★ 失敗しても黙って諦める。合鍵の持ち回りは**おまけ**で、
+     これが理由でカレンダー登録が止まってはいけない。 */
+var ATTEND_KEY_LS = 'dropperAdminKey';   // 出欠システムが使うのと同じ名前・同じオリジン
+// 管理画面の場所。attendance-hook.js の adminUrl と**同じ行き先**にそろえること
+var ATTEND_ADMIN_URL = 'https://app.dropper-tools.com/attend/admin.html';
+
+function attendKeyLocal_() {
+  try { return localStorage.getItem(ATTEND_KEY_LS) || ''; } catch (e) { return ''; }
+}
+function attendKeySetLocal_(v) {
+  try { localStorage.setItem(ATTEND_KEY_LS, v); } catch (e) { /* 保存できない端末は諦める */ }
+}
+
+/* ログインのあとに1回だけ走らせる。両側を突き合わせて、空いているほうを埋める。
+   ★ 両方あって食い違うときは**この端末を採る**。localStorage に入っているのは
+     「この端末に覚える」を主催者が押した結果で、意図のある値だから。 */
+async function syncAttendKey_() {
+  if (!accessToken) return;
+  try {
+    var remote = await readAppDataMap_(APPDATA_ATTEND_NAME);
+    var saved = (remote && remote.adminKey) ? String(remote.adminKey) : '';
+    var local = attendKeyLocal_();
+
+    if (local && local !== saved) {
+      await writeAppDataMap_(APPDATA_ATTEND_NAME, { adminKey: local, at: Date.now() });
+    } else if (!local && saved) {
+      attendKeySetLocal_(saved);        // 新しい端末：預けてあった合鍵が戻る
+    }
+    wireAttendEntry_();                 // 戻った合鍵をボタンの行き先に反映する
+  } catch (e) {
+    // 期限切れも含めて黙って諦める（次のログインでまた試される）
+  }
 }
 
 // 指定フォルダIDが実在し、ゴミ箱でなければ true
@@ -2381,8 +2430,19 @@ function wireAttendEntry_() {
   var link = document.getElementById('attendEntryBtn');
   if (!box || !link || !attendReady_()) return;
 
+  /* 合鍵を持っていれば、行き先に付けて渡す（`admin.html#k=…`）。
+     ★ `?s=` は要らない。管理画面は合鍵だけで認証する（api の authOrg）。
+     ★ `#` のうしろはサーバーに送られないので、アクセスログにも Referer にも残らない。
+     ★ 持っていなければ素のURL。向こうで「すでに団体をお持ちの方」が出る。
+     合鍵はログイン後の syncAttendKey_ で戻ることがあるので、この関数は**何度呼んでもよい**。 */
+  var key = attendKeyLocal_();
+  link.href = ATTEND_ADMIN_URL + (key ? '#k=' + encodeURIComponent(key) : '');
+
   if (attendStandalone_()) link.removeAttribute('target');
-  link.addEventListener('click', function () { track('attend_entry', {}); });
+  if (!link.__wired) {
+    link.addEventListener('click', function () { track('attend_entry', {}); });
+    link.__wired = true;            // 読み直すたびに増やさない
+  }
   box.style.display = '';
 }
 
