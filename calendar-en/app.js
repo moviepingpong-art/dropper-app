@@ -2442,8 +2442,14 @@ function wireAttendEntry_() {
      ★ 合鍵はログイン後の syncAttendKey_ で戻ることがあり、別のタブで団体をつくることも
        あるので、この関数は**何度呼んでも正しい**ように書く（毎回いまの合鍵を見て描き直す）。 */
   var key = attendKeyLocal_();
-  var note = document.getElementById('attendEntryNote');
-  /* ★ 団体をつくるのは**ログインしてから**（2026-08-26）。
+  /* ★ 説明文は 2026-08-26 に外した。**ボタンだけにする。**
+     「Googleでログインしておくと…」を「管理へ」の下に出していたが、
+     その状態のボタンは**ログインせずに押せる**ので、書いてあることと食い違っていた。
+     ことばで補うより、ボタンの文字（つくる／管理へ）と見た目（破線かどうか）で示す。
+     辞書の attendEntryNote / attendMakeNote / attendMakeLogin は残してあるが、
+     **いまはどこにも出していない**。戻すときは `<p>` を書き戻すだけでよい。
+
+     ★ 団体をつくるのは**ログインしてから**（2026-08-26）。
      ログイン前につくると、合鍵はこの端末の localStorage にしか残らない。
      次にログインするまでドライブへ預けられず、その間に端末を失うと戻せない
      （管理リンクの表示はもう無い）。ドロッパーはどのみちログインして使うので、
@@ -2456,9 +2462,6 @@ function wireAttendEntry_() {
   link.textContent = I18N.t(key ? 'attendEntryBtn' : 'attendMakeBtn');
   link.classList.toggle('need-login', needLogin);
   link.setAttribute('aria-disabled', needLogin ? 'true' : 'false');
-  if (note) {
-    note.textContent = I18N.t(key ? 'attendEntryNote' : (needLogin ? 'attendMakeLogin' : 'attendMakeNote'));
-  }
 
   if (attendStandalone_()) link.removeAttribute('target');
   if (!link.__wired) {
