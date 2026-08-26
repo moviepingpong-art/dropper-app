@@ -1276,7 +1276,14 @@ function buildAnnouncementBody_(f, channel, typeKey) {
     if (maps && !attendLine) L.push('🗺️ ' + I18N.t('annMap') + ' ▶ ' + maps);
     L.push('');
   }
-  if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
+  /* ★ ここはLINE面——**メンバーが読む**。出欠をとる回は、彼らに関係のある
+     **出欠入力の締切**を出す。申込締切を並べると「どっちだ」になるので並べない。
+     出欠をとらない回（attend が false）は申込締切のまま。答える先が無いのに
+     「出欠入力の締切」と書いても意味がない。
+     X・汎用は**公開の場**なので、あちらは行事そのものの事実（申込締切）を出す。 */
+  var memberDue = attend ? ymdText_(f.entry_deadline || '') : '';
+  if (memberDue) { L.push('📝 ' + I18N.t('annAnswerBy') + CL + memberDue); L.push(''); }
+  else if (f.shimekiri) { L.push('📝 ' + I18N.t('annDeadline') + CL + f.shimekiri); L.push(''); }
   if (keyInfo.length) {
     L.push('💡 ' + I18N.t('annPoints'));
     keyInfo.forEach(function (it) {
@@ -1519,6 +1526,7 @@ function addCard(name) {
     typedFieldHtml_('address', 'fldAddress', 'kaijo_jusho') +
     typedFieldHtml_('opening', 'fldOpening', 'kaikai_jikan') +
     typedFieldHtml_('deadline', 'fldDeadline', 'shimekiri') +
+    entryBackHtml_() +
     typedFieldHtml_('note', 'fldNote', 'note') +
     '<div class="keyinfo-wrap" style="display:none">' +
       '<p class="keyinfo-head">' + I18N.t('keyInfoHead') + '</p>' +
@@ -1667,6 +1675,20 @@ function addCard(name) {
     var spans = rowsEl.querySelectorAll('.day-row-format .format-label-text');
     for (var i = 0; i < spans.length; i++) { spans[i].textContent = formatLabel_; }
   }
+  /* 逆算の再計算。申込締切と日数の**どちらが変わっても**やる。
+     日数はその場で端末に覚える——次の行事で入れ直させないため。 */
+  (function wireEntryBack_() {
+    var dl = li.querySelector('[data-k="shimekiri"]');
+    var nd = li.querySelector('[data-k="entry_back_days"]');
+    if (dl) dl.addEventListener('input', function () { paintEntryBack_(li); });
+    if (nd) nd.addEventListener('input', function () {
+      var v = parseInt(nd.value, 10);
+      if (isFinite(v) && v >= 0 && v <= 90) entryBackRemember_(v);
+      paintEntryBack_(li);
+    });
+    paintEntryBack_(li);
+  })();
+
   // 「＋日を追加」ボタン
   var addBtn = li.querySelector('.day-add');
   if (addBtn) addBtn.addEventListener('click', function () { addRow_('', ''); });
@@ -1726,6 +1748,7 @@ function addCard(name) {
       setVal(li, 'kaikai_jikan', fields.kaikai_jikan);
       setVal(li, 'shimekiri', fields.shimekiri);
       setVal(li, 'note', fields.note);
+      paintEntryBack_(li);   // 読み取った申込締切から逆算し直す
       renderWarnings_(li, fields.warnings || []);   // 採点係：⚠を該当項目に表示
     },
     isChecked: function () { return li.querySelector('.chk input').checked; },
@@ -1745,6 +1768,8 @@ function addCard(name) {
         kaijo_jusho: getVal(li, 'kaijo_jusho'),
         kaikai_jikan: getVal(li, 'kaikai_jikan'),
         shimekiri: getVal(li, 'shimekiri'),
+        // 出欠入力の締切（申込締切 − N日）。読めなければ空
+        entry_deadline: entryDeadlineOf_(li),
         note: getVal(li, 'note'),
         key_info: readKeyInfo_()   // チェックされた重要情報 [{label,text}]（カレンダー説明文用）
       };
@@ -2187,7 +2212,7 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     if ('kaijo' in obj) setVal(li, 'kaijo', obj.kaijo);
     if ('kaijo_jusho' in obj) setVal(li, 'kaijo_jusho', obj.kaijo_jusho);
     if ('kaikai_jikan' in obj) setVal(li, 'kaikai_jikan', obj.kaikai_jikan);
-    if ('shimekiri' in obj) setVal(li, 'shimekiri', obj.shimekiri);
+    if ('shimekiri' in obj) { setVal(li, 'shimekiri', obj.shimekiri); paintEntryBack_(li); }
     // 競技方法（試合形式）の補完：schedule.events が空でも shiai_keishiki に値があれば、
     // 空の day_format 欄をそれで埋める。1日開催で events が漏れるケースの保険。
     if (obj.shiai_keishiki) {
@@ -2225,6 +2250,95 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
     setAi(I18N.t('aiFail') + (e && e.message ? e.message : e));
     fallback(e && e.message ? e.message : String(e));
   }
+}
+
+/* ===== 出欠入力の締切（申込締切から逆算） =====
+
+   要項から読む `shimekiri` は**大会主催者へ申し込む期限**。
+   主催者はその前にメンバー編成をするので、**メンバーが答える期限はもっと手前**になる。
+   2026-08-26 までは申込締切そのもので回答が締まっており、編成の時間がゼロだった。
+
+   ★ 逆算は**こちらで済ませる**。出欠システムへは計算すみの日付を2つ渡すだけ。
+     あちらにNを持たせると、申込締切を直したときに回答の締切が黙って動くことになる。
+   ★ 申込締切が**日付として読めないときは逆算しない**（「要問合せ」など）。
+     その場合は空のままで、いままでどおり開催日で締まる。 */
+
+var ENTRY_BACK_LS = 'dropperEntryBackDays';   // 何日前にするか。端末に覚える
+var ENTRY_BACK_DEFAULT = 7;
+
+function entryBackDefault_() {
+  try {
+    var v = parseInt(localStorage.getItem(ENTRY_BACK_LS), 10);
+    return (isFinite(v) && v >= 0 && v <= 90) ? v : ENTRY_BACK_DEFAULT;
+  } catch (e) { return ENTRY_BACK_DEFAULT; }
+}
+function entryBackRemember_(n) {
+  try { localStorage.setItem(ENTRY_BACK_LS, String(n)); } catch (e) { /* 拒否されても進む */ }
+}
+
+function entryBackHtml_() {
+  return '<label class="f entry-back"><span>' + I18N.t('fldEntryBack') + '</span>'
+    + '<span class="entry-back-in">'
+    +   '<input data-k="entry_back_days" type="number" min="0" max="90" step="1" inputmode="numeric" value="'
+    +     entryBackDefault_() + '">'
+    +   '<span class="entry-back-unit">' + I18N.t('fldEntryBackUnit') + '</span>'
+    +   '<span class="entry-back-out"></span>'
+    + '</span></label>';
+}
+
+/* 文字列の日付を YYYY-MM-DD にする。読めなければ空。
+   出欠システム側の toYmd と**同じ判定にそろえてある**。
+   片方だけ緩めると、画面には日付が出るのに向こうで落ちる。 */
+function ymd_(v) {
+  var m = String(v == null ? '' : v).trim().match(/(\d{4})\D{1,3}(\d{1,2})\D{1,3}(\d{1,2})/);
+  if (!m) return '';
+  var y = +m[1], mo = +m[2], d = +m[3];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
+/* N日前を返す。UTCで組み立てる——地元の時刻や夏時間で日がずれないように。 */
+function minusDays_(ymd, n) {
+  var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  var t = Date.UTC(+m[1], +m[2] - 1, +m[3]) - n * 86400000;
+  var d = new Date(t);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0')
+    + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+
+var WDAY_ = { ja: ['日','月','火','水','木','金','土'], en: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] };
+/* 画面に出す形。出欠システムの fmtDate と見た目をそろえる（スラッシュ区切り）。 */
+function ymdText_(ymd) {
+  var m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  var w = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+  var ja = (window.LANG !== 'en' && window.LANG !== 'in');
+  return m[1] + '/' + m[2] + '/' + m[3] + (ja ? ('（' + WDAY_.ja[w] + '）') : (' (' + WDAY_.en[w] + ')'));
+}
+
+/** このカードの「出欠入力の締切」を計算する。読めなければ空。 */
+function entryDeadlineOf_(li) {
+  var src = ymd_(attendDeadline_((li.querySelector('[data-k="shimekiri"]') || {}).value || ''));
+  if (!src) return '';
+  var el = li.querySelector('[data-k="entry_back_days"]');
+  var n = parseInt(el && el.value, 10);
+  if (!isFinite(n) || n < 0) n = 0;
+  return minusDays_(src, n);
+}
+
+/** 逆算結果をその場で見せる。何日前が妥当かを、日付を見ながら決められるように。 */
+function paintEntryBack_(li) {
+  var out = li.querySelector('.entry-back-out');
+  if (!out) return;
+  var d = entryDeadlineOf_(li);
+  /* ★ 「申込締切が無い」と「あるのに日付として読めない」を分ける。
+     「10月5日必着」のように**年が無い**と読めないので、同じ文言にすると
+     主催者は「書いてあるのになぜ」となる。黙って流さない。 */
+  var raw = ((li.querySelector('[data-k="shimekiri"]') || {}).value || '').trim();
+  out.textContent = d ? ('→ ' + ymdText_(d))
+    : I18N.t(raw ? 'entryBackUnparsed' : 'entryBackNone');
+  out.className = 'entry-back-out' + (d ? ' on' : ' warn');
 }
 
 function fieldHtml(label, key) {
@@ -2547,7 +2661,13 @@ function attendPayload_(cardApi, fileId) {
   return {
     name: (f.taikai_mei || '').trim(),
     date: attendEventDate_(f.kaisai_dates),
-    deadline: attendDeadline_(f.shimekiri),
+    /* ★ `deadline` は**出欠入力の締切**（メンバーが答える期限）。
+       向こうはこれで回答を止めるので、**申込締切を入れないこと**。
+       2026-08-26 までは申込締切を入れていて、編成の時間がゼロだった。
+       空なら締切無し（開催日で締まる）。 */
+    deadline: f.entry_deadline || '',
+    // 申込締切は主催者が見るためだけ。締めの判定には使われない
+    entryDeadline: attendDeadline_(f.shimekiri),
     place: (f.kaijo || '').trim(),
     items: attendEvents_(f.shiai_keishiki_by_day),
     youkou: fileId ? 'https://drive.google.com/file/d/' + fileId + '/view' : '',
