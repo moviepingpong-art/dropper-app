@@ -346,10 +346,14 @@ async function chooseAi_() {
 // （全項目が最初からAI取得済みで、項目ごとの検算は使わないため不要）
 function updateAiRecheckVisibility_() {
   var isAi = (aiMode === 'ai');
+  /* 手入力のカード（data-manual）では、AIモードに関わらず**常に隠す**。
+     検算は読み取った生テキストをAIに掛け直すもので、手で打ったカードには
+     掛ける中身が無い（ocrText が空のまま走る）。 */
+  var manual_ = function (el) { return !!(el.closest && el.closest('.card[data-manual]')); };
   var btns = document.querySelectorAll('.ai-recheck');
-  for (var i = 0; i < btns.length; i++) { btns[i].style.display = isAi ? 'none' : ''; }
+  for (var i = 0; i < btns.length; i++) { btns[i].style.display = (isAi || manual_(btns[i])) ? 'none' : ''; }
   var notes = document.querySelectorAll('.ai-anyfield');
-  for (var j = 0; j < notes.length; j++) { notes[j].style.display = isAi ? 'none' : ''; }
+  for (var j = 0; j < notes.length; j++) { notes[j].style.display = (isAi || manual_(notes[j])) ? 'none' : ''; }
 }
 
 // ポップアップのボタン・設定リンクを配線
@@ -504,6 +508,53 @@ if (loginBtn) {
 }
 
 // ファイル選択ボタン（スマホの主動線）。ログイン済みなのでダイアログを開くだけ。
+/* 文書が無くても始められるようにする。**新しい仕組みは要らない。**
+   LINEから `?d=` で来たとき（applyHandoff_）と同じで、`file: null` のカードを1枚足すだけ。
+   下流はすべて対応ずみ——
+     ・要項のドライブ保存は `saveYoukou_` が `!item.file` で自動的に飛ばす
+     ・カレンダー登録は添付が付かないだけ
+     ・案内文は要項の行が出ないだけ
+     ・出欠システムへも渡せる（ただし**種目は打ってもらう**。空だと attendSend_ が止まる。
+       ここを自動で埋めない——読み違えではなく、こちらが勝手に決めた値が入ることになる）
+
+   ★ 状態は「読み取り中…」のまま出さないこと。カードは作った瞬間そう出る（addCard の初期値）。
+   ★ 左の細い列（.fn）に大会名を入れないこと。何行にも折り返して縦に潰れる
+     （applyHandoff_ で実際にそうなった）。短い固定文言にする。 */
+function addManualCard_() {
+  var card = addCard(I18N.t('manualCardLabel'));
+  /* ★ fill() を必ず通すこと。カードは `.fields` `.card-foot` とも display:none で生まれ、
+     開くのは fill() だけ。呼ばないと**入力欄が1つも出ない**カードになる。
+     空で呼べば日付の行が1本だけ出た、まっさらな状態になる（rebuildRows_ が面倒を見る）。 */
+  card.fill({
+    taikai_mei: '', kaisai_dates: [], schedule: [],
+    shiai_keishiki: '', kaijo: '', kaijo_jusho: '',
+    kaikai_jikan: '', shimekiri: '', note: ''
+  });
+  /* fill() は状態を「読み取り完了」にする。読み取っていないので上書きする（fill の後で）。 */
+  card.setStatus(I18N.t('stManual'), 'ok');
+  items.push({ file: null, card: card, fileId: null, mimeType: '' });
+  syncRegBtn_();
+
+  var li = card.el;
+  if (li) {
+    li.setAttribute('data-manual', '1');   // AI検算を出さない印（updateAiRecheckVisibility_ が見る）
+    // 「内容を確認してください」は読み取った結果への注意。手入力では的外れなので出さない
+    var hint = li.querySelector('.edit-hint');
+    if (hint) hint.style.display = 'none';
+    updateAiRecheckVisibility_();          // 検算ボタンと注意文をこのカードだけ消す
+
+    var name = li.querySelector('[data-k="taikai_mei"]');
+    if (name) {
+      try { li.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* 古い端末 */ }
+      name.focus();
+    }
+  }
+  track('manual_card', {});
+}
+
+var manualBtn = document.getElementById('manualBtn');
+if (manualBtn) manualBtn.addEventListener('click', addManualCard_);
+
 if (pickBtn) {
   pickBtn.addEventListener('click', function () {
     fileInput.value = '';

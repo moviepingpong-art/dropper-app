@@ -212,6 +212,14 @@
     .login-badge { font-size:11.5px; font-weight:700; color:var(--teal-d); background:#e6fffb;
       border:1px solid var(--teal); border-radius:999px; padding:4px 10px; white-space:nowrap; }
     .guide-link a + a { margin-left:14px; }
+    /* 文書が無くても使えることを、**ログインより前**に言う帯。
+       ドロップゾーンの中にも同じ案内があるが、あれは `#work` の中なので
+       **ログイン後にしか出ない**。「自分には関係ない道具だ」と判断されるのは
+       この画面なので、ここで言わないと届かない。
+       ★ 「ドロッパー」の名からは外れる話なので、**ドロップを先に**書いて添える形にする。
+       ★ 1行に収める（スマホで最初の画面がスクロールしないようにしてある）。 */
+    .entry-ways { font-size:12.5px; font-weight:700; color:var(--teal-d);
+                  margin:0 auto 12px; max-width:460px; line-height:1.5; }
     /* 出欠システムへの入口。**ここにしか無い導線**——要項をドロップしないと
        カードの「🙋 出欠システムへ」は出ないので、集計だけ見たい人の行き先が無かった。
        ★ ログインボタンとは**役割が違う**（あちらはGoogle、こちらは別の仕組みで
@@ -241,7 +249,9 @@
       .visitor-badge { margin-top:4px; }
       #login-area { padding:10px 10px 0; }
       .login-note { margin-top:8px; }
-      .attend-entry { margin-top:10px; padding:12px 10px 0; }
+      .entry-ways { margin-bottom:8px; }
+      .login-badges { margin-top:8px; }
+      .attend-entry { margin-top:8px; padding:10px 10px 0; }
     }
     .pick-btn {
       font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
@@ -250,6 +260,27 @@
       box-shadow:0 8px 20px rgba(6,182,164,.30); transition:transform .12s, box-shadow .2s;
     }
     .pick-btn:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(6,182,164,.4); }
+    /* 文書が無くても始められる、という第2の入口。**ドロップを主役のまま**にするため、
+       区切り線の下・枠線だけの控えめな見た目にする（.pick-btn は塗りつぶし＋影）。 */
+    .drop-alt { margin-top:20px; padding-top:16px; border-top:1px dashed rgba(6,182,164,.35);
+                position:relative; }
+    .drop-or { position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+               background:var(--paper); padding:0 10px; font-size:12px; font-weight:700;
+               color:var(--sub); }
+    .manual-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:15px; font-weight:700;
+      padding:11px 22px; border-radius:13px; cursor:pointer;
+      border:2px solid var(--teal); color:var(--teal-d); background:#fff;
+      transition:background .15s, color .15s;
+    }
+    .manual-btn:hover { background:var(--teal); color:#fff; }
+    .drop-alt-note { font-size:12.5px; color:var(--sub); margin:10px auto 0; max-width:340px;
+                     line-height:1.7; }
+    /* ★ スマホでは縦が効くので、ここも詰める（余白だけ。文字は小さくしない） */
+    @media (max-width:480px){
+      .drop-alt { margin-top:14px; padding-top:14px; }
+      .drop-alt-note { margin-top:8px; }
+    }
     /* ===== ドロッパーの切り替えタブ（イベント / 予定表） =====
        ドロッパーが2本になったので、h1 の上にタブを置いて行き来できるようにする。
        予定表ドロッパーは日本語版のみのため、i18n.js が en/in では行ごと隠す。 */
@@ -551,7 +582,9 @@
     .ann-row { display:flex; gap:8px; align-items:stretch; flex-wrap:nowrap; }
     .ann-row .cal-btn, .ann-row .attend-btn { flex:1 1 0; min-width:0; white-space:nowrap; }
     /* 案内文は①②のあとの仕上げ。行を分け、幅いっぱいにして最後の一手だと分かるようにする。
-       ★ 出欠が使える言語では、**出欠ができるまで出さない**（app.js の wireAnnounceGate_）。 */
+       ★ 出欠が使える言語では、**出欠ができるまで出さない**（app.js の wireAnnounceGate_）。
+       ★ 点滅は 2026-08-25 にやめた。出欠から戻ったらこちらで案内文を開くので、
+          「押してください」と促す必要がなくなったため（app.js の annOpen_）。 */
     .ann-make { margin-top:10px; }
     .ann-make .ann-btn { width:100%; padding:9px 12px; }
     /* 要項の保存を待っているあいだ（app.js の openPanel_）。文言だけでは押せないことが伝わらない */
@@ -642,6 +675,7 @@
   </header>
   <main>
     <div id="login-area">
+      <p class="entry-ways" data-i18n="entryWays">📄 チラシをドロップ　／　✎ 無ければ手で入力</p>
       <button id="loginBtn" class="login-btn" data-i18n="loginBtn">Googleでログイン</button>
       <!-- 権限の**範囲**を先に見せる。不安の中身は「私のドライブを覗かれるのでは」で、
            「必要です」とだけ書いても答えになっていない。
@@ -692,6 +726,16 @@
       <div class="sub" data-i18n="dropSub">PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。</div>
       <button id="pickBtn" class="pick-btn" type="button" data-i18n="pickBtn">ファイルを選ぶ</button>
       <input id="file" type="file" accept="image/*,application/pdf" multiple style="display:none">
+      <!-- ★ 文書が無くても始められることを、**探しに行かなくても分かる場所**に置く。
+           ドロップゾーンの外に小さく置くと、持っていない人ほど見つけられない
+           （「無い」と気づくのはここを見たときだから）。
+           ★ ただし**ドロップを主役のまま**にする。区切り線の下に、控えめな見た目で。
+           ★ #drop に click は付いていない（drag/drop だけ）ので、中にボタンを置いてよい。 -->
+      <div class="drop-alt">
+        <span class="drop-or" data-i18n="dropOr">または</span>
+        <button id="manualBtn" class="manual-btn" type="button" data-i18n="manualBtn">✎ 手で入力して始める</button>
+        <p class="drop-alt-note" data-i18n="manualNote">チラシが無くても、練習会などのお知らせと出欠に使えます。</p>
+      </div>
     </div>
     <p class="note" id="ocrNote" data-i18n="note">※読み取りはGoogleのOCRで変換して必要項目を抽出します。要項はGoogleドライブのDropperFilesフォルダに保存され、カレンダーの予定に添付（リンクが保存）されます。</p>
     <ul id="list"></ul>
@@ -1049,10 +1093,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260840"></script>
+  <script src="i18n.js?v=20260841"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260837"></script>
+  <script src="app.js?v=20260841"></script>
 </body>
 </html>
