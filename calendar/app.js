@@ -2585,11 +2585,21 @@ function attendSend_(item, status) {
   var li = cardApi.el;
   (function () {
 
-    // 先に形だけ見る。名前と種目が無ければ、要項を保存する前に止める
+    // 先に形だけ見る。名前が無ければ、要項を保存する前に止める
     var probe = attendPayload_(cardApi, item && item.fileId);
     if (!probe.name) { setAttendStatus_(status, 'ng', I18N.t('attendNoName')); return; }
-    // 出欠ページは1項目=1種目で並ぶ。種目が取れないと選択肢を作れないので、先に手入力してもらう。
-    if (!probe.items) {
+    /* 種目が空のとき、**読み取ったカードは止めるが、手入力のカードは通す**。
+       同じ空欄でも意味が逆だから。
+
+       読み取ったカード … チラシには書いてあるのに**読めなかった**ということ。
+         黙って既定値にすると、シングルス・ダブルスの選択肢が消えた出欠ができ、
+         しかも主催者は気づけない。ここで気づいてもらう
+       手入力のカード … 練習会などで**そもそも種目が無い**。聞くほうが的外れ
+
+       通したあとはサーバーが引き受ける（api/src/index.js の DEFAULT_ITEM）。
+       空なら「参加」1つになり、**団体の言語で入る**（英語の団体なら Attend）。
+       出欠システム側の「行事を手で足す」欄も同じ約束（「空なら『参加』」）。 */
+    if (!probe.items && !(li && li.hasAttribute('data-manual'))) {
       setAttendStatus_(status, 'ng', I18N.t('attendNoEvents'));
       cardApi.focusFormat();
       return;
