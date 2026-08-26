@@ -98,7 +98,18 @@
       // --- ログイン ---
       guideLink: '📖 使い方ガイド ↗',
       loginBtn: 'Googleでログイン',
-      loginNote: '{ev}の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。',
+      /* ★ 「必要です」と並べるだけでは、不安（私のドライブを覗かれるのでは）に答えていない。
+         **保存先が利用者自身であること**と、権限の範囲（下の perm*）で答える。
+         ★ 短く保つこと。スマホで1〜2行。長いと出欠の入口が画面の外に出る。 */
+      /* loginNote は 2026-08-26 からどこにも出していない。**帯（perm*）が同じことを言う**ので、
+         文を足すと縦が伸びるだけだった。戻すときは `<p class="login-note">` を書き戻す。 */
+      loginNote: '{doc}も予定も、保存先はあなた自身のGoogleです。',
+      privacyLink: '📄 プライバシーポリシー',
+      /* 同意画面で利用者自身が確かめられることだけを書く。
+         **「Google公認」「推奨」は書かないこと**（ブランド規約が推奨の示唆を禁じている）。 */
+      permDrive: '🔒 既存ファイルは見ません',
+      permCal: '📅 予定の作成・変更だけ',
+      permVerified: '✅ Google審査ずみ',
       /* 最初の画面から出欠システムへ行く入口（app.js の wireAttendEntry_）。
          ★ ボタンの文字（attendEntryBtn / attendMakeBtn）だけを出す。
          ★ **Note の3つは 2026-08-26 からどこにも出していない。**
@@ -391,7 +402,11 @@
       freeBadge: 'Completely free',
       guideLink: '📖 User guide ↗',
       loginBtn: 'Sign in with Google',
-      loginNote: 'To add events to your Google Calendar, please sign in with Google and allow Calendar and Drive access first.',
+      loginNote: 'Both the {doc} and the event stay in your own Google account.',
+      privacyLink: '📄 Privacy policy',
+      permDrive: '🔒 Existing files stay private',
+      permCal: '📅 Calendar events only',
+      permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
       attendEntryNote: 'Where you collect replies from your members. Sign in with Google and it still opens on your next device.',
       attendMakeBtn: '＋ Set up attendance',
@@ -649,7 +664,11 @@
       freeBadge: 'Bilkul free',
       guideLink: '📖 Guide ↗',
       loginBtn: 'Google se sign in karein',
-      loginNote: 'Events ko aapke Google Calendar mein add karne ke liye, pehle Google se sign in karke Calendar aur Drive ka access allow karein.',
+      loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
+      privacyLink: '📄 Privacy policy',
+      permDrive: '🔒 Purani files nahi dikhtin',
+      permCal: '📅 Sirf calendar event',
+      permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
       attendEntryNote: 'Yahan members ke jawab jama karte hain. Google se login rahenge to naye device par bhi wahi group khulega.',
       attendMakeBtn: '＋ Attendance shuru karein',
@@ -857,13 +876,17 @@
     try {
       document.documentElement.lang = (global.LANG === 'en') ? 'en' : (global.LANG === 'in') ? 'en-IN' : 'ja';
     } catch (e) {}
-    // 使い方ガイドは3言語とも公開済み。リンク先を言語別に切り替える。
+    /* 使い方ガイドとプライバシーポリシー。**どちらも3言語とも公開済み**なので、
+       同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。
+       ★ ポリシーだけ張り替え漏れがあった（2026-08-26 に発見）。英語の利用者が
+         日本語のポリシーに飛ばされていた。**リンクを増やしたらここにも足すこと。** */
     var gl = document.getElementById('guideLink');
     if (gl) {
-      var a = gl.querySelector('a');
-      if (a) {
-        var gp = (global.LANG === 'en') ? 'en/guide.html' : (global.LANG === 'in') ? 'in/guide.html' : 'guide.html';
-        a.href = 'https://dropper-tools.com/' + gp;
+      var pre = (global.LANG === 'en') ? 'en/' : (global.LANG === 'in') ? 'in/' : '';
+      var as = gl.querySelectorAll('a');
+      for (var gi = 0; gi < as.length; gi++) {
+        var page = (as[gi].href.indexOf('privacy') >= 0) ? 'privacy.html' : 'guide.html';
+        as[gi].href = 'https://dropper-tools.com/' + pre + page;
       }
     }
     // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、

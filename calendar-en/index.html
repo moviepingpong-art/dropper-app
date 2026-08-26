@@ -205,6 +205,13 @@
     }
     @media (prefers-reduced-motion: reduce){ .login-btn.attract { animation:none; } }
     .login-note { max-width:420px; margin:14px auto 0; text-align:center; }
+    /* 権限の範囲を見せる帯。**文にすると縦が伸びる**ので帯にしてある。
+       AI設定の .ai-badges と同じ見た目（利用者から見て「同じ種類の説明」に見える）。 */
+    .login-badges { display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+                    margin:12px auto 0; max-width:460px; }
+    .login-badge { font-size:11.5px; font-weight:700; color:var(--teal-d); background:#e6fffb;
+      border:1px solid var(--teal); border-radius:999px; padding:4px 10px; white-space:nowrap; }
+    .guide-link a + a { margin-left:14px; }
     /* 出欠システムへの入口。**ここにしか無い導線**——要項をドロップしないと
        カードの「🙋 出欠システムへ」は出ないので、集計だけ見たい人の行き先が無かった。
        ★ ログインボタンとは**役割が違う**（あちらはGoogle、こちらは別の仕組みで
@@ -590,8 +597,12 @@
       <select class="type-select" id="typePicker" aria-labelledby="typePrompt"></select>
     </div>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
+    <!-- ★ ポリシーはここに並べる。**新しい行を作らない**ため。
+         ツールからポリシーへのリンクは 2026-08-26 まで存在しなかった。
+         押すかどうか迷っている人が確かめる先が無いのは、審査の要件としても不足していた。 -->
     <p class="guide-link" id="guideLink">
       <a href="https://dropper-tools.com/guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
+      <a href="https://dropper-tools.com/privacy.html" target="_blank" rel="noopener" data-i18n="privacyLink">📄 プライバシーポリシー</a>
     </p>
     <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
     <p class="visitor-badge" id="visitorBadge">
@@ -601,7 +612,18 @@
   <main>
     <div id="login-area">
       <button id="loginBtn" class="login-btn" data-i18n="loginBtn">Googleでログイン</button>
-      <p class="note login-note" data-i18n="loginNote">大会の予定をGoogleカレンダーに登録するため、最初にGoogleログインとカレンダー・ドライブの許可が必要です。</p>
+      <!-- 権限の**範囲**を先に見せる。不安の中身は「私のドライブを覗かれるのでは」で、
+           「必要です」とだけ書いても答えになっていない。
+           ★ ここに書くのは**同意画面で利用者自身が確かめられること**だけ。
+             drive.file は作ったファイルしか見えず、calendar.events は予定の操作だけ。
+           ★ 「Google公認」「推奨」と書かないこと。**ブランド規約が推奨の示唆を禁じている。**
+             審査通過は基準を満たしたという意味で、推奨ではない。Googleのロゴも使わない。
+           ★ 縦を伸ばさないため、文ではなく帯にしてある（AI設定の .ai-badges と同じ作り）。 -->
+      <p class="login-badges">
+        <span class="login-badge" data-i18n="permDrive">🔒 既存のドライブは見ません</span>
+        <span class="login-badge" data-i18n="permCal">📅 予定の作成・変更だけ</span>
+        <span class="login-badge" data-i18n="permVerified">✅ Googleの審査ずみ</span>
+      </p>
     </div>
     <div id="work" style="display:none">
     <div id="mode-banner" class="mode-banner" role="status">
@@ -949,7 +971,7 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260837"></script>
+  <script src="i18n.js?v=20260839"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
