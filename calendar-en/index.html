@@ -620,6 +620,12 @@
       margin-right:6px; vertical-align:-1px; border:2px solid #b5f5ec; border-top-color:#13c2c2;
       border-radius:50%; animation:youkouSpin .8s linear infinite; }
     .youkou-note.ok a { color:#389e0d; font-weight:700; }
+    /* 共有に失敗したとき。**目に入らないと意味がない**——
+       これを見逃すと、メンバーに開けないリンクを配ることになる。
+       ただし赤にはしない（保存自体は成功している）。 */
+    .youkou-note.warn { color:#7a4f01; background:#fff7e6; border:1px solid #ffd591;
+                        border-radius:6px; padding:6px 8px; }
+    .youkou-note.warn a { color:#7a4f01; font-weight:700; }
     @keyframes youkouSpin { to { transform:rotate(360deg); } }
     @media (prefers-reduced-motion:reduce){ .youkou-note.busy::before { animation:none; } }
     @media (max-width:420px){
@@ -1104,10 +1110,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260844"></script>
+  <script src="i18n.js?v=20260845"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260844"></script>
+  <script src="app.js?v=20260845"></script>
 </body>
 </html>

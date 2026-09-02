@@ -197,6 +197,8 @@
          {path} は保存先の道順（例：2026 Tournaments / 09 / 第3回◯◯大会）。 */
       youkouSaving: '📄 {doc}を保存しています…',
       youkouSavedTo: '📁 {path} に保存しました',
+      /* 共有に失敗したとき。**黙って進むとメンバーが開けないリンクを配ることになる** */
+      youkouShareFail: '⚠ 保存しましたが、共有の設定ができませんでした。このままだとメンバーは{doc}を開けません。タップしてドライブを開き、共有を「リンクを知っている全員」にしてください。',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
       // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
@@ -496,6 +498,7 @@
       attendFailed: 'Could not open the attendance system. Please try again.',
       youkouSaving: '📄 Saving the {doc}…',
       youkouSavedTo: '📁 Saved to {path}',
+      youkouShareFail: '⚠ Saved, but sharing could not be set. Members will not be able to open the {doc}. Tap to open Drive and set sharing to “Anyone with the link”.',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
       annAttendUrl: 'Answer here',
@@ -779,6 +782,7 @@
       attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
       youkouSaving: '📄 {doc} save ho raha hai…',
       youkouSavedTo: '📁 {path} mein save ho gaya',
+      youkouShareFail: '⚠ Save ho gaya, lekin sharing set nahi hui. Members {doc} nahi khol payenge. Tap karke Drive kholein aur sharing “Anyone with the link” karein.',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
       annAttendUrl: 'Jawab yahan dein',
