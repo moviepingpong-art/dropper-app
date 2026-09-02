@@ -190,6 +190,10 @@
       attendMoving: '出欠システムに移ります…',
       attendDone: '✓ 出欠の受付を始めました。案内文に反映しました。',
       annSkipAttend: 'この行事の出欠をとらずに案内文を作成する',
+      /* 渡したのに受付が始まっていないとき。向こうのボタン名（adTkAccept）を
+         **そのまま引用する**——探すものが画面にある言葉と違うと見つからない。
+         向こうの文言を変えたら、こちらも直すこと。 */
+      annNotAccepted: '⚠ 出欠システムへ渡しましたが、まだ受付が始まっていません。あちらの画面で「この内容で出欠を受け付ける」を押してください。',
       attendCopied: '✓ コピーしました。出欠システムの管理画面に貼り付けてください。',
       attendFailed: '出欠システムを開けませんでした。もう一度お試しください。',
       /* 要項をドライブに保存するときの、カード上の1行（app.js の youkouNote_）。
@@ -494,6 +498,7 @@
       attendMoving: 'Going to the attendance system…',
       attendDone: '✓ Attendance is now open. The announcement has been updated.',
       annSkipAttend: 'Write the announcement without attendance',
+      annNotAccepted: '⚠ Handed over to the attendance system, but replies are not being collected yet. Press “Open attendance with this” on that screen.',
       attendCopied: '✓ Copied. Paste it into the attendance admin page.',
       attendFailed: 'Could not open the attendance system. Please try again.',
       youkouSaving: '📄 Saving the {doc}…',
@@ -778,6 +783,7 @@
       attendMoving: 'Attendance system par ja rahe hain…',
       attendDone: '✓ Attendance shuru ho gaya. Announcement update ho gaya.',
       annSkipAttend: 'Attendance ke bina announcement banayein',
+      annNotAccepted: '⚠ Attendance system ko bhej diya, lekin abhi jawab lena shuru nahi hua. Us screen par “Isi se attendance shuru karein” dabayein.',
       attendCopied: '✓ Copy ho gaya. Attendance admin page mein paste karein.',
       attendFailed: 'Attendance system khol nahi paye. Dobara koshish karein.',
       youkouSaving: '📄 {doc} save ho raha hai…',
