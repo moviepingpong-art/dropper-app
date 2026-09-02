@@ -629,6 +629,16 @@
     .youkou-note.warn { color:#7a4f01; background:#fff7e6; border:1px solid #ffd591;
                         border-radius:6px; padding:6px 8px; }
     .youkou-note.warn a { color:#7a4f01; font-weight:700; }
+    /* 不具合の手がかりを**スマホだけで読める**ようにする。
+       ふだんは畳んでおくので、正常時の見た目は変わらない。 */
+    .youkou-detail-btn { display:block; margin:6px 0 0; padding:0; border:none; background:none;
+      font-family:inherit; font-size:12px; color:#7a4f01; text-decoration:underline; cursor:pointer; }
+    .youkou-detail { margin:6px 0 0; }
+    .youkou-detail-text { font-size:11.5px; line-height:1.6; color:#555; background:#fff;
+      border:1px solid #e5d3a8; border-radius:6px; padding:6px 8px;
+      word-break:break-all; white-space:pre-wrap; max-height:160px; overflow:auto; }
+    .youkou-detail-copy { margin-top:6px; padding:5px 12px; font-family:inherit; font-size:12px;
+      border:1px solid #d9a441; background:#fff; color:#7a4f01; border-radius:6px; cursor:pointer; }
     @keyframes youkouSpin { to { transform:rotate(360deg); } }
     @media (prefers-reduced-motion:reduce){ .youkou-note.busy::before { animation:none; } }
     @media (max-width:420px){
@@ -1113,10 +1123,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260847"></script>
+  <script src="i18n.js?v=20260848"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260847"></script>
+  <script src="app.js?v=20260848"></script>
 </body>
 </html>
