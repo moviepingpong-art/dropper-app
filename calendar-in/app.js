@@ -809,6 +809,8 @@ function attendKeySetLocal_(v) {
 /* ログインのあとに1回だけ走らせる。両側を突き合わせて、空いているほうを埋める。
    ★ 両方あって食い違うときは**この端末を採る**。localStorage に入っているのは
      「この端末に覚える」を主催者が押した結果で、意図のある値だから。 */
+var attendKeySynced_ = '';   // このセッションで預け終えた合鍵。同じ値を何度も送らないため
+
 async function syncAttendKey_() {
   if (!accessToken) return;
   try {
@@ -821,6 +823,7 @@ async function syncAttendKey_() {
     } else if (!local && saved) {
       attendKeySetLocal_(saved);        // 新しい端末：預けてあった合鍵が戻る
     }
+    attendKeySynced_ = attendKeyLocal_();   // ここまで来たら両側が揃っている
     wireAttendEntry_();                 // 戻った合鍵をボタンの行き先に反映する
   } catch (e) {
     // 期限切れも含めて黙って諦める（次のログインでまた試される）
@@ -2672,9 +2675,20 @@ function wireAttendEntry_() {
       track('attend_entry', { has_key: attendKeyLocal_() ? 1 : 0 });
     });
     /* 別のタブで団体をつくって戻ってきたら、その場で「管理へ」に変わってほしい。
-       同じオリジンなので localStorage はもう入っている。読み直しを待たせない。 */
+       同じオリジンなので localStorage はもう入っている。読み直しを待たせない。
+
+       ★ **合鍵をドライブへ預け直すのもここ。** `syncAttendKey_` はもともと
+         ログイン直後にしか走らなかった。だが団体をつくるのは**そのあと**なので、
+         「ログイン→要項をドロップ→出欠システムへ→そこで団体をつくる」という
+         ごく自然な道を通ると、**合鍵が localStorage にしか無いまま**になる。
+         その状態で機種を替えると、名簿も回答も永久に失われる
+         （サーバーには SHA-256 しか無い）。2026-08-29 に実運用で発覚した。
+       ★ 鍵が無いときとログイン前は呼ばない。戻るたびに無駄な通信をしないため。 */
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'visible') wireAttendEntry_();
+      if (document.visibilityState !== 'visible') return;
+      wireAttendEntry_();
+      var k = attendKeyLocal_();
+      if (accessToken && k && k !== attendKeySynced_) syncAttendKey_();
     });
     link.__wired = true;            // 読み直すたびに増やさない
   }
