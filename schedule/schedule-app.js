@@ -480,7 +480,10 @@ regBtn.addEventListener('click', async function () {
 // 「何ができる？」ポップアップ（#tools-modal）。3本それぞれの入力と出力を図で見せる。
 // タブ（.tool-tab）は今までどおり直行させ、説明はこのポップアップに分けてある。
 // タブを押すたびに説明を挟むと、行き来する人に毎回1クリック増えるため。
-var TOOLS_SEEN_STORE = 'dropper_tools_seen';
+/* ★ 初回の自動表示はやめた（2026-09-03、利用者の判断）。**戻さないこと。**
+   何も押していないのに説明が出るのは、初めての人ほど戸惑う。
+   知りたい人は「何ができる？」を押す。押さない人には要らなかった、というだけ。
+   「見た印」（dropper_tools_seen）も一緒に消した——出し分ける必要がもう無い。 */
 
 // 開くときは必ず「いま開いているドロッパー」のタブから見せる。
 // どれが自分かは #tools-modal の data-home が持つ（3本でこのJSを同一に保つため）。
@@ -489,7 +492,6 @@ function openToolsModal_() {
   if (!m) return;
   selectToolsTab_(m.getAttribute('data-home') || 'event');
   m.classList.add('show');
-  try { localStorage.setItem(TOOLS_SEEN_STORE, '1'); } catch (e) {}
 }
 function closeToolsModal_() {
   var m = document.getElementById('tools-modal');
@@ -529,14 +531,4 @@ function selectToolsTab_(name) {
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && m.classList.contains('show')) closeToolsModal_();
   });
-
-  // 初回だけ自動で開く。2回目以降は「何ができる？」を押したときだけ。
-  // AI利用ポップアップはログイン後に出るので、この時点では重ならない。
-  // それでも既に何か開いていたら譲る（ポップアップを二重に見せない）。
-  var seen = '1';
-  try { seen = localStorage.getItem(TOOLS_SEEN_STORE) || ''; } catch (e) { seen = '1'; }
-  if (!seen) {
-    var ai = document.getElementById('ai-modal');
-    if (!ai || !ai.classList.contains('show')) openToolsModal_();
-  }
 })();
