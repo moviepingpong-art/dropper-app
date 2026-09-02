@@ -38,8 +38,11 @@
       tmTagEvent1: 'どんなイベントにも',
       tmTagEvent2: '日付・会場を自動で',
       tmTagEvent3: '案内文もワンタップ',
-      /* ★ 出欠は**4本目として並べない。** 単体では始められず、入口はここで読み取ったあとの
-         画面だけ。並べると、それだけで使えるように見えてしまう（周知サイトと同じ決めごと）。
+      /* ★ 出欠は**4本目として並べない**（周知サイトと同じ決めごと）。理由は「単体で使えないから」
+         **ではない**——出欠システムには「＋ 手で入力して追加」があり、最初の画面にも直接の入口が
+         あるので、要項を1枚も読まずに完結できる（2026-09-03 に食い違いが見つかり、文言を直した）。
+         並べない理由は、**主な道が「読み取ってそのまま渡す」ほうだから**。4本並べると、
+         いちばん楽な道が3本の中に埋もれる。
          訳は周知サイト（dropper の tool1.attend*）から持ってきた。**文言を直すときは両方そろえる。** */
       tmAttendHead: '読み取ったら、そのまま出欠も',
       tmAttendDesc: '読み取ったあとの画面から、出欠の受付を立ち上げられます。メンバーは名簿から名前を選んで〇△×を送るだけ、アプリも登録も不要です。',
@@ -50,7 +53,7 @@
       tmAttendPass: '行事名・日付・会場を引き継ぐ',
       tmAttendFig2: '名簿から回答',
       tmAttendFig3: '〇△×を集計',
-      tmAttendNote: '出欠だけを単体で使うことはできません。お試し公開中のため、画面や手順は変わることがあります。',
+      tmAttendNote: '要項が無くても、最初の画面の「＋ 出欠の団体をつくる」から始められます。お試し公開中のため、画面や手順は変わることがあります。',
       tmNameSchedule: '📅 予定表ドロッパー',
       tmOneSchedule: '予定表1枚から、中の予定を全部。確認してからまとめて登録。',
       tmFigSheet: '予定表1枚',
@@ -75,7 +78,7 @@
       tmGoDecide: '✅ 決めごとドロッパーを使ってみる',
       tmHere: 'いま使っています',
       tmClose: '閉じる',
-      tmFoot: '※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。',
+      tmFoot: '※ この説明は「何ができる？」からいつでも見られます。',
       tmLineTitle: 'LINEでも使えます',
       tmLineText: '公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。',
       tmLineBtn: '友だち追加して試す',
@@ -410,7 +413,7 @@
       tmAttendPass: 'Name, date and venue carry over',
       tmAttendFig2: 'Pick from the roster',
       tmAttendFig3: 'Tally the replies',
-      tmAttendNote: 'Attendance cannot be used on its own - it starts from an event you read here. It is still a preview, so screens and steps may change.',
+      tmAttendNote: 'No document? You can also start from “＋ Set up attendance” on the first screen. It is still a preview, so screens and steps may change.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'One sheet becomes every entry on it. Check the list, then add them all.',
       tmFigSheet: 'One sheet',
@@ -435,7 +438,7 @@
       tmGoDecide: '✅ Try Decide Dropper',
       tmHere: 'You are here',
       tmClose: 'Close',
-      tmFoot: 'Opens automatically the first time. After that, use "What can these do?" whenever you like.',
+      tmFoot: 'You can open this again any time from "What can these do?".',
       tmLineTitle: 'Also on LINE',
       tmLineText: 'Send an image or PDF to the official account. No login needed.',
       tmLineBtn: 'Add as friend',
@@ -702,7 +705,7 @@
       tmAttendPass: 'Naam, date, venue saath jaate hain',
       tmAttendFig2: 'Roster se chunein',
       tmAttendFig3: 'Replies ka total',
-      tmAttendNote: 'Attendance akele nahi chalta - yahin padhe hue event se hi shuru hota hai. Abhi preview hai, isliye screens aur steps badal sakte hain.',
+      tmAttendNote: 'Document na ho to bhi, pehli screen ke “＋ Attendance shuru karein” se shuru kar sakte hain. Abhi preview hai, isliye screens aur steps badal sakte hain.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'Ek sheet se usme likhi saari entries. Check karke sab ek saath add karein.',
       tmFigSheet: 'Ek sheet',
@@ -727,7 +730,7 @@
       tmGoDecide: '✅ Decide Dropper try karein',
       tmHere: 'Abhi yahi khula hai',
       tmClose: 'Band karein',
-      tmFoot: 'Pehli baar apne aap khulta hai. Uske baad "Ye kya kar sakte hain?" se kabhi bhi dekh sakte hain.',
+      tmFoot: 'Ise kabhi bhi "Ye kya kar sakte hain?" se dobara dekh sakte hain.',
       tmLineTitle: 'LINE par bhi',
       tmLineText: 'Official account ko image ya PDF bhejein. Login ki zaroorat nahi.',
       tmLineBtn: 'Friend add karein',
