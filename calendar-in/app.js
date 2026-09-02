@@ -963,10 +963,19 @@ async function saveYoukou_(item, f) {
   youkouNote_(li, 'busy', I18N.t('youkouSaving'));
   try {
     var folderId = await ensureEventFolder_(date, f.taikai_mei);
-    item.fileId = await uploadOriginal_(item.file, folderId);
+    var up = await uploadOriginal_(item.file, folderId);
+    item.fileId = up.fileId;
     item.folderId = folderId;
-    youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),
-                'https://drive.google.com/drive/folders/' + folderId);
+    /* ★ 共有に失敗したら**そう言う**。保存はできているので止めないが、
+       黙って進むと**メンバーが要項を開けないリンクを配る**ことになる。
+       フォルダへのリンクを添えて、その場で手当てできるようにする。 */
+    if (up.shareErr) {
+      youkouNote_(li, 'warn', I18N.t('youkouShareFail'),
+                  'https://drive.google.com/drive/folders/' + folderId);
+    } else {
+      youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),
+                  'https://drive.google.com/drive/folders/' + folderId);
+    }
   } catch (e) {
     // 「保存しています…」を出したままにしない。失敗の中身は呼んだ側が知らせる
     youkouNote_(li, '', '');
@@ -1002,20 +1011,39 @@ async function uploadOriginal_(file, folderId) {
     });
   } catch (e) { /* 名前変更・移動の失敗は無視（ファイルはマイドライブ直下に残る） */ }
 
-  // このファイルのURLは**主催者以外の人に渡る**。案内文（X・汎用）に載り、
-  // カレンダー予定の説明にも入り、出欠の回答画面の「要項を見る」もここを指す。
-  // 共有設定が無いと、受け取った人は全員「アクセス権が必要です」で止まる。
-  // drive.file はアプリが作ったファイルの権限を変えられるので、ここで開けておく。
-  // best-effort：失敗しても保存自体は成功させる（主催者本人は開けるため）。
+  /* このファイルのURLは**主催者以外の人に渡る**。案内文（X・汎用）に載り、
+     カレンダー予定の説明にも入り、出欠の回答画面の「要項を見る」もここを指す。
+     共有設定が無いと、受け取った人は全員「アクセスできません」で止まる。
+     drive.file はアプリが作ったファイルの権限を変えられるので、ここで開けておく。
+
+     ★ **応答を必ず見ること。** `fetch` は HTTP 403 でも例外を投げない。
+       2026-08-25〜08-29 はここを try/catch だけで済ませていたため、Googleが共有を
+       断っても成功として進み、**主催者には何も出ないままリンクだけが死んでいた**
+       （2026-08-29 に実運用で発覚。メンバーがLINEから要項を開けなかった）。
+
+     ★ 保存自体は成功させる（主催者本人は開ける）。失敗は**呼び出し元に伝えて
+       画面に出す**——黙って進むのが今回の原因だったので、そこだけは変える。 */
+  var shareErr = '';
   try {
-    await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions?fields=id', {
+    var pm = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions?fields=id', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: 'reader', type: 'anyone' })
     });
-  } catch (e) { /* 共有の失敗は無視。主催者だけが開ける状態で残る */ }
+    if (!pm.ok) {
+      var body = '';
+      try { body = (await pm.text()).slice(0, 300); } catch (e2) { body = ''; }
+      shareErr = pm.status + ' ' + body;
+    }
+  } catch (e) {
+    shareErr = String((e && e.message) || e);
+  }
+  if (shareErr) {
+    // 原因を追えるようにコンソールへ残す。画面には言い換えた文を出す（呼び出し元）
+    try { console.warn('[dropper] 要項の共有に失敗:', shareErr); } catch (e3) {}
+  }
 
-  return fileId;
+  return { fileId: fileId, shareErr: shareErr };
 }
 
 // OCR本体（従来どおり）：Googleドキュメント変換で一時アップロード→本文取得→一時ファイル削除（使い捨て）
