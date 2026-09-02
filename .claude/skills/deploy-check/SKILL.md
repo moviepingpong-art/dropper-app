@@ -5,52 +5,49 @@ description: dropper-appの3言語同期チェックとGitHubアップロード�
 
 # dropper-app デプロイ前チェック
 
-## 手順1：3言語ファイルの同期確認
-
-3フォルダ（`calendar/` `calendar-en/` `calendar-in/`）で以下を検証する。
-
-### 1-1. 共通JSは完全同一か
-
-`app.js` `parser.js` `i18n.js` は**バイト単位で同じ**でなければならない。
+## 手順1：同期チェックを流す
 
 ```
-md5sum calendar/app.js calendar-en/app.js calendar-in/app.js
-md5sum calendar/parser.js calendar-en/parser.js calendar-in/parser.js
-md5sum calendar/i18n.js calendar-en/i18n.js calendar-in/i18n.js
+node tools/sync-check.js
 ```
 
-3つのハッシュが一致すればOK。1つでも違えば同期漏れ。
+これ1本で、`CLAUDE.md` に書かれている「壊すと気づきにくい」約束ごとをまとめて見る。
+**1つでも落ちたら終了コード 1**。直してからアップロードすること。
 
-### 1-2. index.html は window.LANG だけが違うか
+| # | 内容 |
+|---|---|
+| 1 | 3言語フォルダの共有JSがバイト同一か（`calendar*` `schedule*` `decide*` の**全JS**） |
+| 2 | `index.html` の `</head>` 以降が `window.LANG` 以外は同一か |
+| 3 | JSの構文（`node --check`） |
+| 4 | i18n の ja / en / in にキーの過不足が無いか |
+| 5 | `attend/` が原本（`hakusan-attendance`）とバイト同一か |
+| 6 | `LICENSE` が3リポジトリでバイト同一か |
+| 7 | `BASE_SCOPES` が審査済みの3つのままか |
 
-丸ごとコピーすると壊れる。**追加部分だけ差し込む**こと。
+### ★ head の中は揃えない
 
-検証方法：`window.LANG` の値を揃えて diff を取り、差分ゼロなら正しい。
+`index.html` で同一でなければならないのは **`</head>` から後ろ**だけ。
+head の中の `title` / `description` / `canonical` / `og:*` / `twitter:*` / JSON-LD は
+**言語ごとに違うのが正しい**（現在28行）。ここを揃えると多言語SEOが壊れる。
 
-```
-sed "s/window.LANG *= *'[a-z]*'/window.LANG='X'/" calendar/index.html > /tmp/ja.html
-sed "s/window.LANG *= *'[a-z]*'/window.LANG='X'/" calendar-en/index.html > /tmp/en.html
-diff /tmp/ja.html /tmp/en.html
-```
+以前この手順書には「`window.LANG` を置換して diff を取り、差分ゼロなら正しい」と書いてあったが、
+それだとファイル全体を見るため**必ず28行の差が出る**。誤検知するので、その方法は使わないこと。
 
-### 1-3. 構文チェック
+### スクリプトが見ていないもの
 
-```
-node --check calendar/app.js
-node --check calendar/parser.js
-node --check calendar/i18n.js
-```
-
-### 1-4. i18n キーの過不足
-
-`i18n.js` に文言を足したときは **ja / en / in すべてに同じキー**があるか確認する。
+- **`?v=` の繰り上げ**。変えたファイルと `index.html` の対応は人が決める。
+  `app.js` や `i18n.js` を直したら、3ビルドの `index.html` の `?v=` も一緒に上げること
+  （上げ忘れると、一度でも開いた端末は古いJSを使い続ける）。
+- 5・6 は隣に別リポジトリが要る（`drop-repos/` に並んでいること）。無ければその項目だけ飛ばす。
 
 ---
 
-## 手順2：OAuth審査に触れていないか（必ず確認）
+## 手順2：OAuth審査に触れていないか
 
-`app.js` の `BASE_SCOPES` に**新しいスコープが増えていないか**を確認する。
-増えていたらコミットせず、ユーザーに「再審査（数週間）が発生する」と伝えて判断を仰ぐ。
+スクリプトの 7 が機械的に見るが、**増えていたときの判断は人がする**。
+
+新しいスコープが増えていたら**コミットせず**、ユーザーに
+「その機能にはスコープ追加が必要で、Googleの再審査（数週間）が発生します」と伝えて判断を仰ぐ。
 
 ---
 
