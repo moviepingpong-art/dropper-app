@@ -203,6 +203,12 @@
       youkouSavedTo: '📁 {path} に保存しました',
       /* 共有に失敗したとき。**黙って進むとメンバーが開けないリンクを配ることになる** */
       youkouShareFail: '⚠ 保存しましたが、共有の設定ができませんでした。このままだとメンバーは{doc}を開けません。タップしてドライブを開き、共有を「リンクを知っている全員」にしてください。',
+      /* スマホだけで原因を読めるようにするための一式。
+         コンソールはパソコンでしか開けないので、利用者には届かない */
+      youkouDetail: '詳細を見る',
+      youkouDetailHide: '詳細を閉じる',
+      youkouDetailCopy: 'この内容をコピー',
+      youkouDetailCopied: 'コピーしました',
       attendNoName: '{ev}名が空です。先に{ev}名を入れてください。',
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
       // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
@@ -504,6 +510,10 @@
       youkouSaving: '📄 Saving the {doc}…',
       youkouSavedTo: '📁 Saved to {path}',
       youkouShareFail: '⚠ Saved, but sharing could not be set. Members will not be able to open the {doc}. Tap to open Drive and set sharing to “Anyone with the link”.',
+      youkouDetail: 'Show details',
+      youkouDetailHide: 'Hide details',
+      youkouDetailCopy: 'Copy this',
+      youkouDetailCopied: 'Copied',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
       annAttendUrl: 'Answer here',
@@ -789,6 +799,10 @@
       youkouSaving: '📄 {doc} save ho raha hai…',
       youkouSavedTo: '📁 {path} mein save ho gaya',
       youkouShareFail: '⚠ Save ho gaya, lekin sharing set nahi hui. Members {doc} nahi khol payenge. Tap karke Drive kholein aur sharing “Anyone with the link” karein.',
+      youkouDetail: 'Detail dekhein',
+      youkouDetailHide: 'Detail chhupayein',
+      youkouDetailCopy: 'Yeh copy karein',
+      youkouDetailCopied: 'Copy ho gaya',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
       annAttendUrl: 'Jawab yahan dein',

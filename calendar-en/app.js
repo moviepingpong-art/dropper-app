@@ -930,7 +930,15 @@ function folderPath_(kaisaiDate, taikaiMei) {
 /* カードの上に出す「どこに保存したか」の1行。保存中と保存後を、この1本で兼ねる。
    **saveYoukou_ からだけ呼ぶこと。** 経路ごとに書くと、保存したのに何も出ない道ができる。
    大会名がそのまま入るので、リンクの文字は textContent で入れる（innerHTML にしない）。 */
-function youkouNote_(li, cls, text, href) {
+/* 要項の保存についての一行。
+   detail を渡すと「詳細」を付け、タップで中身を出す。
+
+   ★ **この道具の利用者はスマホ。** 不具合の手がかりが
+     コンソール（パソコンでしか開けない）にしか無いと、原因を追えない。
+     2026-08-29 に実際に行き詰まったので、画面から読めるようにした。
+   ★ コピーも付ける。スマホで長押し選択させるのは酷で、
+     「LINEで送ってもらう」までが1タップで終わることに意味がある。 */
+function youkouNote_(li, cls, text, href, detail) {
   if (!li) return;
   var el = li.querySelector('.youkou-note');
   if (!el) return;
@@ -938,6 +946,7 @@ function youkouNote_(li, cls, text, href) {
   if (!text) { el.style.display = 'none'; el.textContent = ''; return; }
   el.style.display = '';
   el.textContent = '';
+
   if (href) {
     var a = document.createElement('a');
     a.href = href;
@@ -946,8 +955,48 @@ function youkouNote_(li, cls, text, href) {
     a.textContent = text;
     el.appendChild(a);
   } else {
-    el.textContent = text;
+    el.appendChild(document.createTextNode(text));
   }
+
+  if (!detail) return;
+
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'youkou-detail-btn';
+  btn.textContent = I18N.t('youkouDetail');
+
+  var box = document.createElement('div');
+  box.className = 'youkou-detail';
+  box.style.display = 'none';
+
+  var pre = document.createElement('div');
+  pre.className = 'youkou-detail-text';
+  pre.textContent = String(detail);
+
+  var copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'youkou-detail-copy';
+  copy.textContent = I18N.t('youkouDetailCopy');
+  copy.addEventListener('click', function () {
+    var done = function () {
+      copy.textContent = I18N.t('youkouDetailCopied');
+      setTimeout(function () { copy.textContent = I18N.t('youkouDetailCopy'); }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(String(detail)).then(done, done);
+    } else { done(); }
+  });
+
+  box.appendChild(pre);
+  box.appendChild(copy);
+  btn.addEventListener('click', function () {
+    var on = box.style.display === 'none';
+    box.style.display = on ? '' : 'none';
+    btn.textContent = I18N.t(on ? 'youkouDetailHide' : 'youkouDetail');
+  });
+
+  el.appendChild(btn);
+  el.appendChild(box);
 }
 
 /* 要項をドライブへ保存する**唯一の入口**。
@@ -974,7 +1023,7 @@ async function saveYoukou_(item, f) {
        フォルダへのリンクを添えて、その場で手当てできるようにする。 */
     if (up.shareErr) {
       youkouNote_(li, 'warn', I18N.t('youkouShareFail'),
-                  'https://drive.google.com/drive/folders/' + folderId);
+                  'https://drive.google.com/drive/folders/' + folderId, up.shareErr);
     } else {
       youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),
                   'https://drive.google.com/drive/folders/' + folderId);
