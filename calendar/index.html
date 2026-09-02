@@ -61,7 +61,7 @@
     .guide-link { margin:8px 0 0; font-size:13px; }
     .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; }
     .guide-link a:hover { border-bottom-color:var(--teal); }
-    .visitor-badge { margin:10px 0 0; }
+    .visitor-badge { margin:0; }
     .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
     main { padding:8px 22px 48px; max-width:760px; }
 
@@ -250,6 +250,8 @@
       text-decoration:none; transition:background .15s, color .15s;
     }
     .attend-entry-btn:hover { background:var(--teal); color:#fff; }
+    /* ボタンの上の1行。app.js が合鍵の有無で出し入れする（無いときだけ出る）。 */
+    .attend-lead { margin:0 0 10px; font-size:13px; font-weight:700; color:var(--teal-d); }
     /* ログインがまだのときの「つくる」。**押せなくは見せるが、行き止まりにはしない**——
        押すとログインへ回す（app.js の wireAttendEntry_）。
        枠線を破線にして「まだ使えない」を伝える。文字は薄くしすぎない（読めなくなる）。 */
@@ -262,13 +264,13 @@
       header { padding-top:12px; padding-bottom:2px; }
       .tool-hint { margin-top:4px; }
       .guide-link { margin-top:4px; }
-      .visitor-badge { margin-top:4px; }
       #login-area { padding:10px 10px 0; }
       .login-note { margin-top:8px; }
       .entry-ways { margin-bottom:8px; }
       .login-badges { margin-top:8px; }
       .login-perm { margin-top:6px; }
       .attend-entry { margin-top:8px; padding:10px 10px 0; }
+      .attend-lead { margin-bottom:8px; }
     }
     .pick-btn {
       font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
@@ -471,8 +473,13 @@
     @media (prefers-reduced-motion: reduce){ .tm-panel.on { animation:none; } }
 
     .subtitle-row { margin:12px 0 4px; }
+    /* 見出しと訪問者カウンタを1行に同居させる。**カウンタに自分の行を持たせない**——
+       スマホは縦が足りず、1行が出欠の入口を折り返しの外へ押し出す（2026-09-02 に実測）。
+       ★ セレクトの右ではなく見出しの右。セレクトは中身で幅が変わり
+         （「— 選んでください —」で238px）、375px では折り返してしまう。 */
+    .type-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 8px; }
     /* ドロッパーの種類選択（ボタン一覧 → 選択後は名称を表示） */
-    .type-prompt { font-size:14px; font-weight:700; color:var(--teal-d); margin:0 0 8px; }
+    .type-prompt { font-size:14px; font-weight:700; color:var(--teal-d); margin:0; }
     /* 種類は6つある。横並びのボタンだと狭い画面で3〜4段に折り返して縦に伸び、
        肝心のドロップ欄が画面の外へ押し出されるため、プルダウンにしてある。 */
     .type-select {
@@ -693,7 +700,14 @@
     <p class="tool-hint" id="toolHint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと</p>
     <h1 data-i18n="appName">イベントドロッパー</h1>
     <div class="subtitle-row">
-      <p class="type-prompt" id="typePrompt" data-i18n="eventTypePrompt">イベントの種類</p>
+      <!-- 訪問者カウンターはここに同居させる。src は window.LANG を読んだあと（ページ末尾）で入れる。
+           ★ 自分の行を持たせないこと。**1行が出欠の入口を折り返しの外へ押し出す。** -->
+      <div class="type-head">
+        <p class="type-prompt" id="typePrompt" data-i18n="eventTypePrompt">イベントの種類</p>
+        <p class="visitor-badge" id="visitorBadge">
+          <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
+        </p>
+      </div>
       <select class="type-select" id="typePicker" aria-labelledby="typePrompt"></select>
     </div>
     <!-- 使い方ガイドへの導線。日本語ガイドのみ公開のため、i18n.js が ja 以外では非表示にする -->
@@ -703,10 +717,6 @@
     <p class="guide-link" id="guideLink">
       <a href="https://dropper-tools.com/guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
       <a href="https://dropper-tools.com/privacy.html" target="_blank" rel="noopener" data-i18n="privacyLink">📄 プライバシーポリシー</a>
-    </p>
-    <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
-    <p class="visitor-badge" id="visitorBadge">
-      <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
     </p>
   </header>
   <main>
@@ -800,6 +810,10 @@
          ★ 「つくる」は合鍵が無いときだけ出す。**二重に団体をつくらせないため**——
            二つめができると、配ったURLが古いほうを指したままになる（出欠システム側の警告）。 -->
     <div id="attend-entry" class="attend-entry" style="display:none">
+      <!-- ★ 目的から入る1行。**合鍵が無いときだけ**出す（app.js が display を切り替える）。
+           出欠の集計だけが目的の人にとっては、これが最初に押すボタン。
+           すでに団体がある人には出さない（縦を伸ばさないため）。 -->
+      <p id="attendMakeLead" class="attend-lead" data-i18n="attendMakeLead" style="display:none">🙋 メンバーの出欠を集計したいなら、まずここから</p>
       <a id="attendEntryBtn" class="attend-entry-btn" target="_blank" rel="noopener"
          href="https://app.dropper-tools.com/attend/admin.html"></a>
     </div>
@@ -1134,10 +1148,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260849"></script>
+  <script src="i18n.js?v=20260851"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260848"></script>
+  <script src="app.js?v=20260850"></script>
 </body>
 </html>

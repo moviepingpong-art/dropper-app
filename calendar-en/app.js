@@ -2725,6 +2725,11 @@ function wireAttendEntry_() {
 
   link.href = ATTEND_ADMIN_URL + (key ? '#k=' + encodeURIComponent(key) : '');
   link.textContent = I18N.t(key ? 'attendEntryBtn' : 'attendMakeBtn');
+
+  /* 目的から入る1行は**「つくる」のときだけ**。すでに団体がある人には出さない。
+     知っている人には要らず、スマホは縦が足りない（実効650px前後）。 */
+  var lead = document.getElementById('attendMakeLead');
+  if (lead) lead.style.display = key ? 'none' : '';
   link.classList.toggle('need-login', needLogin);
   link.setAttribute('aria-disabled', needLogin ? 'true' : 'false');
 

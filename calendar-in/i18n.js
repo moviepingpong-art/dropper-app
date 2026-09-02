@@ -124,9 +124,13 @@
          2026-09-02 に利用者から「安全の2つが分かりにくい」と指摘された。
          ログイン前に決めているのは「自分に要るか」で、権限の範囲はその答えにならない。
          安全の話は消さず、帯の下の permNote 1行にまとめてある（**消さないこと**）。 */
-      flowExtract: '📄 {doc}から項目を自動で抜き出す',
-      flowMake: '✉️ 案内文と出欠リンクを作る',
-      flowAnswer: '🙋 メンバーはタップで回答',
+      /* ★ 短いまま保つこと。**帯は2行に収まる長さが上限**——3行になると
+         出欠の入口が実機の折り返し（実効650px前後）の外へ出る。2026-09-02 に実測。
+         ★ 「{doc}から」は入れない。上の entryWays が同じことを言っており、
+           その1語で2行が3行になる。 */
+      flowExtract: '📄 項目を自動で抜き出す',
+      flowMake: '✉️ 案内文と出欠リンク',
+      flowAnswer: '🙋 タップで回答',
       permNote: '🔒 見るのはこのアプリが作ったファイルだけ。予定はカレンダーに入れるだけです。',
       permVerified: '✅ Google審査ずみ',
       /* 最初の画面から出欠システムへ行く入口（app.js の wireAttendEntry_）。
@@ -140,6 +144,12 @@
       /* まだ団体が無いとき。**この文言は「つくる」側**で、上の2つと入れ替わる。
          用意するものを先に言う（名簿を手元に置いてから始めてもらうため）。 */
       attendMakeBtn: '＋ 出欠の団体をつくる',
+      /* ★ 目的から入る1行。**合鍵が無いときだけ**出す（wireAttendEntry_）。
+         区切り線の下のボタンには見出しが無く、出欠の集計だけが目的の人にとっては
+         「最初に押すもの」なのに、それが画面のどこにも書かれていなかった。
+         すでに団体がある人には出さない——知っている人には要らず、
+         スマホは縦が足りない（実効650px前後）。 */
+      attendMakeLead: '🙋 メンバーの出欠を集計したいなら、まずここから',
       attendMakeNote: 'メンバーの出欠を集めるなら、最初に団体をつくります。要るのは団体名とお名前だけです。',
       /* ログイン前に団体をつくらせない理由の説明。**なぜ要るのかを言う**——
          ただ「ログインしてください」だけだと、Google非依存の出欠システムなのに
@@ -461,14 +471,15 @@
       loginBtn: 'Sign in with Google',
       loginNote: 'Both the {doc} and the event stay in your own Google account.',
       privacyLink: '📄 Privacy policy',
-      flowExtract: '📄 Pulls the details out of your {doc}',
-      flowMake: '✉️ Writes the notice and the RSVP link',
-      flowAnswer: '🙋 Members reply in one tap',
+      flowExtract: '📄 Reads the details',
+      flowMake: '✉️ Notice + RSVP link',
+      flowAnswer: '🙋 One-tap replies',
       permNote: '🔒 It only ever sees the files it made itself, and only adds calendar events.',
       permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
       attendEntryNote: 'Where you collect replies from your members. Sign in with Google and it still opens on your next device.',
       attendMakeBtn: '＋ Set up attendance',
+      attendMakeLead: '🙋 Want to collect replies from your members? Start here',
       attendMakeNote: 'To collect replies from your members, first create a group. All you need is a name and your members.',
       attendMakeLogin: 'Please sign in with Google first. We keep your key in your own Drive, so the same group opens on your next device.',
       stepSport: '① Select sport:',
@@ -752,14 +763,15 @@
       loginBtn: 'Google se sign in karein',
       loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
       privacyLink: '📄 Privacy policy',
-      flowExtract: '📄 {doc} se details khud nikalta hai',
-      flowMake: '✉️ Notice aur RSVP link banata hai',
-      flowAnswer: '🙋 Member ek tap mein jawab dete hain',
+      flowExtract: '📄 Details khud nikalta hai',
+      flowMake: '✉️ Notice + RSVP link',
+      flowAnswer: '🙋 Ek tap mein jawab',
       permNote: '🔒 Sirf apni banayi files dikhti hain, aur calendar mein sirf event jaata hai.',
       permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
       attendEntryNote: 'Yahan members ke jawab jama karte hain. Google se login rahenge to naye device par bhi wahi group khulega.',
       attendMakeBtn: '＋ Attendance shuru karein',
+      attendMakeLead: '🙋 Members se attendance jama karni hai? Yahan se shuru karein',
       attendMakeNote: 'Members ke jawab jama karne ke liye pehle ek group banayein. Sirf group ka naam aur members chahiye.',
       attendMakeLogin: 'Pehle Google se login karein. Aapki key aapki hi Drive mein rakhi jati hai, isliye naye device par bhi wahi group khulega.',
       stepSport: '① Sport chunein:',
