@@ -48,7 +48,7 @@ GitHub Pages で公開している静的サイト。サーバーは無い。**�
 スポーツのみ `useSportSelector: true`（競技セレクタ表示＋競技用プロンプト）。
 それ以外は `parser.js` の**汎用イベントモード**（`parse(text, sport, eventMode, opts)` の第3引数）で解析する。
 
-## ★ `fetch` の応答を見ない try/catch を書かない（2026-08-29 に本番を壊した）
+## ★ `fetch` の応答を見ない try/catch を書かない（2026-09-02 に本番を壊した）
 
 **`fetch` は HTTP 403 でも例外を投げない。** `try/catch` だけで囲むと、
 サーバーが断っても**成功として素通り**する。
