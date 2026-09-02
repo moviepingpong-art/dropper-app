@@ -1378,11 +1378,24 @@ function wireAnnounceGate_(li) {
 }
 
 /** 案内文のボタンを出す。 */
+/** 「渡したが受付が始まっていない」を出す。
+    渡していない人と、受付を始めた人には出さない。 */
+function annPendingPaint_(li) {
+  if (!li) return;
+  var el = li.querySelector('.ann-pending');
+  if (!el) return;
+  var show = !!li.__attendSent && !li.__attendReady;
+  el.style.display = show ? '' : 'none';
+  if (show) el.textContent = I18N.t('annNotAccepted');
+}
+
 function annShow_(li) {
   var make = li.querySelector('.ann-make');
   var skip = li.querySelector('.ann-skip');
   if (!make) return;
   if (skip) skip.style.display = 'none';
+  var pend = li.querySelector('.ann-pending');
+  if (pend) pend.style.display = 'none';      // 受付が始まったので、注意書きは引っ込める
   if (make.style.display !== 'none') return;
   make.style.display = '';
 }
@@ -1587,6 +1600,12 @@ function addCard(name) {
         '<div class="ann-make">' +
           '<button type="button" class="ann-btn">' + I18N.t('annBtn') + '</button>' +
         '</div>' +
+        /* ★ 渡したのに受付が始まっていないときだけ出す。
+           下の逃げ道は「出欠は要らない」人向けの言葉で、
+           **「もう作ったつもりの人」には合わない**（2026-08-29 に実運用で発覚）。
+           団体をつくって戻ってきた人は、受付を始めずにここを押し、
+           **出欠の無い案内文を配る**ことになった。 */
+        '<p class="ann-pending" style="display:none"></p>' +
         '<p class="ann-skip" style="display:none">' +
           '<button type="button" class="ann-skip-btn">' + I18N.t('annSkipAttend') + '</button>' +
         '</p>' +
@@ -2793,6 +2812,9 @@ function attendSend_(item, status) {
 
     var done = function (msg) {
       setAttendStatus_(status, 'ok', I18N.t(msg));
+      /* 渡したことを覚えておく。戻ってきても __attendReady が立たなければ、
+         **受付が始まっていない**ということ。それを名指しで伝えるための印。 */
+      if (li) { li.__attendSent = true; annPendingPaint_(li); }
       track('attend_copy', {});
     };
 
