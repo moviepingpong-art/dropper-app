@@ -120,8 +120,14 @@
       privacyLink: '📄 プライバシーポリシー',
       /* 同意画面で利用者自身が確かめられることだけを書く。
          **「Google公認」「推奨」は書かないこと**（ブランド規約が推奨の示唆を禁じている）。 */
-      permDrive: '🔒 既存ファイルは見ません',
-      permCal: '📅 予定の作成・変更だけ',
+      /* ★ 帯は「押しても安全か」ではなく「押すと何が起きるか」を言う。
+         2026-09-02 に利用者から「安全の2つが分かりにくい」と指摘された。
+         ログイン前に決めているのは「自分に要るか」で、権限の範囲はその答えにならない。
+         安全の話は消さず、帯の下の permNote 1行にまとめてある（**消さないこと**）。 */
+      flowExtract: '📄 {doc}から項目を自動で抜き出す',
+      flowMake: '✉️ 案内文と出欠リンクを作る',
+      flowAnswer: '🙋 メンバーはタップで回答',
+      permNote: '🔒 見るのはこのアプリが作ったファイルだけ。予定はカレンダーに入れるだけです。',
       permVerified: '✅ Google審査ずみ',
       /* 最初の画面から出欠システムへ行く入口（app.js の wireAttendEntry_）。
          ★ ボタンの文字（attendEntryBtn / attendMakeBtn）だけを出す。
@@ -455,8 +461,10 @@
       loginBtn: 'Sign in with Google',
       loginNote: 'Both the {doc} and the event stay in your own Google account.',
       privacyLink: '📄 Privacy policy',
-      permDrive: '🔒 Existing files stay private',
-      permCal: '📅 Calendar events only',
+      flowExtract: '📄 Pulls the details out of your {doc}',
+      flowMake: '✉️ Writes the notice and the RSVP link',
+      flowAnswer: '🙋 Members reply in one tap',
+      permNote: '🔒 It only ever sees the files it made itself, and only adds calendar events.',
       permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
       attendEntryNote: 'Where you collect replies from your members. Sign in with Google and it still opens on your next device.',
@@ -744,8 +752,10 @@
       loginBtn: 'Google se sign in karein',
       loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
       privacyLink: '📄 Privacy policy',
-      permDrive: '🔒 Purani files nahi dikhtin',
-      permCal: '📅 Sirf calendar event',
+      flowExtract: '📄 {doc} se details khud nikalta hai',
+      flowMake: '✉️ Notice aur RSVP link banata hai',
+      flowAnswer: '🙋 Member ek tap mein jawab dete hain',
+      permNote: '🔒 Sirf apni banayi files dikhti hain, aur calendar mein sirf event jaata hai.',
       permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
       attendEntryNote: 'Yahan members ke jawab jama karte hain. Google se login rahenge to naye device par bhi wahi group khulega.',
