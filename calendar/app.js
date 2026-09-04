@@ -1000,6 +1000,19 @@ function youkouNote_(li, cls, text, href, detail) {
 
    すでに保存済み・元ファイルが無い（LINEから ?d= で来たカード）・未ログイン、
    のときは何もしない。呼ぶ側は毎回そのまま呼んでよい。 */
+/* 共有を断ったのが**組織（学校・職場）の設定**かどうかを、Googleの返答から見分ける。
+   実例（短大が配布したアカウント、2026-09-04）:
+     403 {"error":{"code":403,"message":"The domain administrators have disabled
+          Drive apps sharing outside of the domain." ...}}
+   ★ **迷ったら false。** 外れた原因を名指しするほうが、汎用の文言より遠回りさせる。
+     だから語は絞ってある（"policy" のような広い語は入れない——不適切なファイルの
+     警告など、別の理由の403にも出てくる）。
+   ★ 判定を外しても**詳細（Googleの返答そのもの）は必ず出る**ので、行き止まりにはならない。 */
+function orgBlocked_(err) {
+  var s = String(err || '').toLowerCase();
+  return /domain|sharingnotpermitted|shareoutside/.test(s);
+}
+
 async function saveYoukou_(item, f) {
   if (!item || item.fileId || !item.file || !accessToken) return;
   var li = (item.card && item.card.el) || null;
@@ -1014,7 +1027,10 @@ async function saveYoukou_(item, f) {
        黙って進むと**メンバーが要項を開けないリンクを配る**ことになる。
        フォルダへのリンクを添えて、その場で手当てできるようにする。 */
     if (up.shareErr) {
-      youkouNote_(li, 'warn', I18N.t('youkouShareFail'),
+      /* 理由が分かるなら**名指しで書く**。「共有できませんでした」だけだと、主催者は
+         自分の操作を疑って何度もやり直す。組織アカウントでは何度やっても直らない。 */
+      youkouNote_(li, 'warn',
+                  I18N.t(orgBlocked_(up.shareErr) ? 'youkouShareOrg' : 'youkouShareFail'),
                   'https://drive.google.com/drive/folders/' + folderId, up.shareErr);
     } else {
       youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),

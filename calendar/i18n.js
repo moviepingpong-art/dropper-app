@@ -222,6 +222,13 @@
       youkouSavedTo: '📁 {path} に保存しました',
       /* 共有に失敗したとき。**黙って進むとメンバーが開けないリンクを配ることになる** */
       youkouShareFail: '⚠ 保存しましたが、共有の設定ができませんでした。このままだとメンバーは{doc}を開けません。タップしてドライブを開き、共有を「リンクを知っている全員」にしてください。',
+      /* ★ 組織（学校・職場）のGoogleアカウントで管理者が共有を禁じているとき用。
+         **やることが逆になる**ので文言を分けてある——汎用の文言は「ドライブで共有を
+         変えてください」と言うが、組織アカウントでは**その選択肢自体が出ない**。
+         何度やっても直らないものを勧めることになる（2026-09-02〜04 に実際そうなった。
+         短大が配布したアカウントで、主催者は3回やり直した）。
+         ★ 出し分けは app.js の orgBlocked_()。**確信が持てるときだけ**こちらを出す。 */
+      youkouShareOrg: '⚠ 保存しましたが、共有できませんでした。組織（学校・職場）のGoogleアカウントで、管理者がリンク共有を禁じています。このままではメンバーが{doc}を開けません。個人のGoogleアカウントで使い直すと解決します。',
       /* スマホだけで原因を読めるようにするための一式。
          コンソールはパソコンでしか開けないので、利用者には届かない */
       youkouDetail: '詳細を見る',
@@ -532,6 +539,7 @@
       youkouSaving: '📄 Saving the {doc}…',
       youkouSavedTo: '📁 Saved to {path}',
       youkouShareFail: '⚠ Saved, but sharing could not be set. Members will not be able to open the {doc}. Tap to open Drive and set sharing to “Anyone with the link”.',
+      youkouShareOrg: '⚠ Saved, but sharing was refused. This is a work or school Google account and its administrator blocks link sharing. Members will not be able to open the {doc}. Using a personal Google account fixes this.',
       youkouDetail: 'Show details',
       youkouDetailHide: 'Hide details',
       youkouDetailCopy: 'Copy this',
@@ -824,6 +832,7 @@
       youkouSaving: '📄 {doc} save ho raha hai…',
       youkouSavedTo: '📁 {path} mein save ho gaya',
       youkouShareFail: '⚠ Save ho gaya, lekin sharing set nahi hui. Members {doc} nahi khol payenge. Tap karke Drive kholein aur sharing “Anyone with the link” karein.',
+      youkouShareOrg: '⚠ Save ho gaya, par sharing mana kar di gayi. Yeh school ya office ka Google account hai aur admin ne link sharing band ki hui hai. Members {doc} nahi khol payenge. Personal Google account use karne se theek ho jayega.',
       youkouDetail: 'Detail dekhein',
       youkouDetailHide: 'Detail chhupayein',
       youkouDetailCopy: 'Yeh copy karein',
