@@ -163,16 +163,17 @@
       dropSub: 'PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。',
       pickBtn: 'ファイルを選ぶ',
       /* ログイン前の画面で言う一行。いまは purpose* が担っている。 */
-      /* entryWays は 2026-09-06 からどこにも出していない（purposeDocS が同じことを言う）。
+      /* entryWays は 2026-09-06 からどこにも出していない（purpose* が同じ役をする）。
          戻すときは <p class="entry-ways"> を書き戻す。 */
       entryWays: '📄 {doc}をドロップ　／　✎ 無ければ手で入力',
-      /* ★ ログイン前の2択（2026-09-06）。**ログインは1つ**で、選んだほうへ行く。
+      /* ★ ログイン前の2択（2026-09-06）。**入口はチラシの有無だけ**で、選んだ瞬間に進む。
          entryWays（「{doc}をドロップ／無ければ手で入力」）はここに吸収した。
          **「文書が無くても使える」は必ずどこかに残すこと**——それを言わないと
-         「自分には関係ない道具だ」と判断されるのがこの画面。いまは purposeDocS が言っている。 */
+         「自分には関係ない道具だ」と判断されるのがこの画面。いまは purposeAttendT が言っている。
+         ★ purposeDocT に副題は付けない（2026-09-06）。「ドロップするだけ」と書いていたが、
+           見出しの「{doc}から」で言い尽くされており、**1行増えるぶん実効650pxを超えた**。 */
       purposeLead: '何をしますか？',
-      purposeDocT: '📄 {doc}から予定と案内文をつくる',
-      purposeDocS: 'ドロップするだけ',
+      purposeDocT: '📄 {doc}から予定と案内文をつくり、出欠を集める',
       purposeAttendT: '🙋 {doc}なしで、出欠だけを集める',
       purposeAttendS: '項目は手入力',
       /* ★ 合鍵の控えは**管理リンクを自分で保存してもらう**（以前の方法）。
@@ -508,8 +509,7 @@
       pickBtn: 'Choose a file',
       entryWays: '📄 Drop a {doc} / ✎ or just type it in',
       purposeLead: 'What would you like to do?',
-      purposeDocT: '📄 Turn a {doc} into an event and an announcement',
-      purposeDocS: 'Just drop the file',
+      purposeDocT: '📄 Turn a {doc} into an event, an announcement and attendance',
       purposeAttendT: '🙋 Just collect attendance, without a {doc}',
       purposeAttendS: 'Type the details in by hand',
       purposeNote: '※ “Without a {doc}” needs no Google sign-in. Be sure to save the admin link shown on the next screen.',
@@ -805,8 +805,7 @@
       entryWays: '📄 {doc} drop karein / ✎ ya khud type karein',
       purposeLead: 'Aap kya karna chahte hain?',
       /* {doc} が先頭に来ると小文字で始まってしまう（flyer se…）。Ek を足して受ける。 */
-      purposeDocT: '📄 Ek {doc} se event aur announcement banayein',
-      purposeDocS: 'Bas file drop karein',
+      purposeDocT: '📄 Ek {doc} se event, announcement aur attendance',
       purposeAttendT: '🙋 Bina {doc}, sirf attendance jama karein',
       purposeAttendS: 'Details khud type karein',
       purposeNote: '※ “Bina {doc}” ke liye Google sign-in nahi chahiye. Agli screen par jo admin link aata hai, use zaroor save karein.',
