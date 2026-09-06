@@ -247,7 +247,7 @@
       attendNoEvents: '種目を読み取れませんでした。競技方法欄に種目（例：男女ダブルス 等）を入れてください。',
       // ja はリッチメニューに出欠ページを常設しているのでURLを書かない。
       // en/in はリッチメニューが無いのでURLを書く（annAttendUrl）
-      annAttendUrl: '出欠入力はこちら',
+      annAttendUrl: '出欠の回答を以下のリンクからお願いします',
       annAttendNoUrl: '出欠の回答をお願いします。',
       // --- 要チェック（採点係）＆AI ---
       warnNotice: '点滅している枠は「特に注意したい箇所」の目印です。点滅していない項目にも誤りがある場合があります。気になる項目はそのまま手で直すか、処理モードを「AIモード」に変えて読み取り直してください。',
@@ -557,7 +557,7 @@
       youkouDetailCopied: 'Copied',
       attendNoName: 'The {ev} name is empty. Please enter it first.',
       attendNoEvents: 'No category could be read. Please enter a category (e.g. Mixed Doubles) in the format field.',
-      annAttendUrl: 'Answer here',
+      annAttendUrl: 'Please reply to the attendance from the link below',
       annAttendNoUrl: 'Please reply to the attendance.',
       warnNotice: 'A blinking box marks a spot worth double-checking. Items without a blink can still be wrong. Fix anything by hand, or switch the processing mode to "AI mode" and run it again.',
       warnMultiDayEvents: 'Multi-day event. Please check the events per day, and whether a practice day slipped in.',
@@ -854,7 +854,7 @@
       youkouDetailCopied: 'Copy ho gaya',
       attendNoName: '{ev} ka naam khali hai. Pehle naam daalein.',
       attendNoEvents: 'Koi category nahi mili. Format field mein category (jaise Mixed Doubles) daalein.',
-      annAttendUrl: 'Jawab yahan dein',
+      annAttendUrl: 'Attendance ka jawab neeche di gayi link se dein',
       annAttendNoUrl: 'Attendance ka jawab dein.',
       warnNotice: 'Blink karta box us jagah ko mark karta hai jise double-check karna chahiye. Bina blink wale items bhi galat ho sakte hain. Kisi bhi field ko haath se theek karein, ya processing mode ko "AI mode" par switch karke dobara run karein.',
       warnMultiDayEvents: 'Multi-day event hai. Har din ke events, aur kahin practice day to mix nahi hua, check karein.',
