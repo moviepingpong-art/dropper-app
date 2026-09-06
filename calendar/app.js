@@ -4,7 +4,7 @@
 /* ===== 設定（ここだけ書き換える） ===== */
 var GOOGLE_CLIENT_ID = '924835597048-lf0e4p3f73373ur5pnujac9bcl5cj820.apps.googleusercontent.com';
 
-// 出欠システム連携（出欠ドロッパー）：読み取った要項を出欠システムの管理画面に渡すだけ。
+// 出欠システム連携（出欠システム）：読み取った要項を出欠システムの管理画面に渡すだけ。
 // ドロッパーは何も書き込まないので、こちら側に設定は一切ない（attendance-hook.js）。
 // 旧クラブ運用モード（?club=hakusan の大会マスタ・シート書き出し）は、この仕組みに置き換えて撤去した。
 // 出欠システムが3言語になったので、**どの言語版でも出す**。
@@ -600,15 +600,28 @@ function unpopAnim() {
     var lb = document.getElementById('loginBtn');
     if (lb) lb.click();
   });
-  if (att) att.addEventListener('click', function () {
-    var k = attendKeyLocal_();
-    track('attend_entry', { has_key: k ? 1 : 0 });
-    /* ★ 戻り先を置いておく。出欠を作り終えたら、向こうがここへ返してくれる。
-       言語ごとに違う（calendar / calendar-en / calendar-in）ので、URLをそのまま持たせる。 */
-    try { localStorage.setItem(ATTEND_RETURN_STORE, location.href); } catch (e) { /* noop */ }
-    location.href = ATTEND_ADMIN_URL + (k ? '#k=' + encodeURIComponent(k) : '');
-  });
+  if (att) att.addEventListener('click', goAttend_);
+
+  /* ★ 周知サイトの「出欠システム」から直に来る道（?go=attend）。
+     admin.html へ直に張ると**案内文までの道が消える**（戻り先が置かれないため）ので、
+     いったんここを通してから送る。 */
+  try {
+    if (/[?&]go=attend(&|$)/.test(location.search)) goAttend_();
+  } catch (e) { /* noop */ }
 })();
+
+function goAttend_() {
+  var k = attendKeyLocal_();
+  track('attend_entry', { has_key: k ? 1 : 0 });
+  /* ★ 戻り先を置いておく。出欠を作り終えたら、向こうがここへ返してくれる。
+     言語ごとに違う（calendar / calendar-en / calendar-in）ので、URLを持たせる。
+     ★ **問い合わせ（?go=attend）は落とすこと。** 付けたまま戻すと、戻った先で
+       もう一度ここが走って出欠システムへ跳ね返り、行ったり来たりになる。 */
+  try {
+    localStorage.setItem(ATTEND_RETURN_STORE, location.origin + location.pathname);
+  } catch (e) { /* noop */ }
+  location.href = ATTEND_ADMIN_URL + (k ? '#k=' + encodeURIComponent(k) : '');
+}
 
 /* ===== Googleログイン ===== */
 function ensureTokenClient() {

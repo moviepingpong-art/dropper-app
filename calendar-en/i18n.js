@@ -38,14 +38,14 @@
       tmTagEvent1: 'どんなイベントにも',
       tmTagEvent2: '日付・会場を自動で',
       tmTagEvent3: '案内文もワンタップ',
-      /* ★ 出欠は**4本目として並べない**（周知サイトと同じ決めごと）。理由は「単体で使えないから」
-         **ではない**——出欠システムには「＋ 手で入力して追加」があり、最初の画面にも直接の入口が
-         あるので、要項を1枚も読まずに完結できる（2026-09-03 に食い違いが見つかり、文言を直した）。
-         並べない理由は、**主な道が「読み取ってそのまま渡す」ほうだから**。4本並べると、
-         いちばん楽な道が3本の中に埋もれる。
-         訳は周知サイト（dropper の tool1.attend*）から持ってきた。**文言を直すときは両方そろえる。** */
-      tmAttendHead: '読み取ったら、そのまま出欠も',
-      tmAttendDesc: '読み取ったあとの画面から、出欠の受付を立ち上げられます。メンバーは名簿から名前を選んで〇△×を送るだけ、アプリも登録も不要です。',
+      /* ★ 出欠は**4本目のタブとして並べない。イベントの中にも置かない**（2026-09-06）。
+         3本は「紙から出す」道具、出欠は「集める」道具で、**向きが逆**。同じ棚に並べると
+         名前（ドロッパー＝ドロップする道具）が嘘になる。**棚を分けて下に置く**（tmShelf）。
+         ★ 「ドロッパー」を名前から外した（2026-09-06）。画面と同じ「出欠システム」で通す。
+         訳は周知サイト（dropper の tool1.attend*）と**対**。**片方だけ直すと食い違う。** */
+      tmShelf: 'もう一つの道具',
+      tmAttendHead: '🙋 出欠システム',
+      tmAttendDesc: 'メンバーの出欠を集めて数えます。読み取った行事からそのまま立ち上げられるほか、チラシが無くても単体で使えます。メンバーは名簿から名前を選んで〇△×を送るだけ、アプリも登録も不要です。',
       tmAttendStage1: 'イベントドロッパー',
       tmAttendStage2: '出欠の受付',
       tmAttendFig1: '要項を読み取る',
@@ -53,7 +53,7 @@
       tmAttendPass: '行事名・日付・会場を引き継ぐ',
       tmAttendFig2: '名簿から回答',
       tmAttendFig3: '〇△×を集計',
-      tmAttendNote: '要項が無くても、最初の画面の「🙋 要項なしで、出欠だけを集める」から始められます。お試し公開中のため、画面や手順は変わることがあります。',
+      tmAttendNote: '最初の画面の「🙋 要項なしで、出欠だけを集める」から始められます。お試し公開中のため、画面や手順は変わることがあります。',
       tmNameSchedule: '📅 予定表ドロッパー',
       tmOneSchedule: '予定表1枚から、中の予定を全部。確認してからまとめて登録。',
       tmFigSheet: '予定表1枚',
@@ -211,7 +211,7 @@
       editHint: '内容を確認してください。訂正、追加等はそのまま入力欄で書き換え可能です。メモ・備考欄にコメントの追加もできます。',
       msgDateEmptyA: '開催日が未入力の{ev}が ',
       msgDateEmptyB: ' 件あります。日付を入力するか、チェックを外してください。',
-      // --- 出欠システム連携（出欠ドロッパー）---
+      // --- 出欠システム連携（出欠システム）---
       // v1は日本語版だけに出す（出欠ページ /attend/ が日本語のため）。app.js の ATTEND_AVAILABLE で制御。
       attendBtn: '🙋 出欠システムへ',
       attendOpened: '✓ 出欠システムを開きました。あちらの画面で受付を始めてください。',
@@ -420,8 +420,9 @@
       tmTagEvent1: 'Any event works',
       tmTagEvent2: 'Date and venue found for you',
       tmTagEvent3: 'Announcement in one tap',
-      tmAttendHead: 'Read it, then collect the replies',
-      tmAttendDesc: 'From the screen you get after reading a document, you can open attendance right away. Members pick their name from the roster and tap yes / maybe / no - no app and no sign-up.',
+      tmShelf: 'One more tool',
+      tmAttendHead: '🙋 Attendance',
+      tmAttendDesc: 'Collects and counts replies from your members. Start it from an event you just read, or on its own without any document. Members pick their name from the roster and tap yes / maybe / no - no app and no sign-up.',
       tmAttendStage1: 'Event Dropper',
       tmAttendStage2: 'Attendance',
       tmAttendFig1: 'Read the document',
@@ -429,7 +430,7 @@
       tmAttendPass: 'Name, date and venue carry over',
       tmAttendFig2: 'Pick from the roster',
       tmAttendFig3: 'Tally the replies',
-      tmAttendNote: 'No document? You can also start from “🙋 Just collect attendance” on the first screen. It is still a preview, so screens and steps may change.',
+      tmAttendNote: 'Start it from “🙋 Just collect attendance” on the first screen. It is still a preview, so screens and steps may change.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'One sheet becomes every entry on it. Check the list, then add them all.',
       tmFigSheet: 'One sheet',
@@ -715,8 +716,9 @@
       tmTagEvent1: 'Koi bhi event',
       tmTagEvent2: 'Date aur venue apne aap',
       tmTagEvent3: 'Announcement ek tap mein',
-      tmAttendHead: 'Padha, aur wahin se attendance',
-      tmAttendDesc: 'Document padhne ke baad wale screen se hi attendance shuru kar sakte hain. Members roster se apna naam chunte hain aur yes / maybe / no tap karte hain - na app, na sign-up.',
+      tmShelf: 'Ek aur tool',
+      tmAttendHead: '🙋 Attendance',
+      tmAttendDesc: 'Members ke jawab jama karke ginta hai. Padhe hue event se bhi shuru kar sakte hain, aur bina kisi document ke akele bhi. Members roster se apna naam chunte hain aur yes / maybe / no tap karte hain - na app, na sign-up.',
       tmAttendStage1: 'Event Dropper',
       tmAttendStage2: 'Attendance',
       tmAttendFig1: 'Document padhein',
@@ -724,7 +726,7 @@
       tmAttendPass: 'Naam, date, venue saath jaate hain',
       tmAttendFig2: 'Roster se chunein',
       tmAttendFig3: 'Replies ka total',
-      tmAttendNote: 'Document na ho to bhi, pehli screen ke “🙋 Sirf attendance jama karein” se shuru kar sakte hain. Abhi preview hai, isliye screens aur steps badal sakte hain.',
+      tmAttendNote: 'Ise pehli screen ke “🙋 Sirf attendance jama karein” se shuru karein. Abhi preview hai, isliye screens aur steps badal sakte hain.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'Ek sheet se usme likhi saari entries. Check karke sab ek saath add karein.',
       tmFigSheet: 'Ek sheet',
