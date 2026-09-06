@@ -513,7 +513,10 @@ if (loginBtn) {
    ★ 状態は「読み取り中…」のまま出さないこと。カードは作った瞬間そう出る（addCard の初期値）。
    ★ 左の細い列（.fn）に大会名を入れないこと。何行にも折り返して縦に潰れる
      （applyHandoff_ で実際にそうなった）。短い固定文言にする。 */
-function addManualCard_() {
+/* pre を渡すと、その中身で埋めたカードを作る（出欠システムから戻ってきたとき）。
+   渡さなければ空のカード。**空のときだけ**名前の欄へ寄せて焦点を当てる——
+   埋まっているカードで焦点を当てると、スマホでキーボードが跳ね上がって案内文が隠れる。 */
+function addManualCard_(pre) {
   var card = addCard(I18N.t('manualCardLabel'));
   /* ★ fill() を必ず通すこと。カードは `.fields` `.card-foot` とも display:none で生まれ、
      開くのは fill() だけ。呼ばないと**入力欄が1つも出ない**カードになる。
@@ -523,6 +526,7 @@ function addManualCard_() {
     shiai_keishiki: '', kaijo: '', kaijo_jusho: '',
     kaikai_jikan: '', shimekiri: '', note: ''
   });
+  if (pre) card.fill(pre);   // 空で開いてから埋める（rebuildRows_ に日付の行を作らせるため）
   /* fill() は状態を「読み取り完了」にする。読み取っていないので上書きする（fill の後で）。 */
   card.setStatus(I18N.t('stManual'), 'ok');
   items.push({ file: null, card: card, fileId: null, mimeType: '' });
@@ -537,12 +541,13 @@ function addManualCard_() {
     updateAiRecheckVisibility_();          // 検算ボタンと注意文をこのカードだけ消す
 
     var name = li.querySelector('[data-k="taikai_mei"]');
-    if (name) {
+    if (name && !pre) {
       try { li.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* 古い端末 */ }
       name.focus();
     }
   }
   track('manual_card', {});
+  return li;
 }
 
 /* ★ 手入力の入口は 2026-09-06 に画面から外した。**addManualCard_ は残してある**が、
@@ -598,6 +603,9 @@ function unpopAnim() {
   if (att) att.addEventListener('click', function () {
     var k = attendKeyLocal_();
     track('attend_entry', { has_key: k ? 1 : 0 });
+    /* ★ 戻り先を置いておく。出欠を作り終えたら、向こうがここへ返してくれる。
+       言語ごとに違う（calendar / calendar-en / calendar-in）ので、URLをそのまま持たせる。 */
+    try { localStorage.setItem(ATTEND_RETURN_STORE, location.href); } catch (e) { /* noop */ }
     location.href = ATTEND_ADMIN_URL + (k ? '#k=' + encodeURIComponent(k) : '');
   });
 })();
@@ -1434,7 +1442,9 @@ function buildAnnouncementBody_(f, channel, typeKey) {
 function annAttendLine_(f, channel) {
   if (channel === 'x' || channel === 'plain') return '';
   var url = String((f && f.attend_url) || '').trim();
-  return url ? (I18N.t('annAttendUrl') + ' ▶ ' + url) : I18N.t('annAttendNoUrl');
+  /* ★ 文とURLは**行を分ける**。1行に続けるとLINEで折り返され、
+     URLの途中で改行が入ったように見える。 */
+  return url ? (I18N.t('annAttendUrl') + '\n▶ ' + url) : I18N.t('annAttendNoUrl');
 }
 
 /* 案内文は、出欠ができるまで出さない。
@@ -2654,6 +2664,7 @@ function attendEventDate_(dates) {
    **両方いる。** ホーム画面のアプリでは同じ画面で移るので opener が無く、
    ふつうのブラウザでは別タブなので戻ったときの読み直しが起きない。 */
 var ATTEND_DONE_STORE = 'dropperAttendDone';
+var ATTEND_RETURN_STORE = 'dropperReturnUrl';   // 出欠を作り終えたら、向こうがここへ返す
 var ATTEND_DONE_MS = 10 * 60 * 1000;   // 10分。古い印を拾って別の行事に付けないため
 var attendPending_ = null;             // 送り出したカード（同じタブに残っているとき）
 
@@ -2693,6 +2704,34 @@ function attendPick_(name, date) {
   return attendFindCard_(name, date) || attendPending_;
 }
 
+/* 出欠システムで手入力した行事から戻ってきたとき、**こちらにはカードが無い**
+   （チラシを1枚も読んでいないので）。印の中身からカードを1枚作って、案内文まで進める。
+
+   ★ 要項とカレンダーの行は出ない。要項はファイルが無いので空、カレンダーは
+     出欠の行が出る回に落ちる作りになっている（annAttendLine_ のあたり）。
+     利用者の言い方でいえば「チラシありの案内文から、要項とカレンダーのリンクを抜いた形」。
+   ★ 名前が無い印では作らない。誤って空のカードを増やさないため。 */
+function attendCardFromNote_(o) {
+  if (!o || !o.name) return null;
+  var date = String(o.date || '');
+  /* 種目は**配列で届く**（出欠システムの splitItems）。つなぐのはこちら側——
+     区切り記号は言語で変わるが、向こうは表示言語を知らない。 */
+  var sep = (window.LANG === 'en' || window.LANG === 'in') ? ', ' : '、';
+  var items = Array.isArray(o.items) ? o.items.join(sep) : String(o.items || '');
+  var li = addManualCard_({
+    taikai_mei: String(o.name),
+    kaisai_dates: date ? [date] : [],
+    schedule: date ? [{ date: date, shiai_keishiki: items }] : [],
+    shiai_keishiki: items,
+    kaijo: String(o.place || ''), kaijo_jusho: '',
+    kaikai_jikan: '', shimekiri: String(o.deadline || ''), note: ''
+  });
+  // 最初の画面のままここへ戻ってくるので、作業画面に切り替える
+  if (loginArea) loginArea.style.display = 'none';
+  if (workArea) workArea.style.display = '';
+  return li;
+}
+
 function attendTakeDone_() {
   var raw = '';
   try { raw = localStorage.getItem(ATTEND_DONE_STORE) || ''; } catch (e) { raw = ''; }
@@ -2701,7 +2740,7 @@ function attendTakeDone_() {
   var o = null;
   try { o = JSON.parse(raw); } catch (e) { o = null; }
   if (!o || !o.name || Date.now() - (o.at || 0) > ATTEND_DONE_MS) return;
-  attendMarkReady_(attendPick_(o.name, o.date), o.url);
+  attendMarkReady_(attendPick_(o.name, o.date) || attendCardFromNote_(o), o.url);
 }
 
 (function wireAttendDone_() {
