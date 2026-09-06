@@ -127,13 +127,6 @@
          2026-09-02 に利用者から「安全の2つが分かりにくい」と指摘された。
          ログイン前に決めているのは「自分に要るか」で、権限の範囲はその答えにならない。
          安全の話は消さず、帯の下の permNote 1行にまとめてある（**消さないこと**）。 */
-      /* ★ 短いまま保つこと。**帯は2行に収まる長さが上限**——3行になると
-         出欠の入口が実機の折り返し（実効650px前後）の外へ出る。2026-09-02 に実測。
-         ★ 「{doc}から」は入れない。上の entryWays が同じことを言っており、
-           その1語で2行が3行になる。 */
-      flowExtract: '📄 項目を自動で抜き出す',
-      flowMake: '✉️ 案内文と出欠リンク',
-      flowAnswer: '🙋 タップで回答',
       permNote: '🔒 見るのはこのアプリが作ったファイルだけ。予定はカレンダーに入れるだけです。',
       permVerified: '✅ Google審査ずみ',
       /* 最初の画面から出欠システムへ行く入口（app.js の wireAttendEntry_）。
@@ -172,7 +165,23 @@
       /* 文書が無くても始められる道。**ドロップゾーンの中**に置く
          （持っていない人ほど、外に置くと見つけられない）。 */
       /* ログイン前の画面で言う一行。**ドロップを先に**。スマホで折り返さない長さにする */
+      /* entryWays は 2026-09-06 からどこにも出していない（purposeDocS が同じことを言う）。
+         戻すときは <p class="entry-ways"> を書き戻す。 */
       entryWays: '📄 {doc}をドロップ　／　✎ 無ければ手で入力',
+      /* ★ ログイン前の2択（2026-09-06）。**ログインは1つ**で、選んだほうへ行く。
+         entryWays（「{doc}をドロップ／無ければ手で入力」）はここに吸収した。
+         **「文書が無くても使える」は必ずどこかに残すこと**——それを言わないと
+         「自分には関係ない道具だ」と判断されるのがこの画面。いまは purposeDocS が言っている。 */
+      purposeLead: '何をしますか？',
+      purposeDocT: '📄 {doc}から予定と案内文をつくる',
+      purposeDocS: 'ドロップするだけ',
+      purposeAttendT: '🙋 {doc}なしで、出欠だけを集める',
+      purposeAttendS: '項目は手入力',
+      /* ★ 合鍵の控えは**管理リンクを自分で保存してもらう**（以前の方法）。
+         この道はドライブに預けないので、ここで言わないと控えが一つも無いまま進む。 */
+      purposeNote: '※「{doc}なし」はGoogleログイン不要です。次の画面に出る管理リンクを、必ず保存してください。',
+      /* 出欠を選んだときだけ出す。**「なぜログイン？」に答えないと別経路に見える。**
+         出欠システム自体にログインは要らないので、理由は合鍵の預け先の話になる。 */
       dropOr: 'または',
       manualBtn: '✎ 手で入力して始める',
       manualNote: '{doc}が無くても、練習会などのお知らせと出欠に使えます。',
@@ -481,9 +490,6 @@
       loginBtn: 'Sign in with Google',
       loginNote: 'Both the {doc} and the event stay in your own Google account.',
       privacyLink: '📄 Privacy policy',
-      flowExtract: '📄 Reads the details',
-      flowMake: '✉️ Notice + RSVP link',
-      flowAnswer: '🙋 One-tap replies',
       permNote: '🔒 It only ever sees the files it made itself, and only adds calendar events.',
       permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
@@ -502,6 +508,12 @@
       dropSub: 'PDF and images (JPEG/PNG) supported. You can drop several files at once.',
       pickBtn: 'Choose a file',
       entryWays: '📄 Drop a {doc} / ✎ or just type it in',
+      purposeLead: 'What would you like to do?',
+      purposeDocT: '📄 Turn a {doc} into an event and an announcement',
+      purposeDocS: 'Just drop the file',
+      purposeAttendT: '🙋 Just collect attendance, without a {doc}',
+      purposeAttendS: 'Type the details in by hand',
+      purposeNote: '※ “Without a {doc}” needs no Google sign-in. Be sure to save the admin link shown on the next screen.',
       dropOr: 'or',
       manualBtn: '✎ Type it in instead',
       manualNote: 'No {doc}? You can still send the announcement and collect replies.',
@@ -774,9 +786,6 @@
       loginBtn: 'Google se sign in karein',
       loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
       privacyLink: '📄 Privacy policy',
-      flowExtract: '📄 Details khud nikalta hai',
-      flowMake: '✉️ Notice + RSVP link',
-      flowAnswer: '🙋 Ek tap mein jawab',
       permNote: '🔒 Sirf apni banayi files dikhti hain, aur calendar mein sirf event jaata hai.',
       permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
@@ -795,6 +804,13 @@
       dropSub: 'PDF aur images (JPEG/PNG) supported hain. Aap ek saath kai files bhi drop kar sakte hain.',
       pickBtn: 'File choose karein',
       entryWays: '📄 {doc} drop karein / ✎ ya khud type karein',
+      purposeLead: 'Aap kya karna chahte hain?',
+      /* {doc} が先頭に来ると小文字で始まってしまう（flyer se…）。Ek を足して受ける。 */
+      purposeDocT: '📄 Ek {doc} se event aur announcement banayein',
+      purposeDocS: 'Bas file drop karein',
+      purposeAttendT: '🙋 Bina {doc}, sirf attendance jama karein',
+      purposeAttendS: 'Details khud type karein',
+      purposeNote: '※ “Bina {doc}” ke liye Google sign-in nahi chahiye. Agli screen par jo admin link aata hai, use zaroor save karein.',
       dropOr: 'ya',
       manualBtn: '✎ Khud type karein',
       manualNote: '{doc} nahi hai? Tab bhi announcement aur attendance chal jayega.',

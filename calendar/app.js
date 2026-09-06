@@ -490,6 +490,7 @@ if (loginBtn) {
       setMsg('');
       if (loginArea) loginArea.style.display = 'none';
       if (workArea) workArea.style.display = '';
+      wireAttendEntry_();    // 作業画面に入った＝下の出欠の入口を出す
       maybeShowAiModal_();   // ログイン直後：未選択ならAI利用ポップアップを出す
       renderModeBanner_();   // 現在のモードを帯バナーに表示
     } catch (e) {
@@ -573,6 +574,30 @@ function unpopAnim() {
   var a = document.querySelector('#drop .anim');
   if (a) a.classList.remove('pop');
 }
+
+/* ===== 最初の画面：入口はチラシの有無だけ（2026-09-06） =====
+   **選んだ瞬間に進む。確定のボタンは置かない。**
+   それまで出欠の入口は区切り線の下の別ボタンで、押すとログインへ回るのに
+   **ログイン後どこへも行かず**作業画面に放り出されていた（目的を覚えていなかった）。
+   ★ チラシあり → Googleログイン → 作業画面
+     チラシなし → **ログインを挟まず**出欠システムへ。項目は向こうで手入力する
+   ★ 合鍵はドライブに預けない道。控えは**つくった直後に出る管理リンク**を
+     利用者自身に保存してもらう（attend/admin.html の #keyScreen）。 */
+(function wirePurpose_() {
+  var doc = document.getElementById('goDoc');
+  var att = document.getElementById('goAttend');
+  /* ★ ログインは**この click の流れのまま**呼ぶこと。await を挟むとポップアップに
+     止められる（CLAUDE.md の「押した瞬間」の項）。隠した loginBtn を押して流用する。 */
+  if (doc) doc.addEventListener('click', function () {
+    var lb = document.getElementById('loginBtn');
+    if (lb) lb.click();
+  });
+  if (att) att.addEventListener('click', function () {
+    var k = attendKeyLocal_();
+    track('attend_entry', { has_key: k ? 1 : 0 });
+    location.href = ATTEND_ADMIN_URL + (k ? '#k=' + encodeURIComponent(k) : '');
+  });
+})();
 
 /* ===== Googleログイン ===== */
 function ensureTokenClient() {
@@ -2722,11 +2747,11 @@ function wireAttendEntry_() {
      辞書の attendEntryNote / attendMakeNote / attendMakeLogin は残してあるが、
      **いまはどこにも出していない**。戻すときは `<p>` を書き戻すだけでよい。
 
-     ★ 団体をつくるのは**ログインしてから**（2026-08-26）。
-     ログイン前につくると、合鍵はこの端末の localStorage にしか残らない。
-     次にログインするまでドライブへ預けられず、その間に端末を失うと戻せない
-     （管理リンクの表示はもう無い）。ドロッパーはどのみちログインして使うので、
-     順番を入れ替えるだけで隙間が消える。
+     ★ 団体をつくるのに**ログインは要らない**（2026-09-06、以前の方法に戻した）。
+     2026-08-26 に一度「つくるのはログインしてから」にしたのは、**当時は管理リンクの
+     表示が無く**、合鍵がこの端末から消えると戻せなかったため。9月1日に管理リンクを
+     戻し、つくった直後に必ず表示されるようになったので、その根拠は消えた。
+     最初の画面の2択（purpose）でも、出欠を選んだときはログインを挟まない。
      ★ すでに合鍵を持っている人は素通し。**出欠システム自体にログインは要らない**ので、
        集計を見るためだけにGoogleを求めない。 */
   var needLogin = !key && !accessToken;
@@ -2740,6 +2765,11 @@ function wireAttendEntry_() {
   if (lead) lead.style.display = key ? 'none' : '';
   link.classList.toggle('need-login', needLogin);
   link.setAttribute('aria-disabled', needLogin ? 'true' : 'false');
+
+  /* ★ 最初の画面には出さない。**ログイン前の入口は上の「何をしますか？」に一本化**した
+     （2026-09-06）。二つ見せると、どちらが正しい道か分からなくなる。
+     作業画面に入ったあとは、従来どおりここが出欠への入口。 */
+  var onWork = !!(workArea && workArea.style.display !== 'none');
 
   if (attendStandalone_()) link.removeAttribute('target');
   if (!link.__wired) {
@@ -2773,7 +2803,7 @@ function wireAttendEntry_() {
     });
     link.__wired = true;            // 読み直すたびに増やさない
   }
-  box.style.display = '';
+  box.style.display = onWork ? '' : 'none';
 }
 
 // カードの入力値から、行事として保存する中身を作る。要項リンクは保存ずみのときだけ付ける。
@@ -3105,6 +3135,7 @@ function applyHandoff_() {
     // AI利用ポップアップも出さない（すでにLINE側で読み取り済みの人に選ばせる意味がない）。
     if (loginArea) loginArea.style.display = 'none';
     if (workArea) workArea.style.display = '';
+    wireAttendEntry_();     // 作業画面に入った＝下の出欠の入口を出す
     focusHandoff_();
   } catch (e3) {
     // カードを作れなくても、通常の初期画面は使えるようにしておく
