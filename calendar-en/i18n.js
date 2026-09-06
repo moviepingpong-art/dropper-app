@@ -53,7 +53,7 @@
       tmAttendPass: '行事名・日付・会場を引き継ぐ',
       tmAttendFig2: '名簿から回答',
       tmAttendFig3: '〇△×を集計',
-      tmAttendNote: '要項が無くても、最初の画面の「＋ 出欠の団体をつくる」から始められます。お試し公開中のため、画面や手順は変わることがあります。',
+      tmAttendNote: '要項が無くても、最初の画面の「🙋 要項なしで、出欠だけを集める」から始められます。お試し公開中のため、画面や手順は変わることがあります。',
       tmNameSchedule: '📅 予定表ドロッパー',
       tmOneSchedule: '予定表1枚から、中の予定を全部。確認してからまとめて登録。',
       tmFigSheet: '予定表1枚',
@@ -153,7 +153,7 @@
       attendMakeLogin: 'まずGoogleでログインしてください。合鍵をあなたのドライブに預けるので、機種を替えても同じ団体が開きます。',
       // --- 競技セレクタ ---
       stepSport: '① 競技を選ぶ：',
-      stepDrop: '② {doc}ファイルをドロップ（無くてもOK）',
+      stepDrop: '② {doc}ファイルをドロップ',
       sportAutoWaiting: '競技は{doc}から自動判定します',
       sportAutoLabel: '競技（自動判定）：',
       sportAutoUnknown: '競技：{doc}から判定できませんでした（手動でご確認ください）',
@@ -162,9 +162,7 @@
       dropTitle: 'ここに{doc}ファイルをドラッグ&ドロップ',
       dropSub: 'PDF・画像（JPEG/PNG）対応。複数ファイルをまとめてドロップもOK。',
       pickBtn: 'ファイルを選ぶ',
-      /* 文書が無くても始められる道。**ドロップゾーンの中**に置く
-         （持っていない人ほど、外に置くと見つけられない）。 */
-      /* ログイン前の画面で言う一行。**ドロップを先に**。スマホで折り返さない長さにする */
+      /* ログイン前の画面で言う一行。いまは purpose* が担っている。 */
       /* entryWays は 2026-09-06 からどこにも出していない（purposeDocS が同じことを言う）。
          戻すときは <p class="entry-ways"> を書き戻す。 */
       entryWays: '📄 {doc}をドロップ　／　✎ 無ければ手で入力',
@@ -180,8 +178,9 @@
       /* ★ 合鍵の控えは**管理リンクを自分で保存してもらう**（以前の方法）。
          この道はドライブに預けないので、ここで言わないと控えが一つも無いまま進む。 */
       purposeNote: '※「{doc}なし」はGoogleログイン不要です。次の画面に出る管理リンクを、必ず保存してください。',
-      /* 出欠を選んだときだけ出す。**「なぜログイン？」に答えないと別経路に見える。**
-         出欠システム自体にログインは要らないので、理由は合鍵の預け先の話になる。 */
+      /* ★ dropOr / manualBtn / manualNote は 2026-09-06 からどこにも出していない。
+         作業画面の手入力の入口を外したため（addManualCard_ 本体は残してある）。
+         **戻すときは <div class="drop-alt"> を書き戻して、app.js で結線するだけ。** */
       dropOr: 'または',
       manualBtn: '✎ 手で入力して始める',
       manualNote: '{doc}が無くても、練習会などのお知らせと出欠に使えます。',
@@ -429,7 +428,7 @@
       tmAttendPass: 'Name, date and venue carry over',
       tmAttendFig2: 'Pick from the roster',
       tmAttendFig3: 'Tally the replies',
-      tmAttendNote: 'No document? You can also start from “＋ Set up attendance” on the first screen. It is still a preview, so screens and steps may change.',
+      tmAttendNote: 'No document? You can also start from “🙋 Just collect attendance” on the first screen. It is still a preview, so screens and steps may change.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'One sheet becomes every entry on it. Check the list, then add them all.',
       tmFigSheet: 'One sheet',
@@ -499,7 +498,7 @@
       attendMakeNote: 'To collect replies from your members, first create a group. All you need is a name and your members.',
       attendMakeLogin: 'Please sign in with Google first. We keep your key in your own Drive, so the same group opens on your next device.',
       stepSport: '① Select sport:',
-      stepDrop: '② Drop the {doc} file (or skip it)',
+      stepDrop: '② Drop the {doc} file',
       sportAutoWaiting: 'Sport is auto-detected from the file',
       sportAutoLabel: 'Sport (auto): ',
       sportAutoUnknown: 'Sport: could not be detected from the file (please check manually)',
@@ -725,7 +724,7 @@
       tmAttendPass: 'Naam, date, venue saath jaate hain',
       tmAttendFig2: 'Roster se chunein',
       tmAttendFig3: 'Replies ka total',
-      tmAttendNote: 'Document na ho to bhi, pehli screen ke “＋ Attendance shuru karein” se shuru kar sakte hain. Abhi preview hai, isliye screens aur steps badal sakte hain.',
+      tmAttendNote: 'Document na ho to bhi, pehli screen ke “🙋 Sirf attendance jama karein” se shuru kar sakte hain. Abhi preview hai, isliye screens aur steps badal sakte hain.',
       tmNameSchedule: '📅 Schedule Dropper',
       tmOneSchedule: 'Ek sheet se usme likhi saari entries. Check karke sab ek saath add karein.',
       tmFigSheet: 'Ek sheet',
@@ -795,7 +794,7 @@
       attendMakeNote: 'Members ke jawab jama karne ke liye pehle ek group banayein. Sirf group ka naam aur members chahiye.',
       attendMakeLogin: 'Pehle Google se login karein. Aapki key aapki hi Drive mein rakhi jati hai, isliye naye device par bhi wahi group khulega.',
       stepSport: '① Sport chunein:',
-      stepDrop: '② {doc} file drop karein (ya bina uske)',
+      stepDrop: '② {doc} file drop karein',
       sportAutoWaiting: 'Sport file se auto-detect hota hai',
       sportAutoLabel: 'Sport (auto): ',
       sportAutoUnknown: 'Sport: file se detect nahi hua (manually check karein)',
