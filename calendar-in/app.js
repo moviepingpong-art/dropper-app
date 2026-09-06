@@ -545,8 +545,11 @@ function addManualCard_() {
   track('manual_card', {});
 }
 
-var manualBtn = document.getElementById('manualBtn');
-if (manualBtn) manualBtn.addEventListener('click', addManualCard_);
+/* ★ 手入力の入口は 2026-09-06 に画面から外した。**addManualCard_ は残してある**が、
+   いまはどこからも呼ばれない。下流（saveYoukou_ の !item.file、attendSend_ の
+   data-manual、案内文の要項の行）も**そのまま残す**——戻すときに配線だけで済む。
+   外した理由：最初の画面でチラシの有無を決めたあと、ここで「無くてもOK」と言うのは
+   決めたことの蒸し返しになる。チラシの無い行事は「チラシなしで、出欠だけを集める」が受ける。 */
 
 if (pickBtn) {
   pickBtn.addEventListener('click', function () {
