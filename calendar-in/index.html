@@ -456,6 +456,11 @@
       border:2px solid var(--line); border-radius:999px; padding:9px 18px; background:#fff; }
     .tm-close { font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; color:var(--sub);
       background:none; border:none; cursor:pointer; text-decoration:underline; padding:9px 4px; }
+    /* ★ 棚の区切り。3本（紙から出す）と出欠（集める）は向きが逆なので、
+       同じ並びに入れず、線で分けて下に置く。**4本目のタブにはしない。** */
+    .tm-shelf { display:flex; align-items:center; gap:10px; margin:18px 0 12px; }
+    .tm-shelf::before, .tm-shelf::after { content:''; flex:1; height:1px; background:rgba(6,182,164,.28); }
+    .tm-shelf-label { font-size:11.5px; font-weight:700; color:var(--sub); white-space:nowrap; }
     .tm-foot { font-size:11px; color:var(--sub); margin:13px 0 0; }
     /* LINE公式アカウントへの導線（日本語のときだけ表示。出し分けは i18n.js の applyDom）。
        ツール本体の画面は汚さず、この説明ポップアップの中だけに置く。 */
@@ -913,53 +918,6 @@
           <span class="tm-tag" data-i18n="tmTagEvent2">日付・会場を自動で</span>
           <span class="tm-tag" data-i18n="tmTagEvent3">案内文もワンタップ</span>
         </div>
-        <!-- 出欠。**4本目のタブとして並べない**（周知サイトと同じ決めごと）。
-             単体では始められず、入口はここで読み取ったあとの画面だけだから、
-             イベントドロッパーの中に置く。図は「読み取る → 出欠へ」「名簿 → 集計」の2段。
-             文言・図の作りは周知サイト（dropper の .ta-* / tool1.attend*）に合わせてある。
-             **どちらかを直すときは両方そろえること。** -->
-        <div class="tm-attend">
-          <p class="ta-head" data-i18n="tmAttendHead">読み取ったら、そのまま出欠も</p>
-          <p class="ta-desc" data-i18n="tmAttendDesc"></p>
-          <div class="ta-fig" aria-hidden="true">
-            <div class="ta-stage">
-              <span class="ta-stage-label" data-i18n="tmAttendStage1">イベントドロッパー</span>
-              <div class="ta-row">
-                <div class="fig-col">
-                  <div class="sheet">
-                    <span class="bar t"></span><span class="bar hi"></span>
-                    <span class="bar"></span><span class="bar s"></span>
-                  </div>
-                  <span class="fig-cap" data-i18n="tmAttendFig1">要項を読み取る</span>
-                </div>
-                <span class="fig-arrow">→</span>
-                <span class="ta-btn" data-i18n="tmAttendBtn">🙋 出欠システムへ</span>
-              </div>
-            </div>
-            <div class="ta-down">
-              <span class="ta-down-arrow">↓</span>
-              <span class="ta-down-cap" data-i18n="tmAttendPass">行事名・日付・会場を引き継ぐ</span>
-            </div>
-            <div class="ta-stage">
-              <span class="ta-stage-label" data-i18n="tmAttendStage2">出欠の受付</span>
-              <div class="ta-row">
-                <div class="fig-col">
-                  <div class="ta-names">
-                    <span class="ta-name sel"></span><span class="ta-name"></span>
-                    <span class="ta-name"></span><span class="ta-name"></span>
-                  </div>
-                  <span class="fig-cap" data-i18n="tmAttendFig2">名簿から回答</span>
-                </div>
-                <span class="fig-arrow">→</span>
-                <div class="fig-col">
-                  <div class="ta-count"><em class="o">〇</em><em class="s">△</em><em class="x">×</em></div>
-                  <span class="fig-cap" data-i18n="tmAttendFig3">〇△×を集計</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <p class="ta-note" data-i18n="tmAttendNote"></p>
-        </div>
         <div class="tm-btns">
           <span class="tm-here" data-i18n="tmHere">いま使っています</span>
           <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
@@ -1060,6 +1018,58 @@
         </div>
       </div>
 
+      <!-- ★ 出欠は**4本目のタブとして並べない**が、**イベントの中にも置かない**（2026-09-06）。
+           3本は「紙から出す」道具、出欠は「集める」道具で、向きが逆。同じ棚に並べると
+           名前（ドロッパー＝ドロップする道具）が嘘になるので、**棚を分けて**下に置く。
+           チラシなしでも単体で使えるようになったので、間借りの理由も無くなった。
+           文言・図の作りは周知サイト（dropper の .ta-* / tool1.attend*）と**対**。
+           **どちらかを直すときは両方そろえること。** -->
+      <div class="tm-shelf">
+        <span class="tm-shelf-label" data-i18n="tmShelf">もう一つの道具</span>
+      </div>
+      <div class="tm-attend">
+        <p class="ta-head" data-i18n="tmAttendHead">読み取ったら、そのまま出欠も</p>
+        <p class="ta-desc" data-i18n="tmAttendDesc"></p>
+        <div class="ta-fig" aria-hidden="true">
+          <div class="ta-stage">
+            <span class="ta-stage-label" data-i18n="tmAttendStage1">イベントドロッパー</span>
+            <div class="ta-row">
+              <div class="fig-col">
+                <div class="sheet">
+                  <span class="bar t"></span><span class="bar hi"></span>
+                  <span class="bar"></span><span class="bar s"></span>
+                </div>
+                <span class="fig-cap" data-i18n="tmAttendFig1">要項を読み取る</span>
+              </div>
+              <span class="fig-arrow">→</span>
+              <span class="ta-btn" data-i18n="tmAttendBtn">🙋 出欠システムへ</span>
+            </div>
+          </div>
+          <div class="ta-down">
+            <span class="ta-down-arrow">↓</span>
+            <span class="ta-down-cap" data-i18n="tmAttendPass">行事名・日付・会場を引き継ぐ</span>
+          </div>
+          <div class="ta-stage">
+            <span class="ta-stage-label" data-i18n="tmAttendStage2">出欠の受付</span>
+            <div class="ta-row">
+              <div class="fig-col">
+                <div class="ta-names">
+                  <span class="ta-name sel"></span><span class="ta-name"></span>
+                  <span class="ta-name"></span><span class="ta-name"></span>
+                </div>
+                <span class="fig-cap" data-i18n="tmAttendFig2">名簿から回答</span>
+              </div>
+              <span class="fig-arrow">→</span>
+              <div class="fig-col">
+                <div class="ta-count"><em class="o">〇</em><em class="s">△</em><em class="x">×</em></div>
+                <span class="fig-cap" data-i18n="tmAttendFig3">〇△×を集計</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="ta-note" data-i18n="tmAttendNote"></p>
+      </div>
+
       <!-- LINE公式アカウントへの導線。日本語のときだけ出す（applyDom が制御）。
            QRは /assets/line-qr.png（9フォルダ共通の絶対パス。index.html を同一に保つため）。
            友だち追加URLはベーシックID @937eheeb から導出した標準形で、
@@ -1075,7 +1085,7 @@
           <p class="tm-line-cap" data-i18n="tmLineQr">パソコンの方はスマホのLINEで読み取り</p>
         </div>
       </div>
-      <p class="tm-foot" data-i18n="tmFoot">※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。</p>
+      <p class="tm-foot" data-i18n="tmFoot">※ この説明は「何ができる？」からいつでも見られます。</p>
     </div>
   </div>
 
@@ -1154,10 +1164,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260862"></script>
+  <script src="i18n.js?v=20260864"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260860"></script>
+  <script src="app.js?v=20260863"></script>
 </body>
 </html>
