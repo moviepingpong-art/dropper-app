@@ -686,6 +686,17 @@
     .ann-share { background:#fff; color:var(--teal-d); }
     .ann-copy:hover, .ann-share:hover { filter:brightness(0.98); }
     /* クレジット行のトグル。既定ONで、利用者が外せる。 */
+    /* 埋もれないための固定用メッセージ。**主催者にだけ見せる**ので、案内文の欄とは
+       見た目を分ける（枠付き・薄い地色）。案内文に紛れると配ってしまう。 */
+    .ann-pin { margin-top:12px; padding:11px 12px; border:1px dashed var(--teal);
+               border-radius:12px; background:#f0fffb; }
+    .ann-pin-head { margin:0 0 7px; font-size:12.5px; font-weight:700; color:var(--teal-d); }
+    .ann-pin-text { margin:0 0 8px; padding:8px 10px; background:#fff; border:1px solid var(--line);
+      border-radius:8px; font-family:inherit; font-size:12.5px; line-height:1.7; color:var(--ink);
+      white-space:pre-wrap; word-break:break-all; }
+    .ann-pin-copy { font-size:13px; font-weight:700; padding:6px 14px; border-radius:8px;
+      cursor:pointer; border:1px solid var(--teal); background:#e6fffb; color:var(--teal-d); }
+    .ann-pin-note { margin:8px 0 0; font-size:11.5px; line-height:1.7; color:var(--sub); }
     .ann-credit { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12.5px; color:var(--sub); cursor:pointer; }
     .ann-credit input { width:16px; height:16px; accent-color:var(--teal); cursor:pointer; }
     /* 直行ボタン。各サービスのブランド色にして、コピー／共有と役割が違うことを見た目で分ける。
@@ -1182,10 +1193,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260868"></script>
+  <script src="i18n.js?v=20260870"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260867"></script>
+  <script src="app.js?v=20260869"></script>
 </body>
 </html>

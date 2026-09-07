@@ -1555,7 +1555,34 @@ function wireAnnouncement_(li, cardApi) {
   var copyBtn = panel.querySelector('.ann-copy');
   var shareBtn = panel.querySelector('.ann-share');
   var lineBtn = panel.querySelector('.ann-line');
+  var pinBox = panel.querySelector('.ann-pin');
+  var pinText = panel.querySelector('.ann-pin-text');
+  var pinCopy = panel.querySelector('.ann-pin-copy');
   var current = 'line';
+
+  /* 固定用メッセージを作る。**行事の名前を入れないこと**——留めっぱなしにするので、
+     大会が変わっても正しいままである必要がある。URLは団体につき1本で変わらない。 */
+  function paintPin_() {
+    if (!pinBox) return;
+    var url = li.__attendUrl || '';
+    /* LINE／WhatsApp のタブのときだけ。X や汎用は「留める」話ではない */
+    var show = !!url && current === 'line';
+    pinBox.style.display = show ? '' : 'none';
+    if (!show) return;
+    pinText.textContent = I18N.t('annPinBody') + '\n' + url;
+  }
+  if (pinCopy) {
+    pinCopy.addEventListener('click', function () {
+      var t = pinText.textContent;
+      var done = function () {
+        pinCopy.textContent = I18N.t('annCopied');
+        setTimeout(function () { pinCopy.textContent = I18N.t('annCopy'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).then(done, done);
+      } else { done(); }
+    });
+  }
 
   /** このカードに対応する items[] の1件。要項のファイルIDはここが持っている */
   function itemOf_() {
@@ -1606,6 +1633,7 @@ function wireAnnouncement_(li, cardApi) {
     f.attend_saved = !!li.__attendReady;
     f.attend_url = li.__attendUrl || '';
     ta.value = buildAnnouncementBody_(f, current, li.getAttribute('data-type'));
+    paintPin_();
     syncLineBtn_();
   }
   panel.__regen = regen;      // 他のカードからも作り直せるようにしておく
@@ -1728,6 +1756,18 @@ function addCard(name) {
             '<button type="button" class="ann-copy">' + I18N.t('annCopy') + '</button>' +
             '<button type="button" class="ann-share">' + I18N.t('annShare') + '</button>' +
             '<button type="button" class="ann-line">' + I18N.t('annLineBtn') + '</button>' +
+          '</div>' +
+          /* ★ 埋もれないための「固定用メッセージ」。**主催者にだけ見せる**もので、
+             案内文には入れない（メンバーに配る文ではない）。
+             ★ **案内文そのものを留めさせないこと。** LINEのアナウンスは本文の先頭を
+               出すので、案内文を留めると**その時の大会名が居座る**。次の大会が来ても
+               古い名前のまま残り、かえって紛らわしくなる（2026-09-07、利用者の指摘）。
+             ★ 出欠のURLがあるときだけ出す（無ければ留めるものが無い）。 */
+          '<div class="ann-pin" style="display:none">' +
+            '<p class="ann-pin-head">' + I18N.t('annPinHead') + '</p>' +
+            '<pre class="ann-pin-text"></pre>' +
+            '<button type="button" class="ann-pin-copy">' + I18N.t('annCopy') + '</button>' +
+            '<p class="ann-pin-note">' + I18N.t('annPinNote') + '</p>' +
           '</div>' +
         '</div>' +
       '</div>' +
