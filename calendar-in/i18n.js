@@ -368,6 +368,14 @@
       annTabLine: 'LINE',
       annTabX: 'X',
       annTabPlain: '汎用',
+      /* ★ 埋もれないための固定用メッセージ。**主催者にだけ見せる**（案内文には入れない）。
+         ★ **行事の名前を入れないこと。** 留めっぱなしにするので、大会が変わっても
+           正しいままである必要がある。URLは団体につき1本で変わらない。
+         ★ 「案内文そのものは留めない」を必ず書く。LINEのアナウンスは本文の先頭を出すので、
+           案内文を留めると**その時の大会名が居座る**（2026-09-07、利用者の指摘）。 */
+      annPinHead: '📌 LINEで埋もれないように',
+      annPinBody: '📋 出欠の回答はこちら（大会が増えても、このリンクのままです）',
+      annPinNote: 'これを1本だけ送り、長押し →「アナウンス」に留めてください。案内文そのものは留めないでください（大会名が残ってしまいます）。',
       annCopy: 'コピー',
       annCopied: 'コピーしました',
       annShare: '共有',
@@ -669,6 +677,9 @@
       annTabLine: 'WhatsApp',
       annTabX: 'X',
       annTabPlain: 'General',
+      annPinHead: '📌 So it does not get buried',
+      annPinBody: '📋 Reply to attendance here (this link stays the same as events are added)',
+      annPinNote: 'Send just this one message and pin it. Do not pin the announcement itself - it would keep showing that one event name.',
       annCopy: 'Copy',
       annCopied: 'Copied',
       annShare: 'Share',
@@ -966,6 +977,9 @@
       annTabLine: 'WhatsApp',
       annTabX: 'X',
       annTabPlain: 'General',
+      annPinHead: '📌 Taki yeh dab na jaye',
+      annPinBody: '📋 Attendance ka jawab yahan dein (event badhne par bhi yahi link rahega)',
+      annPinNote: 'Sirf yeh ek message bhejein aur use pin karein. Announcement ko pin na karein - usme wahi purana event ka naam dikhta rahega.',
       annCopy: 'Copy',
       annCopied: 'Copy ho gaya',
       annShare: 'Share',
