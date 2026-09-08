@@ -936,17 +936,34 @@ function sanitizeFolderName_(name) {
 //    この変更で旧フォルダとは別系統になる。drive.file スコープでは既存フォルダを検索できず、
 //    ツール側での自動統合は不可能（旧フォルダは手作業で移動するしかない）。
 //    利用者が開発者のみの段階で入れた変更。
-function folderNames_(m) {
-  if (!m) return { year: 'Uncategorized Tournaments', month: '' };
+// ★ 種別は2つだけ（2026-09-08）。**スポーツ大会は Tournaments のまま、それ以外は Events。**
+//   イベントドロッパーは6種類（sports / music / exhibition / lecture / festival / general）を
+//   読み取るのに、コンサートのチラシまで "Tournaments" に入っていた。
+//   - **6種類ぶんの名前は作らない。** マイドライブ直下が年に6フォルダ増える。
+//     利用者が探すときの手がかりは年と月で、種別ではない
+//   - **sports を Tournaments のまま据え置いたのは、既存フォルダを取り残さないため。**
+//     drive.file では既存フォルダを検索できず、名前を変えると別系統になって統合できない
+//     （v42→v43 で一度やっている）。いま保存されているのは実質すべてスポーツ大会なので、
+//     **据え置けば代償がゼロになる**
+//   - **種別はカード自身の data-type から引く（currentType ではない）。**
+//     カードは作成時点の種類を覚えていて、あとから種類を切り替えても変わらない決まり。
+//     ここで現在値を読むと、切り替えた瞬間に保存先だけが過去のカードとずれる
+function folderKind_(typeKey) {
+  return (typeKey || DEFAULT_TYPE) === 'sports' ? 'Tournaments' : 'Events';
+}
+
+function folderNames_(m, typeKey) {
+  var kind = folderKind_(typeKey);
+  if (!m) return { year: 'Uncategorized ' + kind, month: '' };
   return {
-    year:  m[1] + ' Tournaments',   // 例: 2026 Tournaments
+    year:  m[1] + ' ' + kind,       // 例: 2026 Tournaments ／ 2026 Events
     month: m[2]                     // 例: 09（ゼロ埋め2桁のまま。月順に並ぶ）
   };
 }
 
-async function ensureEventFolder_(kaisaiDate, taikaiMei) {
+async function ensureEventFolder_(kaisaiDate, taikaiMei, typeKey) {
   var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
-  var names = folderNames_(m);
+  var names = folderNames_(m, typeKey);
   var yearName = names.year;
   var monthName = names.month;
   // 'root' = マイドライブ直下（drive.file でも parents:['root'] で作成可能）
@@ -959,9 +976,9 @@ async function ensureEventFolder_(kaisaiDate, taikaiMei) {
 // 保存先を人が読める形にする（画面に「ここに保存しました」と出すため）。
 // **ensureEventFolder_ と同じ名前の作り方をここでも使う。** 片方だけ直すと、
 // 画面に出る道順と、ドライブにできる実物がずれる。
-function folderPath_(kaisaiDate, taikaiMei) {
+function folderPath_(kaisaiDate, taikaiMei, typeKey) {
   var m = /^(\d{4})-(\d{2})-\d{2}$/.exec(kaisaiDate || '');
-  var names = folderNames_(m);
+  var names = folderNames_(m, typeKey);
   var parts = [names.year];
   if (names.month) parts.push(names.month);
   parts.push(sanitizeFolderName_(taikaiMei));
@@ -1045,7 +1062,8 @@ function youkouNote_(li, cls, text, href, detail) {
    経路ごとに保存していたころは、保存先の表示を足すのに3か所直す必要があった。
 
    保存先は**主催者自身のマイドライブ**（ログインしている本人のドライブ）の
-   `<年> Tournaments／<月>／大会名／`。当方はサーバーを持たないので、他には残らない。
+   `<年> Tournaments／<月>／大会名／`（スポーツ大会以外は `<年> Events／…`）。
+   当方はサーバーを持たないので、他には残らない。
 
    すでに保存済み・元ファイルが無い（LINEから ?d= で来たカード）・未ログイン、
    のときは何もしない。呼ぶ側は毎回そのまま呼んでよい。 */
@@ -1068,7 +1086,10 @@ async function saveYoukou_(item, f) {
   var date = (f.kaisai_dates || [])[0];
   youkouNote_(li, 'busy', I18N.t('youkouSaving'));
   try {
-    var folderId = await ensureEventFolder_(date, f.taikai_mei);
+    /* 種別はカード自身が覚えている値を使う（種類を切り替えても既存カードは元のまま）。
+       カードの要素が取れないときだけ現在の選択に落とす。 */
+    var cardType = (li && li.getAttribute('data-type')) || currentType || DEFAULT_TYPE;
+    var folderId = await ensureEventFolder_(date, f.taikai_mei, cardType);
     var up = await uploadOriginal_(item.file, folderId);
     item.fileId = up.fileId;
     item.folderId = folderId;
@@ -1082,7 +1103,7 @@ async function saveYoukou_(item, f) {
                   I18N.t(orgBlocked_(up.shareErr) ? 'youkouShareOrg' : 'youkouShareFail'),
                   'https://drive.google.com/drive/folders/' + folderId, up.shareErr);
     } else {
-      youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei) }),
+      youkouNote_(li, 'ok', I18N.t('youkouSavedTo', { path: folderPath_(date, f.taikai_mei, cardType) }),
                   'https://drive.google.com/drive/folders/' + folderId);
     }
   } catch (e) {
