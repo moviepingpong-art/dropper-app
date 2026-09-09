@@ -124,6 +124,7 @@
          文を足すと縦が伸びるだけだった。戻すときは `<p class="login-note">` を書き戻す。 */
       loginNote: '{doc}も予定も、保存先はあなた自身のGoogleです。',
       privacyLink: '📄 プライバシーポリシー',
+      siteLink: '🏠 ドロッパーについて ↗',
       /* 同意画面で利用者自身が確かめられることだけを書く。
          **「Google公認」「推奨」は書かないこと**（ブランド規約が推奨の示唆を禁じている）。 */
       /* ★ 帯は「押しても安全か」ではなく「押すと何が起きるか」を言う。
@@ -504,6 +505,7 @@
       loginBtn: 'Sign in with Google',
       loginNote: 'Both the {doc} and the event stay in your own Google account.',
       privacyLink: '📄 Privacy policy',
+      siteLink: '🏠 About Dropper ↗',
       permNote: '🔒 It only ever sees the files it made itself, and only adds calendar events.',
       permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
@@ -805,6 +807,7 @@
       loginBtn: 'Google se sign in karein',
       loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
       privacyLink: '📄 Privacy policy',
+      siteLink: '🏠 About Dropper ↗',
       permNote: '🔒 Sirf apni banayi files dikhti hain, aur calendar mein sirf event jaata hai.',
       permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
@@ -1042,17 +1045,21 @@
     try {
       document.documentElement.lang = (global.LANG === 'en') ? 'en' : (global.LANG === 'in') ? 'en-IN' : 'ja';
     } catch (e) {}
-    /* 使い方ガイドとプライバシーポリシー。**どちらも3言語とも公開済み**なので、
-       同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。
+    /* 周知サイトへの3本。**どれも3言語とも公開済み**なので、同じ言語の版へ送る。
+       HTMLに直書きの href は ja 用の既定値。
        ★ ポリシーだけ張り替え漏れがあった（2026-08-26 に発見）。英語の利用者が
-         日本語のポリシーに飛ばされていた。**リンクを増やしたらここにも足すこと。** */
+         日本語のポリシーに飛ばされていた。
+       ★ **行き先は HTML の `data-site` から取る**（2026-09-09）。
+         以前は href に privacy が入っているかで当てていたので、**3本目を足すと
+         トップへのリンクが guide.html に化けた**。当てるのをやめ、書いてある物を読む。
+         data-site="" はサイトのトップ（言語フォルダそのもの）。
+         リンクを増やすときは、**HTML側に data-site を書けばここは直さなくてよい。** */
     var gl = document.getElementById('guideLink');
     if (gl) {
       var pre = (global.LANG === 'en') ? 'en/' : (global.LANG === 'in') ? 'in/' : '';
-      var as = gl.querySelectorAll('a');
+      var as = gl.querySelectorAll('a[data-site]');
       for (var gi = 0; gi < as.length; gi++) {
-        var page = (as[gi].href.indexOf('privacy') >= 0) ? 'privacy.html' : 'guide.html';
-        as[gi].href = 'https://dropper-tools.com/' + pre + page;
+        as[gi].href = 'https://dropper-tools.com/' + pre + as[gi].getAttribute('data-site');
       }
     }
     // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、
