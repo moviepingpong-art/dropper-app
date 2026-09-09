@@ -602,14 +602,20 @@ function unpopAnim() {
   });
   if (att) att.addEventListener('click', goAttend_);
 
-  /* ★ 周知サイトの「出欠システム」から直に来る道（?go=attend）。
-     admin.html へ直に張ると**案内文までの道が消える**（戻り先が置かれないため）ので、
-     いったんここを通してから送る。 */
-  try {
-    if (/[?&]go=attend(&|$)/.test(location.search)) goAttend_();
-  } catch (e) { /* noop */ }
+  /* ★ ?go=attend の発火は**ここに置かない**。ファイル末尾に移してある。
+     理由は goAttend_ の手前のコメントを見ること。 */
 })();
 
+/* ★★ この関数は**スクリプトを最後まで走らせてから**呼ぶこと。
+   使っている ATTEND_KEY_LS（839行辺り）・ATTEND_ADMIN_URL・ATTEND_RETURN_STORE は
+   この位置より**下**で代入される。var の宣言は巻き上げられるが、値はまだ入らないので、
+   ファイル先頭で呼ぶと**三つとも undefined**になる。
+
+   2026-09-09 に本番で踏んだ（導入は 2026-09-06、**3日間壊れていた**）。
+     location.href = undefined + '#k=' … → /calendar/undefined → 404
+     localStorage.setItem(undefined, …) → "undefined" という名の項目を作っていた
+   画面のボタンから押したときは動くので、**手で試しても見つからない**。
+   壊れるのは ?go=attend で直に来たときだけ。 */
 function goAttend_() {
   var k = attendKeyLocal_();
   track('attend_entry', { has_key: k ? 1 : 0 });
@@ -3382,5 +3388,16 @@ function focusHandoff_() {
 
 (function () { try { applyHandoff_(); } catch (e) {} })();
 (function () { try { wireAttendEntry_(); } catch (e) {} })();
+
+/* 周知サイトの「使ってみる」・使い方ガイドから直に来る道（?go=attend）。
+   admin.html へ直に張ると**案内文までの道が消える**（戻り先が置かれないため）ので、
+   いったんここを通してから送る。
+   ★ **必ずここ（ファイル末尾）で呼ぶこと。** 先頭の wirePurpose_ の中で呼んでいて、
+     定数がまだ undefined のまま /calendar/undefined へ飛んでいた（2026-09-09 に修正）。 */
+(function () {
+  try {
+    if (/[?&]go=attend(&|$)/.test(location.search)) goAttend_();
+  } catch (e) { /* noop */ }
+})();
 
 
