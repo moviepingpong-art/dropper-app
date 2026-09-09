@@ -125,6 +125,7 @@
       loginNote: '{doc}も予定も、保存先はあなた自身のGoogleです。',
       privacyLink: '📄 プライバシーポリシー',
       siteLink: '🏠 ドロッパーについて ↗',
+      newsletterLink: '',   // ★ 日本語では出さない（下の wire で隠す）
       /* 同意画面で利用者自身が確かめられることだけを書く。
          **「Google公認」「推奨」は書かないこと**（ブランド規約が推奨の示唆を禁じている）。 */
       /* ★ 帯は「押しても安全か」ではなく「押すと何が起きるか」を言う。
@@ -506,6 +507,7 @@
       loginNote: 'Both the {doc} and the event stay in your own Google account.',
       privacyLink: '📄 Privacy policy',
       siteLink: '🏠 About Dropper ↗',
+      newsletterLink: '📮 Notes from building this ↗',
       permNote: '🔒 It only ever sees the files it made itself, and only adds calendar events.',
       permVerified: '✅ Verified by Google',
       attendEntryBtn: '🙋 Go to the attendance admin',
@@ -808,6 +810,7 @@
       loginNote: '{doc} aur event, dono aapke apne Google mein hi rehte hain.',
       privacyLink: '📄 Privacy policy',
       siteLink: '🏠 About Dropper ↗',
+      newsletterLink: '📮 Notes from building this ↗',
       permNote: '🔒 Sirf apni banayi files dikhti hain, aur calendar mein sirf event jaata hai.',
       permVerified: '✅ Google se verified',
       attendEntryBtn: '🙋 Attendance admin par jayein',
@@ -1061,6 +1064,11 @@
       for (var gi = 0; gi < as.length; gi++) {
         as[gi].href = 'https://dropper-tools.com/' + pre + as[gi].getAttribute('data-site');
       }
+      /* ★ ニュースレターは英語なので**日本語では出さない**（日本語の読者には note がある）。
+         index.html の本文は3言語で同一に保つ決まりなので、HTMLからは外せない。ここで隠す。
+         行き先は dropper-tools.com ではないため data-site を持たず、上の張り替えも通らない。 */
+      var nl = document.getElementById('newsletterLink');
+      if (nl) nl.style.display = (global.LANG === 'ja') ? 'none' : '';
     }
     // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、
     // 同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。
