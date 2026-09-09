@@ -11,6 +11,22 @@
     gtag('config', 'G-PQPKYYYXKG');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+  /* ?go=attend で来た人に、イベントドロッパーの画面を一瞬も見せない。
+     app.js は </body> の直前で走るので、**本文を描き終えてから**出欠システムへ飛ぶ。
+     そのままだと別の道具の画面が必ずちらつく（2026-09-09 に指摘を受けた）。
+     ★ ここでは飛ばさない。**隠すだけ。** 管理画面のURLと保存する項目名の置き場を
+       増やさないため（app.js の ATTEND_ADMIN_URL と attendance-hook.js の
+       adminUrl の2つにそろえてある。CLAUDE.md 参照）。
+     ★ **戻す仕掛けを必ず残すこと。** 飛べなかったときに真っ白のまま
+       何も操作できなくなる。 */
+  try {
+    if (/[?&]go=attend(&|$)/.test(location.search)) {
+      document.documentElement.style.visibility = 'hidden';
+      setTimeout(function () { document.documentElement.style.visibility = ''; }, 2000);
+    }
+  } catch (e) { /* noop */ }
+  </script>
   <title>イベントドロッパー｜PDF・画像から文章を抽出してGoogleカレンダーへ</title>
   <meta name="description" content="イベントのPDF・画像・チラシから文章を抽出し、開催日・会場をGoogleカレンダーへ自動登録。LINE・SNSの案内文も作成。ブラウザだけで動き、インストール不要・無料。">
   <link rel="canonical" href="https://app.dropper-tools.com/calendar/">
