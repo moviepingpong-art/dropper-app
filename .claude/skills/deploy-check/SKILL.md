@@ -33,6 +33,21 @@ head の中の `title` / `description` / `canonical` / `og:*` / `twitter:*` / JS
 以前この手順書には「`window.LANG` を置換して diff を取り、差分ゼロなら正しい」と書いてあったが、
 それだとファイル全体を見るため**必ず28行の差が出る**。誤検知するので、その方法は使わないこと。
 
+### ★ 外から入る道は、スクリプトでは見えない
+
+**中のボタンから押すと動くので、壊れていても気づけない。**
+アップロードしたら、次を**直接URLで開いて**確かめる。
+
+- `https://app.dropper-tools.com/calendar/?go=attend`
+  → `attend/admin.html`（出欠システムの管理）に飛ぶこと
+- フッターの3リンク（トップ／使い方／プライバシー）が
+  `dropper-tools.com` の各言語で開くこと（`index.html` の `data-site` が行き先）
+
+**2026-09-09 に `?go=attend` が404（`/calendar/undefined`）になり、3日間そのままだった。**
+中から押すぶんには動いていたので、誰も踏まなかった。
+原因は `app.js` の先頭で、下の `var` を使う関数を呼んでいたこと（`CLAUDE.md` に別項あり）。
+同期チェックはファイルの一致と構文しか見ないので、**この種の壊れ方は検出できない。**
+
 ### スクリプトが見ていないもの
 
 - **`?v=` の繰り上げ**。変えたファイルと `index.html` の対応は人が決める。
@@ -56,10 +71,17 @@ head の中の `title` / `description` / `canonical` / `og:*` / `twitter:*` / JS
 ユーザーにファイルを渡すときは、必ず以下をセットで提示する。
 
 1. **アップロード先**（どのフォルダのどのファイルを差し替えるか）
-2. **反映後の確認URL**
-   - 日本語：https://app.dropper-tools.com/calendar/
-   - 英語：https://app.dropper-tools.com/calendar-en/
-   - Hinglish：https://app.dropper-tools.com/calendar-in/
+2. **反映後の確認URL**（直したツールのぶんを出す）
+
+   | ツール | 日本語 | 英語 | Hinglish |
+   |---|---|---|---|
+   | イベント | `/calendar/` | `/calendar-en/` | `/calendar-in/` |
+   | 予定表 | `/schedule/` | `/schedule-en/` | `/schedule-in/` |
+   | 決めごと | `/decide/` | `/decide-en/` | `/decide-in/` |
+
+   いずれも `https://app.dropper-tools.com` の下。
+   **同期チェックの項目1は3ツールとも見ている。確認URLも直したツールに合わせること**
+   （以前ここはイベントの3つしか書いていなかった）
 3. **確認ポイント**（何が変わったか、どこを見れば動作確認できるか）
 
 3言語分は1つのZIPにまとめて渡す。
