@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <!-- ★ 試作中。検索に出さない。どこからもリンクしない。GA4 と訪問者カウンターは公開するときに入れる。
+       公開するときは、周知サイトのプライバシーポリシーに「Gemini に何を送るか」を足してから。 -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>申込書ドロッパー（試作）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    /* 配色と部品は決めごとドロッパー（decide/index.html）に揃えてある */
+    :root {
+      --teal:#06b6a4; --teal-d:#048b7f; --lime:#a3e635; --lime-d:#84cc16;
+      --yellow:#ffd23f; --ink:#0f3d3a; --sub:#4f7c78; --line:#cdeae6;
+      --paper:#ffffff; --ng:#d4380d; --warn-bg:#fff8e6; --warn-line:#ffd591; --warn-ink:#7a4f01;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display:none !important; }
+    body {
+      font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Kaku Gothic ProN',Meiryo,sans-serif;
+      font-weight:500; color:var(--ink); margin:0;
+      background:linear-gradient(135deg,#e6fbf7 0%,#f3ffe0 55%,#fffbe6 100%);
+      background-attachment:fixed; min-height:100vh; line-height:1.6;
+    }
+    .wrap { max-width:820px; margin:0 auto; padding:20px 16px 60px; }
+    h1 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:26px; color:var(--teal-d); margin:0 0 6px; line-height:1.3; }
+    .badge { display:inline-block; font-family:'Zen Maru Gothic',sans-serif; font-size:12px; font-weight:700; vertical-align:middle;
+      color:var(--warn-ink); background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:999px; padding:2px 10px; margin-left:6px; }
+    .lead { margin:0 0 18px; font-size:14px; color:var(--sub); }
+
+    .card { background:var(--paper); border-radius:18px; padding:18px 16px; margin:0 0 16px;
+      box-shadow:0 8px 26px rgba(6,182,164,.13); }
+    .card > h2 { font-size:17px; font-weight:700; color:var(--teal-d); margin:0 0 10px; }
+    .sheet { margin:0 0 18px; }
+    .sheet h3 { font-size:14.5px; margin:0 0 8px; color:var(--ink); }
+    .sub-title { font-size:13px; font-weight:700; margin:14px 0 6px; }
+    .hint { margin:6px 0 0; font-size:12.5px; color:var(--sub); line-height:1.7; }
+    .small { font-size:12.5px; margin:6px 0 0; }
+
+    /* ===== 入れたものの扱い ===== */
+    .priv { border:2px solid var(--teal); border-radius:14px; background:linear-gradient(180deg,#f0fffb,#ffffff);
+      padding:12px 14px; margin:0 0 16px; }
+    .priv h2 { font-size:14px; margin:0 0 6px; color:var(--teal-d); }
+    .priv ul { margin:0; padding-left:0; list-style:none; font-size:12.5px; color:var(--sub); line-height:1.85; }
+    .priv li { padding-left:16px; position:relative; }
+    .priv li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
+    .priv li.warn { padding-left:0; margin-top:8px; color:var(--warn-ink); background:var(--warn-bg);
+      border:1px solid var(--warn-line); border-radius:10px; padding:9px 11px; font-weight:700; }
+    .priv li.warn::before { content:none; }
+
+    /* ===== ドロップ ===== */
+    .drops { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media (max-width:640px) { .drops { grid-template-columns:1fr; } }
+    .drop { border:3px dashed var(--teal); border-radius:18px; background:#f7fffd; text-align:center;
+      padding:22px 14px; cursor:pointer; transition:background .15s, transform .15s; }
+    .drop.over { background:#e6fffb; transform:scale(1.01); }
+    .drop .dt { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:16px; color:var(--teal-d); }
+    .drop .ds { font-size:12.5px; color:var(--sub); margin-top:4px; }
+    .drop button { margin-top:12px; font-size:14px; padding:9px 18px; }
+
+    button { font-family:'Zen Maru Gothic',sans-serif; font-size:16px; font-weight:700;
+      padding:13px 26px; border-radius:14px; border:none; cursor:pointer; color:#fff;
+      background:linear-gradient(100deg,var(--teal) 0%,var(--lime-d) 100%);
+      box-shadow:0 8px 20px rgba(6,182,164,.32); transition:transform .12s, box-shadow .2s; }
+    button:hover:not(:disabled) { transform:translateY(-1px); }
+    button:disabled { opacity:.5; cursor:default; box-shadow:none; }
+    .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+    .btn-sub { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
+    .link-btn { background:none !important; box-shadow:none !important; color:var(--teal-d) !important;
+      padding:0; font-size:12.5px; text-decoration:underline; border-radius:0; }
+
+    .msg { margin:12px 0 0; font-size:13.5px; font-weight:700; min-height:1.4em; }
+    .msg.wait { color:var(--sub); }
+    .msg.ok { color:var(--teal-d); }
+    .msg.ng { color:var(--ng); }
+
+    select, input[type=date] { font-family:inherit; font-size:14px; padding:8px 10px; border:2px solid var(--line);
+      border-radius:10px; background:#fff; color:var(--ink); max-width:100%; }
+    select:focus, input[type=date]:focus { outline:none; border-color:var(--teal); }
+    .field { margin:4px 0 8px; }
+    .field label { display:block; font-size:13px; font-weight:700; margin-bottom:6px; }
+
+    /* ===== 名簿の列 ===== */
+    .col-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px 12px; margin-top:8px; }
+    .col-item { display:flex; flex-direction:column; gap:3px; font-size:12.5px; font-weight:700; }
+    details.more { margin:10px 0 0; font-size:13px; }
+    details.more summary { cursor:pointer; color:var(--teal-d); font-weight:700; }
+    ul.plain { margin:6px 0 0; padding-left:1.2em; font-size:13px; line-height:1.8; }
+    ul.notes li { color:var(--warn-ink); }
+
+    /* ===== 名前の確認 ===== */
+    ul.names { list-style:none; margin:0; padding:0; }
+    .name-row { border:2px solid var(--line); border-radius:12px; padding:9px 12px; margin-bottom:8px; background:#fff; }
+    .name-row.kind-ambiguous, .name-row.kind-suspect { border-color:var(--warn-line); background:#fffdf6; }
+    .name-head { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+    .ref { font-size:12px; font-weight:700; color:var(--sub); background:#eefaf8; border-radius:6px; padding:1px 7px; }
+    .typed { font-size:15px; font-weight:700; }
+    .name-note { margin:4px 0 0; font-size:13px; }
+    .name-note.ok { color:var(--teal-d); }
+    .name-note.warn { color:var(--warn-ink); }
+    .name-note.ng { color:var(--ng); font-weight:700; }
+    .name-row select { margin-top:6px; width:100%; }
+
+    /* ===== AI に送る内容 ===== */
+    pre.preview { white-space:pre-wrap; word-break:break-all; font-size:12px; line-height:1.6; background:#f7fffd;
+      border:1px solid var(--line); border-radius:10px; padding:10px 12px; max-height:320px; overflow:auto; margin:8px 0 0; }
+
+    /* ===== 書き込む内容 ===== */
+    .table-wrap { overflow-x:auto; margin-top:10px; }
+    table.review { border-collapse:collapse; font-size:13px; min-width:100%; }
+    table.review th { background:#eefaf8; color:var(--teal-d); font-weight:700; padding:6px 8px; border:1px solid var(--line); white-space:nowrap; }
+    table.review td { padding:5px 8px; border:1px solid var(--line); vertical-align:top; white-space:nowrap; }
+    table.review td.miss { background:var(--warn-bg); color:var(--warn-ink); }
+    table.review td.none { color:#b5c9c6; text-align:center; }
+    .cell-ref { display:block; font-size:10.5px; color:var(--sub); }
+
+    /* ===== APIキー入力モーダル（決めごとドロッパーと同じ） ===== */
+    #key-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
+    #key-modal.show { display:flex; }
+    .modal-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
+      padding:26px 24px; box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
+    .modal-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px; margin:0 0 8px; color:var(--teal-d); }
+    .modal-card .note { color:var(--sub); font-size:14px; margin:0 0 16px; }
+    .key-steps { margin:8px 0 14px; padding-left:1.3em; font-size:13px; color:var(--sub); line-height:1.9; }
+    .key-studio-btn { display:inline-block; background:var(--teal); color:#fff !important; font-weight:700;
+      font-size:14px; padding:11px 18px; border-radius:12px; text-decoration:none; }
+    .key-box { border:2px solid var(--teal); border-radius:16px; padding:15px 16px; margin-bottom:14px;
+      background:linear-gradient(180deg,#f0fffb,#ffffff); }
+    .key-box h3 { margin:0 0 6px; font-size:15px; font-weight:700; color:var(--ink); }
+    .key-field { display:block; margin:16px 0 0; }
+    .key-field > label { display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+    .key-field input { width:100%; font-size:15px; padding:12px 14px; border:2px solid var(--line);
+      border-radius:12px; font-family:inherit; background:#fff; }
+    .key-field input:focus { outline:none; border-color:var(--teal); }
+    /* マスクと表示切り替えは必ずセット。label で input を包まないこと（クリックが label に吸われる） */
+    .key-input-wrap { position:relative; }
+    .key-input-wrap input { padding-right:50px; }
+    .key-eye { position:absolute; top:50%; right:6px; transform:translateY(-50%);
+      width:38px; height:38px; padding:0; border:none; border-radius:10px; cursor:pointer;
+      background:none; box-shadow:none; color:var(--sub); font-size:18px; line-height:1; }
+    .key-eye:hover { background:#e6fffb; transform:translateY(-50%); }
+    .key-check { margin:8px 0 0; font-size:12.5px; font-weight:700; line-height:1.7; display:none; }
+    .key-check.show { display:block; }
+    .key-check.testing { color:var(--sub); }
+    .key-check.ok { color:var(--teal-d); }
+    .key-check.ng { color:var(--ng); }
+    .key-trust { margin:14px 0 0; border:2px solid var(--teal); border-radius:14px;
+      background:linear-gradient(180deg,#f0fffb,#ffffff); padding:12px 14px; }
+    .key-trust h3 { margin:0 0 6px; font-size:14px; font-weight:700; color:var(--teal-d); }
+    .key-trust ul { margin:0; padding-left:0; list-style:none; font-size:12.5px; color:var(--sub); line-height:1.85; }
+    .key-trust li { padding-left:16px; position:relative; }
+    .key-trust li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
+    .key-more { margin:10px 0 0; font-size:12.5px; }
+    .key-more a { color:var(--teal-d); font-weight:700; }
+    .modal-btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    .modal-btns button { flex:1 1 auto; font-size:15px; padding:13px 18px; }
+    .modal-foot { margin:14px 0 0; font-size:11.5px; color:var(--sub); line-height:1.6; }
+    .key-change { margin:16px 0 0; font-size:12.5px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1><span data-i18n="appName">申込書ドロッパー</span><span class="badge" data-i18n="trialBadge">試作中</span></h1>
+    <p class="lead" data-i18n="lead">大会の申込書に名前だけ書いて入れると、名簿から性別・生年月日・年齢・住所・電話番号を埋めて返します。</p>
+
+    <div class="priv">
+      <h2 data-i18n="privTitle">入れたものの扱い</h2>
+      <ul>
+        <li data-i18n="priv1">申込書も名簿も、この端末の中（ブラウザ）だけで扱います。</li>
+        <li data-i18n="priv2">AI に送るのは、名前を伏せた申込書の文字だけです。</li>
+        <li data-i18n="priv3">名簿はこの端末に覚えません。</li>
+        <li class="warn" data-i18n="priv4">⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。</li>
+      </ul>
+    </div>
+
+    <div class="drops">
+      <section class="card">
+        <h2 data-i18n="step1Title">① 申込書を入れる</h2>
+        <div class="drop" id="formDrop" role="button" tabindex="0">
+          <div class="dt" data-i18n="formDropTitle">名前だけ書いた申込書（Excel）</div>
+          <div class="ds" data-i18n="formDropSub">ここにドラッグ、またはタップして選ぶ</div>
+          <button type="button" id="formPick" class="btn-sub" data-i18n="formPick">ファイルを選ぶ</button>
+        </div>
+        <input type="file" id="formInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <p class="hint" data-i18n="formNote">名前だけを書いてから入れてください。</p>
+        <p class="msg" id="formMsg"></p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="step2Title">② 名簿を入れる</h2>
+        <div class="drop" id="rosterDrop" role="button" tabindex="0">
+          <div class="dt" data-i18n="rosterDropTitle">団体の名簿（Excel か CSV）</div>
+          <div class="ds" data-i18n="rosterDropSub">ここにドラッグ、またはタップして選ぶ</div>
+          <button type="button" id="rosterPick" class="btn-sub" data-i18n="rosterPick">ファイルを選ぶ</button>
+        </div>
+        <input type="file" id="rosterInput" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <p class="hint" data-i18n="rosterNote">毎回入れてください（覚えません）。</p>
+        <p class="msg" id="rosterMsg"></p>
+      </section>
+    </div>
+    <section class="card" id="rosterColsCard" hidden>
+      <div id="rosterCols"></div>
+    </section>
+
+    <section class="card" id="stepNames" hidden>
+      <h2 data-i18n="step3Title">③ 名前の確認</h2>
+      <p class="hint" data-i18n="step3Hint">⚠ の人は選んでください。</p>
+      <div id="namesBody"></div>
+      <div class="btns"><button type="button" id="namesNext" data-i18n="namesNext">次へ</button></div>
+      <p class="msg" id="namesMsg"></p>
+    </section>
+
+    <section class="card" id="stepMap" hidden>
+      <h2 data-i18n="step4Title">④ どの欄に何を書くか</h2>
+      <div id="mapBody"></div>
+      <p class="msg" id="mapMsg"></p>
+      <p class="key-change"><button type="button" id="keyChangeBtn" class="link-btn" data-i18n="keyChange">APIキーを変更</button></p>
+    </section>
+
+    <section class="card" id="stepReview" hidden>
+      <h2 data-i18n="step5Title">⑤ 書き込む内容の確認</h2>
+      <p class="hint" data-i18n="step5Hint">この内容で申込書に書き込みます。</p>
+      <div id="reviewBody"></div>
+    </section>
+
+    <section class="card" id="stepSave" hidden>
+      <h2 data-i18n="step6Title">⑥ 保存</h2>
+      <div class="btns"><button type="button" id="saveBtn" data-i18n="saveBtn">記入済みの申込書を保存</button></div>
+      <p class="hint" data-i18n="saveNote">元の申込書は変わりません。</p>
+      <p class="msg" id="saveMsg"></p>
+    </section>
+  </div>
+
+  <div id="key-modal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
+    <div class="modal-card">
+      <h2 id="keyTitle" data-i18n="keyTitle">🔑 Gemini APIキーの設定</h2>
+      <p class="note" data-i18n="keyNote">AIで読み取るには、ご自身のGemini APIキーが必要です。</p>
+      <div class="key-box">
+        <h3 data-i18n="keyStepsTitle">取得のしかた</h3>
+        <ol class="key-steps">
+          <li data-i18n="keyStep1">下のリンクから Google AI Studio を開く</li>
+          <li data-i18n="keyStep2">Googleアカウントでログインする</li>
+          <li data-i18n="keyStep3">「APIキーを作成」をクリックする</li>
+          <li data-i18n="keyStep4">できたキーをコピーして、下の欄に貼り付ける</li>
+        </ol>
+        <a class="key-studio-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="keyStudioLink">Google AI Studio を開く ↗</a>
+      </div>
+      <div class="key-field">
+        <label for="keyInput" data-i18n="keyLabel">🔑 APIキー</label>
+        <div class="key-input-wrap">
+          <input type="password" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
+          <button type="button" id="keyEyeBtn" class="key-eye" aria-pressed="false"
+                  data-i18n="keyShow" data-i18n-attr="aria-label">👁</button>
+        </div>
+      </div>
+      <p class="key-check" id="keyCheck"></p>
+      <div class="key-trust">
+        <h3 data-i18n="keyTrustTitle">🔒 入力したキーの扱い</h3>
+        <ul>
+          <li data-i18n="keyTrust1">保存先はお使いの端末の中だけです。</li>
+          <li data-i18n="keyTrust2">当方はサーバーを持っていないため受け取れません。</li>
+          <li data-i18n="keyTrust3">送信先は Gemini API だけです。</li>
+        </ul>
+        <p class="key-more"><a id="keyMoreLink" href="https://dropper-tools.com/apikey.html" target="_blank" rel="noopener" data-i18n="keyMoreLink">クレカ不要で0円な理由 ↗</a></p>
+      </div>
+      <div class="modal-btns">
+        <button type="button" id="keyCancel" class="btn-sub" data-i18n="keyCancel">キャンセル</button>
+        <button type="button" id="keySave" data-i18n="keySave">保存して使う</button>
+      </div>
+      <p class="modal-foot" data-i18n="keyFoot">🔒 キーは端末内だけに保存されます。</p>
+    </div>
+  </div>
+
+  <script>window.LANG = 'ja';</script>
+  <script src="entry-i18n.js"></script>
+  <script src="entry-xlsx.js"></script>
+  <script src="entry-roster.js"></script>
+  <script src="entry-ai.js"></script>
+  <script src="entry-app.js"></script>
+</body>
+</html>

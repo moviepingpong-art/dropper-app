@@ -3,6 +3,17 @@
 `entry-xlsx.js`（xlsx の読み書き）・`entry-roster.js`（名簿・名前の突き合わせ・書き込む値）・
 `entry-ai.js`（欄の対応づくり）を、画面を通さずに Node で確かめるためのものです。
 
+## 画面を手元で試す
+
+```
+python -m http.server 8765 --bind 127.0.0.1        （リポジトリの直下で）
+```
+
+`http://127.0.0.1:8765/entry/` を開き、`fixtures/` の様式と名簿を入れる。
+AI を呼ばずに試すときは、ブラウザのコンソールで `window.fetch` を差し替え、Gemini への POST に
+`expected-maps.json` の答えを返させる（2026-09-15 はこの形で①〜⑥を通した）。
+`entry/test/out/local-typed.xlsx`（`run.js` が作る、本物の百万石に架空の名前を書いた版）も入れられる。
+
 ## 使い方
 
 ```
