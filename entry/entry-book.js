@@ -245,13 +245,7 @@
         p.birthText = nfkc(bc ? bc.text : '');
         p.birth = birthOf(bc);
         p.extras = extras.map(function (_, k) { var c = at(HEADERS.length + k + 1); return c ? nfkc(c.text) : ''; });
-        if (!p.given) p.problems.push('given-empty');
-        if (!p.birthText) p.problems.push('birth-empty');
-        else if (!p.birth) p.problems.push('birth-unreadable');
-        if (!p.kanaFamily && !p.kanaGiven) p.problems.push('kana-empty');
-        if (!p.pref && !p.address) p.problems.push('address-empty');
-        if (!p.phone) p.problems.push('phone-empty');
-        if (p.postal && !/^\d{3}-?\d{4}$/.test(p.postal)) p.problems.push('postal-bad');
+        p.problems = problemsOf(p);
         if (p.problems.length) problems.push(p);
         list.push(p);
       }
@@ -259,6 +253,20 @@
     });
     if (headerBad) return { ok: false, code: headerBad.code, detail: headerBad.detail };
     return { ok: true, org: org, today: today, version: version, people: people, extraHeaders: extraHeaders, problems: problems };
+  }
+
+  // 1人ぶんの気になる点。★ 止めるためではなく知らせるため（申込書にその欄があると困る、と分かるように）
+  function problemsOf(p) {
+    var out = [];
+    if (!nfkc(p.given)) out.push('given-empty');
+    var birthText = nfkc(p.birthText);
+    if (!p.birth && !birthText) out.push('birth-empty');
+    else if (!p.birth) out.push('birth-unreadable');
+    if (!nfkc(p.kanaFamily) && !nfkc(p.kanaGiven)) out.push('kana-empty');
+    if (!nfkc(p.pref) && !nfkc(p.address)) out.push('address-empty');
+    if (!nfkc(p.phone)) out.push('phone-empty');
+    if (nfkc(p.postal) && !/^\d{3}-?\d{4}$/.test(nfkc(p.postal))) out.push('postal-bad');
+    return out;
   }
 
   // セルの一覧を R<行>C<列> の引きやすい形にする
@@ -305,6 +313,7 @@
 
   global.EntryBook = {
     VERSION: VERSION, SHEETS: SHEETS, INFO_SHEET: INFO_SHEET, HEADERS: HEADERS, KEYS: KEYS,
-    blank: blank, make: make, read: read, toRoster: toRoster, fileName: fileName, serialOf: serialOf
+    blank: blank, make: make, read: read, toRoster: toRoster, fileName: fileName, serialOf: serialOf,
+    problemsOf: problemsOf
   };
 })(window);
