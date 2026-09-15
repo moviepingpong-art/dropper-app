@@ -1,18 +1,17 @@
 // entry-app.js — 申込書ドロッパーの画面
 //
 // 流れ: ① 申込書（名前だけ書いた Excel）② 名簿（Excel / CSV）③ 名前の確認
-//       ④ 欄の対応（前に使った様式なら AI を呼ばない。初めてなら送る内容を見せてから送る）
-//       ⑤ 書き込む内容の確認 ⑥ 記入済みの申込書を保存
+//       （欄の対応は見出しの規則で作る。画面の段は無い）⑤ 書き込む内容の確認 ⑥ 記入済みの申込書を保存
+//       段の番号は、利用者に見せる見出しと合わせて ④ を欠番にしてある
 //
-// ★ 名簿は端末の外に出さない。このファイルは Gemini（entry-ai.js 経由）以外と通信しない。
+// ★ 名簿も申込書も、端末の外に出さない。このファイルは通信を一切しない（2026-09-15 に Gemini をやめた）。
 //   名簿の中身を console に出さないこと。画面に出すのは本人の端末の中だけ。
-// ★ 名簿は覚えない（localStorage に入れない）。端末に保存するのは欄の対応（entry-ai.js の cache）と APIキーだけ。
+// ★ 名簿は覚えない（localStorage に入れない）。端末に覚えるのは、様式ごとの書き方の選び直し・西暦／和暦の選択・縮小のチェックだけ。
 // ★ 文言は entry-i18n.js。値（名前・住所など）は textContent で入れる（innerHTML を使わない）。
 (function () {
   'use strict';
 
-  var X = window.EntryXlsx, R = window.EntryRoster, AI = window.EntryAI;
-  var AI_KEY_STORE = 'dropper_ai_key';   // ほかの3本と共通
+  var X = window.EntryXlsx, R = window.EntryRoster, M = window.EntryMap;
 
   function t(k, v) { return window.I18N.t(k, v); }
   function has(k) { return Object.prototype.hasOwnProperty.call(window.I18N.dict(), k); }
@@ -46,7 +45,6 @@
   // エラーは文言ではなく code で判定する
   function errText(e) {
     var code = (e && e.code) || (e && e.message) || String(e);
-    if (/^http-\d+/.test(code)) return t('err.http', { code: code.replace(/^http-/, '').replace(/:.*$/, '') });
     return has('err.' + code) ? t('err.' + code) : t('err.other', { code: code });
   }
   function ymdText(b) { return b ? t('dateText', { y: b.y, m: b.m, d: b.d }) : t('noBirth'); }
@@ -168,7 +166,7 @@
       var found = R.findNames(cells, state.roster);
       if (!found.names.length && !found.suspects.length) return;
       state.sheets.push({ index: i, name: s.name, cells: cells, merges: X.merges(book, i), found: found,
-        pick: {}, lay: null, key: null, mapping: null, fmt: {}, baseDate: null, fromCache: false });
+        pick: {}, key: null, mapping: null, fmt: {}, baseDate: null });
     });
     hideFrom('stepNames');
     show('stepNames');
@@ -263,87 +261,32 @@
     var left = unresolvedCount();
     el('namesNext').disabled = left > 0;
     setMsg('namesMsg', left ? t('namesLeft', { n: left }) : t('namesReady'), left ? 'wait' : 'ok');
-    hideFrom('stepMap');
+    hideFrom('stepReview');
   }
 
-  /* ===== ④ 欄の対応 ===== */
+  /* ===== ④ 欄の対応（見出しの規則。AI は使わない） ===== */
+  // 規則は一瞬で終わるので、③の「次へ」でそのまま⑤へ進む。
+  // 様式ごとに覚えるのは、本人が⑤で選び直した書き方だけ（EntryMap.prefs。個人情報は入らない）
   function onNamesNext() {
-    show('stepMap');
-    var body = clear(el('mapBody'));
-    setMsg('mapMsg', '', '');
     Promise.all(state.sheets.map(function (sh) {
-      sh.lay = AI.layout(sh.name, sh.cells, sh.merges, sh.found);
-      return AI.cacheKey(sh.lay).then(function (k) {
+      sh.mapping = M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
+      return M.formKey(sh.name, sh.cells, sh.merges, sh.found).then(function (k) {
         sh.key = k;
-        var cached = AI.cache.get(k);
-        sh.mapping = cached;
-        sh.fromCache = !!cached;
+        var saved = M.prefs.get(k);
+        sh.fmt = (saved && saved.fmt) || {};
       });
     })).then(function () {
-      state.sheets.forEach(function (sh) { body.appendChild(mapSection(sh)); });
-      afterMapping();
-    }).catch(function (e) { setMsg('mapMsg', errText(e), 'ng'); });
-    el('stepMap').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function mapSection(sh) {
-    var sec = h('div', { class: 'sheet', id: 'map-' + sh.index }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
-    var msg = h('p', { class: 'msg' });
-    if (sh.mapping) {
-      sec.appendChild(h('p', { class: 'name-note ok', text: sh.fromCache ? t('mapCached') : t('mapDone') }));
-      sec.appendChild(h('p', { class: 'small' }, [h('button', { type: 'button', class: 'link-btn', text: t('mapAskAgain'), onclick: function () {
-        AI.cache.forget(sh.key);
-        sh.mapping = null;
-        sh.fromCache = false;
-        sec.parentNode.replaceChild(mapSection(sh), sec);
-        afterMapping();
-      } })]));
-      return sec;
-    }
-    // 送る内容をそのまま見せる（名前は伏せ字）。これを見て本人がボタンを押したときだけ送る
-    var lines = sh.lay.cells.map(function (c) { return c.ref + '\t' + c.text; }).join('\n');
-    sec.appendChild(h('p', { class: 'hint', text: t('mapIntro') }));
-    sec.appendChild(h('details', { class: 'more' }, [
-      h('summary', { text: t('mapPreview', { n: sh.lay.cells.length }) }),
-      h('pre', { class: 'preview', text: lines + (sh.lay.merges.length ? '\n\n' + t('mapMerges') + ' ' + sh.lay.merges.join(' ') : '') })
-    ]));
-    var btn = h('button', { type: 'button', text: t('mapSend'), onclick: function () {
-      btn.disabled = true;
-      askKey(false).then(function (key) {
-        if (!key) { msg.textContent = t('err.no-key'); msg.className = 'msg ng'; btn.disabled = false; return null; }
-        return AI.map(sh.lay, {
-          apiKey: key, roster: state.roster, found: sh.found,
-          onStatus: function (s) { if (has('status.' + s)) { msg.textContent = t('status.' + s); msg.className = 'msg wait'; } }
-        }).then(function (mapping) {
-          sh.mapping = mapping;
-          sh.fromCache = false;
-          if (mapping.tables.length) AI.cache.put(sh.key, mapping);
-          sec.parentNode.replaceChild(mapSection(sh), sec);
-          afterMapping();
-        });
-      }).catch(function (e) {
-        msg.textContent = errText(e);
-        msg.className = 'msg ng';
-        btn.disabled = false;
-      });
-    } });
-    sec.appendChild(h('div', { class: 'btns' }, [btn]));
-    sec.appendChild(msg);
-    return sec;
-  }
-
-  function afterMapping() {
-    var left = state.sheets.filter(function (sh) { return !sh.mapping; }).length;
-    if (left) { hideFrom('stepReview'); return; }
-    show('stepReview');
-    renderReview();
+      show('stepReview');
+      renderReview();
+      el('stepReview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }).catch(function (e) { setMsg('namesMsg', errText(e), 'ng'); });
   }
 
   /* ===== ⑤ 書き込む内容の確認 ===== */
   // ★ 生年月日を西暦で書くか和暦で書くか（2026-09-15、本人の要望）。
   //   申込書に指示が無いときは、名簿の書き方に関係なく本人に選んでもらい、選ぶまで保存させない。
   //   選んだ方は端末に覚え、次の申込書では最初から選ばれた状態にする（聞くこと自体は毎回する）。
-  //   指示があるときは聞かず、AI（または規則）が決めた書き方を使う。下の「書き方」でいつでも変えられる。
+  //   指示があるときは聞かず、見出しの規則が決めた書き方を使う。下の「書き方」でいつでも変えられる。
   var BIRTH_STYLE_LS = 'dropper_entry_birth_style';
   var SHRINK_LS = 'dropper_entry_shrink';
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -431,7 +374,7 @@
     var mapping = withFmt(sh);
     var entries = entriesOf(sh).filter(function (e) { return memberOf(sh, e); });
     var anchorOf = function (r) { return X.anchorOf(state.form.book, sh.index, r); };
-    var res = AI.slotsFor(mapping, entries.map(function (e) { return e.n; }), { cells: sh.cells, anchorOf: anchorOf });
+    var res = M.slotsFor(mapping, entries.map(function (e) { return e.n; }), { cells: sh.cells, anchorOf: anchorOf });
     var base = sh.baseDate || mapping.baseDate;
     var people = res.slots.map(function (slot) {
       var e = entries.filter(function (x) { return x.n === slot.name; })[0];
@@ -485,7 +428,7 @@
       var fmtFields = [];
       c.mapping.tables.forEach(function (tb) {
         tb.fields.forEach(function (f) {
-          if (AI.FIELDS[f.field] && AI.FIELDS[f.field].length > 1 && fmtFields.indexOf(f.field) < 0) fmtFields.push(f.field);
+          if (M.FIELDS[f.field] && M.FIELDS[f.field].length > 1 && fmtFields.indexOf(f.field) < 0) fmtFields.push(f.field);
         });
       });
       if (fmtFields.length) {
@@ -496,10 +439,10 @@
           }).filter(Boolean)[0]);
           var sel = h('select', { onchange: function (ev) {
             sh.fmt[field] = ev.target.value;
-            AI.cache.put(sh.key, withFmt(sh));   // 選び直した書き方は、次に同じ様式を使うときも効くように保存する
+            M.prefs.put(sh.key, { fmt: sh.fmt });   // 選び直した書き方は、次に同じ様式を使うときも効くように覚える
             renderReview();
           } });
-          AI.FIELDS[field].forEach(function (f) { sel.appendChild(h('option', { value: f, text: t('fmt.' + field + '.' + f) })); });
+          M.FIELDS[field].forEach(function (f) { sel.appendChild(h('option', { value: f, text: t('fmt.' + field + '.' + f) })); });
           sel.value = current;
           fmtBox.appendChild(h('label', { class: 'col-item' }, [h('span', { text: t('field.' + field) }), sel]));
         });
@@ -512,8 +455,22 @@
       c.people.forEach(function (p) {
         p.slot.fields.forEach(function (f) { if (cols.indexOf(f.field) < 0) cols.push(f.field); });
       });
+      // 列の見出しに、申込書側の見出しの文字も並べる。規則の読み違い（「年齢区分」の列に年齢など）に気づけるように
+      var headersOf = {};
+      c.people.forEach(function (p) {
+        p.slot.fields.forEach(function (f) {
+          if (!f.header) return;
+          headersOf[f.field] = headersOf[f.field] || [];
+          if (headersOf[f.field].indexOf(f.header) < 0) headersOf[f.field].push(f.header);
+        });
+      });
       var table = h('table', { class: 'review' });
-      table.appendChild(h('thead', {}, [h('tr', {}, cols.map(function (f) { return h('th', { text: t('field.' + f) }); }))]));
+      table.appendChild(h('thead', {}, [h('tr', {}, cols.map(function (f) {
+        return h('th', {}, [
+          h('span', { text: t('field.' + f) }),
+          headersOf[f] ? h('span', { class: 'form-header', text: t('formHeader', { text: headersOf[f].join('／') }) }) : null
+        ]);
+      }))]));
       var tbody = h('tbody');
       c.people.forEach(function (p) {
         var byField = {};
@@ -580,9 +537,6 @@
           n: s.refs.length
         }));
       });
-      // ★ ほかの人の行にずれる対応は、端末に保存したままにしない。残すと次に同じ申込書を使ったときも
-      //   AI を呼ばずに同じずれが出る。消しておけば、次は AI に聞き直す道になる
-      if (skipBy['offset-crosses-person']) { AI.cache.forget(sh.key); sh.fromCache = false; }
       c.mapping.problems.forEach(function (pr) {
         notes.push(has('mapprob.' + pr.code) ? t('mapprob.' + pr.code, pr) : t('err.other', { code: pr.code }));
       });
@@ -637,108 +591,11 @@
   }
 
   /* ===== 段の出し入れ ===== */
-  var STEPS = ['stepNames', 'stepMap', 'stepReview', 'stepSave'];
+  var STEPS = ['stepNames', 'stepReview', 'stepSave'];
   function show(id) { el(id).hidden = false; }
   function hideFrom(id) {
     var i = STEPS.indexOf(id);
     STEPS.slice(i).forEach(function (s) { el(s).hidden = true; });
-  }
-
-  /* ===== APIキー（決めごとドロッパーと同じ作り） ===== */
-  function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
-
-  // 叩くのは ListModels。generateContent でダミー送信すると無料枠の1日あたり回数を検証だけで消費する。
-  function testKey(key) {
-    var models = AI.MODELS;
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key);
-    return fetch(url).then(function (res) {
-      if (res.ok) {
-        return res.json().then(function (data) {
-          var names = [], list = (data && data.models) || [];
-          for (var i = 0; i < list.length; i++) names.push(String(list[i].name || '').replace(/^models\//, ''));
-          var model = models[0];
-          for (var m = 0; m < models.length; m++) { if (names.indexOf(models[m]) >= 0) { model = models[m]; break; } }
-          return { ok: true, model: model };
-        }).catch(function () { return { ok: true, model: models[0] }; });
-      }
-      if (res.status === 400 || res.status === 401) return { ok: false, reason: 'invalid' };
-      if (res.status === 403) return { ok: false, reason: 'forbidden' };
-      if (res.status === 429) return { ok: false, reason: 'quota' };
-      return { ok: false, reason: 'other' };
-    }).catch(function () { return { ok: false, reason: 'network' }; });
-  }
-
-  function askKey(force) {
-    var have = savedKey();
-    if (have && !force) return Promise.resolve(have);
-    var modal = el('key-modal'), input = el('keyInput');
-    var eyeBtn = el('keyEyeBtn'), checkEl = el('keyCheck');
-    return new Promise(function (resolve) {
-      var checkTimer = null, checkSeq = 0;
-      function setCheck(cls, text) { checkEl.className = 'key-check show ' + cls; checkEl.textContent = text; }
-      function clearCheck() {
-        if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
-        checkSeq++;
-        checkEl.className = 'key-check';
-        checkEl.textContent = '';
-      }
-      function close(v) {
-        modal.classList.remove('show');
-        el('keySave').removeEventListener('click', onSave_);
-        el('keyCancel').removeEventListener('click', onCancel);
-        input.removeEventListener('input', onInput);
-        eyeBtn.removeEventListener('click', onEye);
-        clearCheck();
-        input.type = 'password';
-        resolve(v);
-      }
-      var KEY_SHAPE = /^AIza[\w-]{30,}$/;
-      function onInput() {
-        var k = (input.value || '').trim();
-        clearCheck();
-        if (!KEY_SHAPE.test(k)) return;
-        setCheck('testing', t('keyTestRunning'));
-        var seq = checkSeq;
-        checkTimer = setTimeout(function () {
-          testKey(k).then(function (r) {
-            if (seq !== checkSeq) return;
-            if (r.ok) { setCheck('ok', t('keyTestOk', { model: r.model })); return; }
-            var keys = { invalid: 'keyTestInvalid', forbidden: 'keyTestForbidden', quota: 'keyTestQuota', network: 'keyTestNetwork' };
-            setCheck('ng', t(keys[r.reason] || 'keyTestOther'));
-          });
-        }, 600);
-      }
-      function onEye() {
-        var toShow = (input.type === 'password');
-        input.type = toShow ? 'text' : 'password';
-        eyeBtn.textContent = toShow ? '🙈' : '👁';
-        eyeBtn.setAttribute('aria-pressed', toShow ? 'true' : 'false');
-        eyeBtn.setAttribute('aria-label', t(toShow ? 'keyHide' : 'keyShow'));
-        input.focus();
-      }
-      function onSave_() {
-        var k = (input.value || '').trim();
-        if (!k) { input.focus(); return; }
-        // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまう。
-        try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
-        close(k);
-      }
-      function onCancel() { close(''); }
-
-      input.value = have || '';
-      input.type = 'password';
-      eyeBtn.textContent = '👁';
-      eyeBtn.setAttribute('aria-pressed', 'false');
-      eyeBtn.setAttribute('aria-label', t('keyShow'));
-      eyeBtn.addEventListener('click', onEye);
-      clearCheck();
-      el('keySave').addEventListener('click', onSave_);
-      el('keyCancel').addEventListener('click', onCancel);
-      input.addEventListener('input', onInput);
-      if (have) onInput();
-      modal.classList.add('show');
-      setTimeout(function () { input.focus(); }, 50);
-    });
   }
 
   /* ===== 配線 ===== */
@@ -767,6 +624,4 @@
   el('saveBtn').addEventListener('click', onSave);
   // 縮小して全体を表示: 既定は入れる。外した人には外したまま覚えておく
   el('shrinkChk').checked = lsGet(SHRINK_LS) !== 'off';
-  el('shrinkChk').addEventListener('change', function () { lsSet(SHRINK_LS, el('shrinkChk').checked ? 'on' : 'off'); });
-  el('keyChangeBtn').addEventListener('click', function () { askKey(true); });
-})();
+  el('shrinkChk').addEventListener('change', function () { lsSet(SHRINK_LS, el('shrinkChk').checked ? 'on' : 'off'); });})();
