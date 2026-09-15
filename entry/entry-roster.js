@@ -1,12 +1,11 @@
 // entry-roster.js — 申込書ドロッパーの名簿まわり
-// window.EntryRoster = { rowsFromCells, decodeCsv, rowsFromCsv, load, matchName, findNames, mask,
+// window.EntryRoster = { rowsFromCells, decodeCsv, rowsFromCsv, load, matchName, findNames,
 //                        fill, parseBirth, ageAt, toWareki, nameKey, foldKey } を公開する。
 //
 // ★ 名簿は個人情報そのもの。このファイルは通信を一切しない。
-//   AI に渡してよいのは mask() を通したものだけ。名前は〔氏名1〕に置き換え、
-//   名簿の項目（生年月日・住所・電話）はそもそも様式に書かれていないので渡らない。
+//   どこにも送らない（2026-09-15 までは AI に送る前に伏せ字にしていたが、AI をやめたので伏せ字の関数も無くした）。
 //
-// 流れ: 名簿を load() → 様式のセルから findNames() → 確認 → mask() して AI へ（設定づくり）
+// 流れ: 名簿を load() → 様式のセルから findNames() → 確認 → entry-rules.js が欄の対応を作る
 //       → 設定（slots）と名簿から fill() → EntryXlsx.setCell で書き込む
 (function (global) {
   'use strict';
@@ -274,7 +273,7 @@
   // 戻り値: { names: [{ refs, text, match }], suspects: [{ ref, text, candidates }], duplicates: [[名前, ...]] }
   //   names    … 名簿と結び付いたセル（exact / variant / ambiguous）
   //   suspects … 名簿に無いが、名前の並びの中にあって名前らしいセル（誤字の疑い）
-  // ★ suspects を拾うのは、AI に送る前に伏せ字にするためでもある。拾い漏れた誤字は名前のまま送られる。
+  // ★ suspects は、画面の③で「名簿にない名前」として本人に選んでもらうために拾う。
   function findNames(cells, roster) {
     var byPos = {};
     cells.forEach(function (c) { byPos[c.row + ':' + c.col] = c; });
@@ -341,20 +340,8 @@
     return { names: names, suspects: suspects, duplicates: duplicates };
   }
 
-  // AI に渡してよい形にする。名前（候補・誤字の疑いを含む）のセルを〔氏名N〕に置き換える。
-  // 戻り値のセルは { ref, text } だけ（value などの付随情報も落とす）。
-  function mask(cells, found) {
-    var label = {}, n = 0;
-    found.names.concat(found.suspects).sort(function (a, b) { return a.row - b.row || a.col - b.col; })
-      .forEach(function (x) {
-        n++;
-        x.refs.forEach(function (r, i) { label[r] = '〔氏名' + n + (x.refs.length > 1 ? (i === 0 ? '・姓' : '・名') : '') + '〕'; });
-      });
-    return cells.map(function (c) { return { ref: c.ref, text: label[c.ref] || c.text }; });
-  }
-
   // ===== 書き込む値を作る =====
-  // slot: { fields: [{ field, ref, fmt }] } … 1人ぶんの欄。設定（AI が作る）の1要素。
+  // slot: { fields: [{ field, ref, fmt }] } … 1人ぶんの欄。欄の対応（entry-rules.js が作る）の1要素。
   // 戻り値: { writes: [{ ref, value }], problems: [{ ref, field, code }], age }
   function fill(member, slot, ctx) {
     ctx = ctx || {};
@@ -386,7 +373,10 @@
           else if (f.fmt === 'seireki-kanji') put(f, b.y + '年' + b.m + '月' + b.d + '日');
           else put(f, b.y + '/' + b.m + '/' + b.d);
           break;
-        case 'birthEra': if (!b) miss(f, 'birth-missing'); else put(f, f.fmt === 'short' ? w.short : w.era); break;
+        case 'birthEra':
+          if (f.fmt === 'none') { put(f, ''); break; }   // 西暦で書くときは元号の欄を空にする
+          if (!b) miss(f, 'birth-missing'); else put(f, f.fmt === 'short' ? w.short : w.era);
+          break;
         case 'birthYear':
           if (!b) { miss(f, 'birth-missing'); break; }
           if (f.fmt === 'wareki') put(f, w.era + w.n);
@@ -419,7 +409,7 @@
 
   global.EntryRoster = {
     rowsFromCells: rowsFromCells, decodeCsv: decodeCsv, rowsFromCsv: rowsFromCsv,
-    guessColumns: guessColumns, load: load, matchName: matchName, findNames: findNames, mask: mask,
+    guessColumns: guessColumns, load: load, matchName: matchName, findNames: findNames,
     fill: fill, parseBirth: parseBirth, parseGender: parseGender, splitAddress: splitAddress,
     ageAt: ageAt, toWareki: toWareki, nameKey: nameKey, foldKey: foldKey, distance: distance
   };

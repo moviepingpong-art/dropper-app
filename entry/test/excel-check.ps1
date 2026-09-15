@@ -50,7 +50,22 @@ try {
         Write-Output ("NG   {0} {1}: expected={2} actual={3}" -f $f.file, $p.Name, $p.Value, $actual); $bad++
       }
     }
-    if ($bad -eq 0) { Write-Output ("OK   {0}: opened in Excel, {1} cells match" -f $f.file, $n) } else { $ng += $bad }
+    # "shrink": cells that must have "Shrink to fit" on and "Wrap text" off (entry-xlsx.js setCell with shrink)
+    $shrinkN = 0
+    if ($f.PSObject.Properties.Name -contains 'shrink') {
+      foreach ($ref in $f.shrink) {
+        $shrinkN++
+        $r = $ws.Range($ref)
+        if (-not $r.ShrinkToFit -or $r.WrapText) {
+          Write-Output ("NG   {0} {1}: ShrinkToFit={2} WrapText={3}" -f $f.file, $ref, $r.ShrinkToFit, $r.WrapText); $bad++
+        }
+      }
+    }
+    if ($bad -eq 0) {
+      $extra = ''
+      if ($shrinkN -gt 0) { $extra = (", {0} cells shrink to fit" -f $shrinkN) }
+      Write-Output ("OK   {0}: opened in Excel, {1} cells match{2}" -f $f.file, $n, $extra)
+    } else { $ng += $bad }
     $wb.Close($false)
     [void][Runtime.InteropServices.Marshal]::ReleaseComObject($wb)
   }
