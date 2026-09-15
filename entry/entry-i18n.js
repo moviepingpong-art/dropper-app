@@ -69,6 +69,18 @@
       namesReady: '全員そろいました。',
 
       formHeader: '申込書:「{text}」',
+      colsSummary: '書く欄の対応を見る（申込書の列 → 書くもの）',
+      colsSummaryUndecided: '⚠ 何を書くか決められなかった列が{n}つあります。書く欄の対応を確かめてください',
+      colsHint: '申込書の見出しから決めました。違っていたら選び直してください。選び直した内容は、この申込書について覚えます（ほかの申込書には使いません）。',
+      colsTable: '{col}列の {from}〜{to}行目の表（{n}人）',
+      colsTableOne: '{col}列の {from}行目の表（{n}人）',
+      colsEmpty: '見出しのある列が見つかりませんでした。',
+      colsLabel: '{col}列「{header}」',
+      colsNone: '書かない',
+      colsUndecided: '⚠ 決められなかった列',
+      colsOverridden: '✏ 選び直した列',
+      colsDup: '⚠ 「{field}」を {cols} 列の2か所に書こうとしています。どちらかを「書かない」にしてください',
+      colsReset: 'この申込書の選び直しをやめて、見出しから決めた対応に戻す',
 
       baseDateLabel: '年齢の基準日',
       baseDateFrom: '申込書の記載：{raw}',
@@ -94,7 +106,7 @@
       missMark: '書けません',
       notesTitle: '知らせること（{n}件）',
       noteWho: '：{list}（{n}人）',
-      extras: '名簿から埋められない欄があります。保存したあと Excel で書いてください：{list}',
+      extras: '書かない列があります。必要なら、保存したあと Excel で書いてください：{list}',
 
       'field.name': '氏名', 'field.family': '姓', 'field.given': '名', 'field.kana': 'フリガナ',
       'field.gender': '性別', 'field.genderMale': '男の欄', 'field.genderFemale': '女の欄',

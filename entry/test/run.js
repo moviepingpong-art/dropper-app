@@ -444,6 +444,64 @@ function mapSection(roster) {
     });
   }, Promise.resolve());
 
+  // --- 本人の直し（④の「書く欄の対応」で選び直す） ---
+  // 見出しを変えた様式Aで、規則の見落とし・誤爆を直せること。直しは「名前の列＋見出しの行」で表を見分けて当てる
+  function variant(headers, typedRows) {
+    return read(path.join(FIX, 'form-a-all-fields.xlsx')).then(function (book) {
+      Object.keys(headers).forEach(function (ref) { X.setCell(book, '申込書', ref, headers[ref]); });
+      if (typedRows) [7, 8, 9, 10, 11, 12].forEach(function (r) { if (typedRows.indexOf(r) < 0) X.setCell(book, '申込書', 'B' + r, ''); });
+      var cells = X.cells(book, '申込書');
+      var found = R.findNames(cells, roster);
+      return { book: book, cells: cells, found: found, mapping: rulesFor(book, '申込書', cells, found) };
+    });
+  }
+  function firstRowItems(v, mapping) {
+    var res = M.slotsFor(mapping, sortedNames(v.found), { cells: v.cells });
+    return res.slots[0].fields.filter(function (f) { return f.field !== 'name'; })
+      .map(function (f) { return f.ref.replace(/\d+$/, '') + ':' + f.field + (f.fmt ? '(' + f.fmt + ')' : ''); }).join(' ');
+  }
+  var overridesDone = variantsDone.then(function () {
+    return variant({ C6: 'よみがな', E6: '生年月日', F6: '満年齢', H6: 'ご住所', I6: '連絡先（携帯）' });
+  }).then(function (v) {
+    var tb = v.mapping.tables[0];
+    eq(M.tableKey(tb), 'B@6', '表の鍵は「名前の列＠見出しの行」');
+    eq(tb.cols.map(function (x) { return x.col + ':' + (x.field || '-'); }).join(' '), 'C:kana D:gender E:birth F:- G:postal H:address I:phone',
+      '一覧には見出しのある列がすべて並び、決められなかった列（満年齢）は種類なし');
+    var r = M.applyOverrides(v.mapping, { 'B@6': { F: 'age' } });
+    eq(firstRowItems(v, r.mapping), 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone', '見落とした「満年齢」を年齢に直すと、書くようになる');
+    eq(r.mapping.tables[0].cols.filter(function (x) { return x.col === 'F'; })[0], { col: 'F', header: '満年齢', field: 'age', overridden: true }, '直した列には印が付く（④で「選び直した列」と出す）');
+    eq(r.duplicates, [], '重ならなければ警告は出ない');
+    // 同じ種類を2列
+    var d = M.applyOverrides(v.mapping, { 'B@6': { F: 'age', G: 'age' } });
+    eq(d.duplicates.map(function (x) { return x.field + ':' + x.cols.join('+'); }), ['age:F+G'], '同じ種類を2つの列に選ぶと警告する');
+    // 受け付けない直し
+    var ng = M.applyOverrides(v.mapping, { 'B@6': { B: 'age', Z: 'age', C: 'name', D: 'unknown' } });
+    eq(firstRowItems(v, ng.mapping), firstRowItems(v, v.mapping), '名前の列・見出しの無い列・名前の欄・知らない種類への直しは受け付けない');
+    return variant({ F6: '年齢区分' });
+  }).then(function (v) {
+    var r = M.applyOverrides(v.mapping, { 'B@6': { F: 'none' } });
+    eq(firstRowItems(v, r.mapping), 'C:kana D:gender(kanji) E:birth(seireki-slash) G:postal H:address(plain) I:phone', '誤爆した「年齢区分」を「書かない」に直すと、書かなくなる');
+    return variant({ D6: '男・女' });
+  }).then(function (v) {
+    var r = M.applyOverrides(v.mapping, { 'B@6': { D: 'gender' } });
+    eq(firstRowItems(v, r.mapping).split(' ')[1], 'D:gender(kanji)', '見落とした「男・女」の列を性別に直すと、男／女で書く');
+    // 名前を書いた人数が変わっても、同じ直しが効く（表の鍵が変わらない）
+    return Promise.all([variant({ F6: '満年齢' }), variant({ F6: '満年齢' }, [8, 9]), variant({}, [11, 12])]);
+  }).then(function (pair) {
+    // ★ 見出し（6行目）から5行以上離れた行だけに名前を書いても、見出しを見つける（空いた記入行の上まで探す）
+    var far = pair[2];
+    eq([M.tableKey(far.mapping.tables[0]), firstRowItems(far, far.mapping)],
+      ['B@6', 'C:kana D:gender(kanji) E:birth(seireki-slash) F:age G:postal H:address(plain) I:phone'],
+      '見出しから5行離れた行（11・12行目）だけに名前を書いても、見出しを見つけて全欄を決める');
+    check(far.mapping.tables[0].cols.every(function (x) { return x.col !== 'A'; }), '番号が印刷済みの「No」の列は一覧に出さない');
+    var all = pair[0], few = pair[1];
+    eq([M.tableKey(all.mapping.tables[0]), M.tableKey(few.mapping.tables[0])], ['B@6', 'B@6'], '名前を書いた人数や行が変わっても、表の鍵は同じ');
+    var r = M.applyOverrides(few.mapping, { 'B@6': { F: 'age' } });
+    check(M.slotsFor(r.mapping, sortedNames(few.found), { cells: few.cells }).slots.every(function (s) {
+      return s.fields.some(function (f) { return f.field === 'age' && /^F/.test(f.ref); });
+    }), '2人だけ書いた申込書にも、同じ直しが効く');
+  });
+
   // --- 対応を検める（規則が外れても書かない） ---
   var weird = M.normalize({
     tables: [
@@ -519,9 +577,16 @@ function mapSection(roster) {
       var res = M.slotsFor(rulesFor(book, si, cells, found), sortedNames(found), { cells: cells, anchorOf: function (r) { return X.anchorOf(book, si, r); } });
       eq(plainSlots(res.slots), expectSlots, label + ': 見出しの規則で全欄が正しい');
       eq(res.groups.map(function (g) { return g.ageSum + '=' + g.slots.join('+'); }), expectGroups, label + ': 合計年齢の欄');
+      return rulesFor(book, si, cells, found);
+    }).then(function (mapping) {
+      if (/スポレク/.test(label)) {
+        eq(mapping.tables.map(function (tb) { return M.tableKey(tb) + ' ' + tb.cols.map(function (x) { return x.col + ':' + (x.field || '-'); }).join(' '); }),
+          ['B@9 E:address F:phone', 'B@12 C:birth D:age E:address F:phone G:-'],
+          label + ': 連絡責任者と選手を別の表として見分け、それぞれの列の一覧を出す（市町（チーム）名は決められない列）');
+      }
     });
   }
-  var localDone = variantsDone;
+  var localDone = overridesDone;
   if (hyaku) {
     localDone = localDone.then(function () {
       return localCase('本物の百万石 個人戦', hyaku, 'ラージ個人戦申込書', { C14: '山田太郎', C15: '山田　花子', C16: '伊藤 美穂', C17: '田中誠' },

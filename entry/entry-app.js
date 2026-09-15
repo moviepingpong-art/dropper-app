@@ -264,9 +264,9 @@
     hideFrom('stepReview');
   }
 
-  /* ===== ④ 欄の対応（見出しの規則。AI は使わない） ===== */
-  // 規則は一瞬で終わるので、③の「次へ」でそのまま⑤へ進む。
-  // 様式ごとに覚えるのは、本人が⑤で選び直した書き方だけ（EntryMap.prefs。個人情報は入らない）
+  /* ===== 欄の対応（見出しの規則。AI は使わない） ===== */
+  // 規則は一瞬で終わるので、③の「次へ」でそのまま④へ進む。
+  // 様式ごとに覚えるのは、本人が④で選び直した書き方（fmt）と書く欄（fields）だけ（EntryMap.prefs。個人情報は入らない）
   function onNamesNext() {
     Promise.all(state.sheets.map(function (sh) {
       sh.mapping = M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
@@ -274,6 +274,8 @@
         sh.key = k;
         var saved = M.prefs.get(k);
         sh.fmt = (saved && saved.fmt) || {};
+        sh.overrides = (saved && saved.fields) || {};
+        sh.colsOpen = null;   // null = 決められなかった列があるときだけ開く。本人が開け閉めしたらそれに従う
       });
     })).then(function () {
       show('stepReview');
@@ -282,7 +284,15 @@
     }).catch(function (e) { setMsg('namesMsg', errText(e), 'ng'); });
   }
 
-  /* ===== ⑤ 書き込む内容の確認 ===== */
+  /* ===== ④ 書き込む内容の確認 ===== */
+  // 本人の直し（書く欄の選び直し）を当てはめた対応。以降の判定（生年月日の問い・書き方・値の表）はすべてこれを使う
+  function effectiveMapping(sh) {
+    var r = M.applyOverrides(sh.mapping, sh.overrides);
+    sh.duplicates = r.duplicates;
+    return r.mapping;
+  }
+  function savePrefs(sh) { M.prefs.put(sh.key, { fmt: sh.fmt, fields: sh.overrides }); }
+
   // ★ 生年月日を西暦で書くか和暦で書くか（2026-09-15、本人の要望）。
   //   申込書に指示が無いときは、名簿の書き方に関係なく本人に選んでもらい、選ぶまで保存させない。
   //   選んだ方は端末に覚え、次の申込書では最初から選ばれた状態にする（聞くこと自体は毎回する）。
@@ -299,7 +309,7 @@
   // 書き方の手がかり（西暦・和暦・元号・昭和・記入例など）があるかを見る
   function birthInstruction(sh) {
     var cols = {}, first = Infinity, nameRows = {};
-    sh.mapping.tables.forEach(function (tb) {
+    effectiveMapping(sh).tables.forEach(function (tb) {
       first = Math.min(first, tb.firstRow);
       tb.fields.forEach(function (f) { if (/^birth/.test(f.field)) cols[f.col] = true; });
     });
@@ -337,12 +347,12 @@
   }
 
   function isSplitBirth(sh) {
-    return sh.mapping.tables.some(function (tb) { return tb.fields.some(function (f) { return f.field === 'birthYear'; }); });
+    return effectiveMapping(sh).tables.some(function (tb) { return tb.fields.some(function (f) { return f.field === 'birthYear'; }); });
   }
 
-  // 書き方の選び直し（西暦／和暦の選択 → 欄ごとの sh.fmt の順）を対応に当てはめた写しを返す
+  // 書く欄の選び直し → 西暦／和暦の選択 → 欄ごとの書き方（sh.fmt）の順に当てはめた写しを返す
   function withFmt(sh) {
-    var m = JSON.parse(JSON.stringify(sh.mapping));
+    var m = effectiveMapping(sh);
     if (sh.birthNeeded && sh.birthStyle) applyBirthStyle(m, sh.birthStyle);
     m.tables.forEach(function (tb) {
       tb.fields.forEach(function (f) { if (sh.fmt[f.field]) f.fmt = sh.fmt[f.field]; });
@@ -368,6 +378,75 @@
       h('div', { class: 'choices' }, [choice('seireki'), choice('wareki')]),
       sh.birthStyle ? null : h('p', { class: 'name-note ng', text: t('birthAskNeeded') })
     ]);
+  }
+
+  // ④の「書く欄の対応」。表ごとに、見出しのある列をすべて並べ、1列ずつ選び直せるようにする
+  // ★ 決めた形（2026-09-15、本人と相談）: 列の一覧で1列ずつ選ぶ／決められなかった列があるときだけ開く／直しはその申込書だけに覚える
+  // ★ 名前の列そのものと、書く行（名前と同じ行）は選ばせない（EntryMap.applyOverrides が rowOffset 0 に固定する）
+  var PICKABLE = ['kana', 'gender', 'genderMale', 'genderFemale', 'birth', 'birthEra', 'birthYear', 'birthMonth', 'birthDay',
+                  'age', 'postal', 'address', 'addressPref', 'addressRest', 'phone'];
+
+  function colsBox(sh, mapping) {
+    var undecidedCount = 0;
+    mapping.tables.forEach(function (tb) {
+      undecidedCount += (tb.cols || []).filter(function (x) { return x.field == null && !x.overridden; }).length;
+    });
+    var details = h('details', { class: 'cols-box' });
+    details.open = sh.colsOpen == null ? undecidedCount > 0 : sh.colsOpen;
+    details.addEventListener('toggle', function () { sh.colsOpen = details.open; });
+    details.appendChild(h('summary', { class: undecidedCount ? 'warn' : '',
+      text: undecidedCount ? t('colsSummaryUndecided', { n: undecidedCount }) : t('colsSummary') }));
+    details.appendChild(h('p', { class: 'hint', text: t('colsHint') }));
+
+    mapping.tables.forEach(function (tb, ti) {
+      var key = M.tableKey(tb);
+      var original = sh.mapping.tables[ti];   // 見出しの規則が決めたまま（直しを当てる前）
+      var nameLetters = tb.nameCol || (tb.familyCol + '・' + tb.givenCol);
+      var people = entriesOf(sh).filter(function (e) {
+        var L = e.n.refs.map(colOf).join('+');
+        return (L === tb.nameCol || L === tb.familyCol + '+' + tb.givenCol) && e.n.row >= tb.firstRow && e.n.row <= tb.lastRow;
+      }).length;
+      var box = h('div', { class: 'cols-table' }, [h('p', { class: 'sub-title', text: tb.firstRow === tb.lastRow
+        ? t('colsTableOne', { col: nameLetters, from: tb.firstRow, n: people })
+        : t('colsTable', { col: nameLetters, from: tb.firstRow, to: tb.lastRow, n: people }) })]);
+      if (!(tb.cols || []).length) box.appendChild(h('p', { class: 'hint', text: t('colsEmpty') }));
+
+      (tb.cols || []).forEach(function (x) {
+        var sel = h('select', { onchange: function (ev) {
+          var v = ev.target.value;
+          var was = ((original.cols || []).filter(function (o) { return o.col === x.col; })[0] || {}).field || 'none';
+          sh.overrides[key] = sh.overrides[key] || {};
+          if (v === was) delete sh.overrides[key][x.col]; else sh.overrides[key][x.col] = v;
+          if (!Object.keys(sh.overrides[key]).length) delete sh.overrides[key];
+          savePrefs(sh);
+          sh.colsOpen = true;
+          renderReview();
+        } });
+        sel.appendChild(h('option', { value: 'none', text: t('colsNone') }));
+        PICKABLE.forEach(function (f) { sel.appendChild(h('option', { value: f, text: t('field.' + f) })); });
+        sel.value = x.field || 'none';
+        var mark = x.overridden ? h('span', { class: 'cols-mark edited', text: t('colsOverridden') })
+          : x.field == null ? h('span', { class: 'cols-mark undecided', text: t('colsUndecided') }) : null;
+        box.appendChild(h('label', { class: 'cols-row' + (x.field == null && !x.overridden ? ' undecided' : '') }, [
+          h('span', { class: 'cols-label', text: t('colsLabel', { col: x.col, header: x.header }) }),
+          h('span', { class: 'cols-arrow', text: '→' }), sel, mark
+        ]));
+      });
+      (sh.duplicates || []).filter(function (d) { return d.table === ti; }).forEach(function (d) {
+        box.appendChild(h('p', { class: 'name-note ng', text: t('colsDup', { field: t('field.' + d.field), cols: d.cols.join('・') }) }));
+      });
+      details.appendChild(box);
+    });
+
+    if (Object.keys(sh.overrides || {}).length) {
+      details.appendChild(h('p', { class: 'small' }, [h('button', { type: 'button', class: 'link-btn', text: t('colsReset'), onclick: function () {
+        sh.overrides = {};
+        savePrefs(sh);
+        sh.colsOpen = true;
+        renderReview();
+      } })]));
+    }
+    return details;
   }
 
   function computeSheet(sh) {
@@ -420,6 +499,9 @@
         (usesAge && !c.base) ? h('p', { class: 'name-note ng', text: t('baseDateNeeded') }) : null
       ]));
 
+      // 書く欄の対応（申込書の列 → 書くもの）。見出しの規則の見落とし・誤爆を本人が直す
+      sec.appendChild(colsBox(sh, c.mapping));
+
       // 生年月日は西暦か和暦か
       if (bi.needed) sec.appendChild(birthStyleBox(sh));
       else if (bi.has) sec.appendChild(h('p', { class: 'hint', text: t('birthFollowsForm', { style: t('birthStyleName.' + bi.hint) }) }));
@@ -439,7 +521,7 @@
           }).filter(Boolean)[0]);
           var sel = h('select', { onchange: function (ev) {
             sh.fmt[field] = ev.target.value;
-            M.prefs.put(sh.key, { fmt: sh.fmt });   // 選び直した書き方は、次に同じ様式を使うときも効くように覚える
+            savePrefs(sh);   // 選び直した書き方は、次に同じ様式を使うときも効くように覚える
             renderReview();
           } });
           M.FIELDS[field].forEach(function (f) { sel.appendChild(h('option', { value: f, text: t('fmt.' + field + '.' + f) })); });
@@ -546,9 +628,14 @@
         sec.appendChild(h('p', { class: 'sub-title', text: t('notesTitle', { n: notes.length }) }));
         sec.appendChild(nl);
       }
-      if (c.mapping.extras.length) {
-        sec.appendChild(h('p', { class: 'hint', text: t('extras', { list: c.mapping.extras.map(function (x) { return x.col + '列 ' + x.label; }).join('、') }) }));
-      }
+      // 書かない列（決められなかった列と、本人が「書かない」にした列）。本人の直しを反映した一覧から作る
+      var notWritten = [], seenCol = {};
+      c.mapping.tables.forEach(function (tb) {
+        (tb.cols || []).forEach(function (x) {
+          if (x.field == null && !seenCol[x.col]) { seenCol[x.col] = true; notWritten.push(x.col + '列 ' + x.header); }
+        });
+      });
+      if (notWritten.length) sec.appendChild(h('p', { class: 'hint', text: t('extras', { list: notWritten.join('、') }) }));
       body.appendChild(sec);
       sh.computed = c;
     });

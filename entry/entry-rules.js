@@ -2,7 +2,11 @@
 //
 // window.EntryRules = { map(cells, merges, found) } を公開する。
 // 戻り値は EntryMap.normalize にそのまま渡せる形:
-//   { baseDateRaw, tables: [{ nameCol | familyCol+givenCol, firstRow, lastRow, pairSize, ageSumCol, fields: [{ field, col, rowOffset, fmt, mark, header }] }], extras }
+//   { baseDateRaw, tables: [{ nameCol | familyCol+givenCol, firstRow, lastRow, headerRow, pairSize, ageSumCol,
+//                             fields: [{ field, col, rowOffset, fmt, mark, header }],
+//                             cols: [{ col, header, field | null }] }], extras }
+//   cols は④の「申込書の列 → 書くもの」の一覧（見出しのある列すべて。本人が選び直す）。
+//   headerRow は表の鍵（EntryMap.tableKey）に使う。名前を書いた行に左右されないこと
 //
 // 考え方（日本の申込書によくある表の形を想定。特定の申込書に合わせて作らない）:
 //   1. 名前の位置は、名簿との突き合わせで分かっている（EntryRoster.findNames）。
@@ -30,6 +34,7 @@
 
   function nfkc(s) { s = s == null ? '' : String(s); try { s = s.normalize('NFKC'); } catch (e) {} return s; }
   function squash(s) { return nfkc(s).replace(/\s+/g, ''); }
+  function isNumberOnly(t) { return /^[#№Nn]?[oO]?\.?\s*\d+[.)）]?$/.test(t) && /\d/.test(t); }
   function colToNum(l) { var n = 0; for (var i = 0; i < l.length; i++) n = n * 26 + (l.charCodeAt(i) - 64); return n; }
   function numToCol(n) { var s = ''; while (n > 0) { var r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; }
 
@@ -92,14 +97,35 @@
       var nameRight = Math.max.apply(null, nameCols.map(function (c) {
         var m = mergeOf(firstRow, c); return m ? m.right : c;
       }));
-      var top = Math.max(1, firstRow - HEADER_ROWS_ABOVE, g.above + 1);
+      // ★ 名前の行より上に、まだ名前を書いていない記入行が続くことがある（20人枠の下の方だけに書いた、など）。
+      //   名前の欄が空で、ほかに数字以外の文字が無い行は記入行とみなし、その上から見出しを探す。
+      //   こうしないと、見出しが遠くて見つからないうえ、書き始めの行によって表の鍵（見出しの行）が変わり、
+      //   本人の直しが効かなくなる（2026-09-15、2行目から書いた様式Aで表の鍵が変わった）
+      var dataTop = firstRow;
+      for (var rr = firstRow - 1; rr > g.above && rr >= firstRow - 60; rr--) {
+        if (textAt(rr, nameCols[0])) break;
+        var wordy = false;
+        for (var cc = 1; cc <= maxCol; cc++) {
+          var tx = textAt(rr, cc);
+          if (tx && !isNumberOnly(tx)) { wordy = true; break; }
+        }
+        if (wordy) break;
+        dataTop = rr;
+      }
+      var top = Math.max(1, dataTop - HEADER_ROWS_ABOVE, g.above + 1);
 
-      // 2. 列ごとの見出し（近い順）
+      // 2. 列ごとの見出し（近い順）。いちばん近い見出しの行も覚える（表の見分けに使う）
+      // ★ 数字だけの文字（No. の列の 1・2・3 など）は見出しと見なさない
+      var headerRow = 0;
       function chain(col) {
         var out = [];
-        for (var r = firstRow - 1; r >= top; r--) {
+        for (var r = dataTop - 1; r >= top; r--) {
           var t = textAt(r, col);
-          if (t && out[out.length - 1] !== t) out.push(t);
+          if (t && isNumberOnly(t)) continue;
+          if (t && out[out.length - 1] !== t) {
+            if (!out.length) headerRow = Math.max(headerRow, r);
+            out.push(t);
+          }
         }
         return out;
       }
@@ -114,7 +140,7 @@
 
       // 3. 語で欄の種類を決める
       var hasBirthParent = function (ch) { return ch.some(function (t) { return /生年月日|誕生日|生まれ/.test(t); }); };
-      var fields = [], ageSum = null;
+      var fields = [], ageSum = null, undecided = [];
       cols.forEach(function (c) {
         var near = c.chain[0], all = c.chain.join('|');
         var f = null;
@@ -136,8 +162,14 @@
           else if (/生年月日|誕生日|生まれ/.test(near)) f = 'birth-or-era';   // 下で決める
         }
         if (!f) {
-          // 名簿から埋められない欄（見出しが表の中にあるものだけ）
-          if (!/申込|記入/.test(near) && !extraCols[c.col]) { extraCols[c.col] = true; extras.push({ col: numToCol(c.col), label: near }); }
+          // 名簿から埋められない欄（見出しが表の中にあるものだけ）。④の一覧には「決められなかった列」として出す
+          // ★ 名前の行すべてに文字が印刷済みの列（No. の番号など）は、何も書けないので出さない
+          //   （出すと、どの申込書でも毎回「決められなかった列」の警告が出る）
+          var prefilled = g.rows.every(function (r) { return !!textAt(r, c.col); });
+          if (!prefilled && !/申込|記入/.test(near)) {
+            undecided.push({ col: numToCol(c.col), header: c.chain.slice().reverse().join(' / '), field: null });
+            if (!extraCols[c.col]) { extraCols[c.col] = true; extras.push({ col: numToCol(c.col), label: near }); }
+          }
           return;
         }
         if (f === 'ageSum') { ageSum = c; return; }
@@ -184,7 +216,13 @@
         if (m && m.bottom > m.top) { pairSize = m.bottom - m.top + 1; ageSumCol = numToCol(ageSum.col); }
       }
 
-      var tb = { firstRow: firstRow, lastRow: lastRow, pairSize: pairSize, ageSumCol: ageSumCol, ageSumRowOffset: 0, fields: fields };
+      // ④の「申込書の列 → 書くもの」の一覧。見出しのある列をすべて、列の順に並べる（合計年齢の列は組の決まりで扱うので出さない）
+      var colList = fields.map(function (f) { return { col: f.col, header: f.header, field: f.field }; })
+        .concat(undecided)
+        .sort(function (a, b) { return colToNum(a.col) - colToNum(b.col); });
+
+      var tb = { firstRow: firstRow, lastRow: lastRow, headerRow: headerRow, pairSize: pairSize, ageSumCol: ageSumCol, ageSumRowOffset: 0,
+                 fields: fields, cols: colList };
       if (g.letters.length === 2) { tb.nameCol = ''; tb.familyCol = g.letters[0]; tb.givenCol = g.letters[1]; }
       else tb.nameCol = g.letters[0];
       tables.push(tb);

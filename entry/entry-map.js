@@ -11,7 +11,7 @@
 //
 // ★ 対応は形も値も信用しない。規則が外れても、ほかの人の行・見出し・式・名前の欄には書かない。
 //
-// window.EntryMap = { FIELDS, normalize, slotsFor, formKey, prefs } を公開する。
+// window.EntryMap = { FIELDS, normalize, slotsFor, tableKey, applyOverrides, formKey, prefs } を公開する。
 (function (global) {
   'use strict';
 
@@ -70,6 +70,7 @@
       var tb = {
         nameCol: col(t.nameCol), familyCol: col(t.familyCol), givenCol: col(t.givenCol),
         firstRow: int(t.firstRow, 1, 100000, 0), lastRow: int(t.lastRow, 1, 100000, 0),
+        headerRow: int(t.headerRow, 0, 100000, 0),
         pairSize: int(t.pairSize, 1, 6, 1), ageSumCol: col(t.ageSumCol), ageSumRowOffset: int(t.ageSumRowOffset, 0, 5, 0),
         fields: []
       };
@@ -102,6 +103,15 @@
       var hasM = tb.fields.some(function (f) { return f.field === 'genderMale'; });
       var hasF = tb.fields.some(function (f) { return f.field === 'genderFemale'; });
       if (hasM !== hasF) out.problems.push({ code: 'gender-mark-unpaired', table: ti, missing: hasM ? 'genderFemale' : 'genderMale' });
+      // ④の「申込書の列 → 書くもの」の一覧（見出しのある列すべて。決められなかった列は field: null）
+      var colSeen = {};
+      tb.cols = (Array.isArray(t.cols) ? t.cols : []).map(function (x) {
+        var c = x && col(x.col);
+        if (!c || colSeen[c] || NAME_FIELDS[str(x.field)]) return null;
+        colSeen[c] = true;
+        var field = FIELDS.hasOwnProperty(str(x.field)) ? str(x.field) : null;
+        return { col: c, header: str(x.header).slice(0, 40), field: field };
+      }).filter(Boolean);
       out.tables.push(tb);
     });
     (Array.isArray(o.extras) ? o.extras : []).forEach(function (x) {
@@ -212,6 +222,58 @@
     return { slots: slots, groups: groups, problems: problems };
   }
 
+  // ===== 本人の直しを当てはめる =====
+  // ★ 2026-09-15、本人と決めた形: ④に「申込書の列 → 書くもの」の一覧を出し、1列ずつ選び直せるようにする。
+  //   見出しの規則の見落とし（満年齢・男・女の1列）と誤爆（年齢区分 → 年齢）を、本人が直すための道。
+  //   直しは「その申込書だけ」に覚える（ほかの大会の申込書には広げない。誤った直しが広がらないように）。
+  //
+  // 表の見分け: 名前の列＋いちばん近い見出しの行。名前を書いた人数（firstRow / lastRow）に左右されない。
+  function tableKey(tb) {
+    return (tb.nameCol || (tb.familyCol + '+' + tb.givenCol)) + '@' + (tb.headerRow || 0);
+  }
+
+  // overrides: { 表の鍵: { 列: 欄の種類 | 'none' } }
+  // 戻り値: { mapping（直しを当てはめた写し）, duplicates: [{ table, field, cols }] }
+  // ★ 書く行は名前と同じ行に固定する（rowOffset 0）。ずれた行に書く誤りを、人の操作で作らないため
+  function applyOverrides(mapping, overrides) {
+    var m = JSON.parse(JSON.stringify(mapping));
+    var duplicates = [];
+    overrides = overrides || {};
+    m.tables.forEach(function (tb, ti) {
+      var ov = overrides[tableKey(tb)] || {};
+      Object.keys(ov).forEach(function (c) {
+        var field = ov[c];
+        var entry = (tb.cols || []).filter(function (x) { return x.col === c; })[0];
+        if (!entry) return;   // 申込書の形が変わって、その列に見出しが無くなった直しは使わない
+        if (field !== 'none' && !FIELDS.hasOwnProperty(field)) return;
+        if (NAME_FIELDS[field]) return;
+        var old = tb.fields.filter(function (f) { return f.col === c && f.rowOffset === 0; })[0];
+        tb.fields = tb.fields.filter(function (f) { return !(f.col === c && f.rowOffset === 0); });
+        entry.field = field === 'none' ? null : field;
+        entry.overridden = true;
+        if (field === 'none') return;
+        var nf = { field: field, col: c, rowOffset: 0, header: entry.header };
+        // 同じ種類のまま選び直したなら、規則が決めた書き方を残す。種類を変えたなら既定の書き方から
+        if (old && old.field === field && old.fmt) nf.fmt = old.fmt;
+        else if (FIELDS[field].length) nf.fmt = FIELDS[field][0];
+        if (field === 'genderMale' || field === 'genderFemale') nf.mark = '○';
+        tb.fields.push(nf);
+      });
+      // 元号の欄があるなら、年の欄は数字だけ（元号は別の欄に書く）
+      var hasEra = tb.fields.some(function (f) { return f.field === 'birthEra'; });
+      tb.fields.forEach(function (f) { if (f.field === 'birthYear' && hasEra && f.fmt === 'wareki') f.fmt = 'wareki-num'; });
+      tb.fields.sort(function (a, b) { return colNum(a.col) - colNum(b.col); });
+      // 同じ種類を2つの列に選んでいたら知らせる（「年齢」が D 列と H 列、など）
+      var byField = {};
+      tb.fields.forEach(function (f) { (byField[f.field] = byField[f.field] || []).push(f.col); });
+      Object.keys(byField).forEach(function (f) {
+        if (byField[f].length > 1) duplicates.push({ table: ti, field: f, cols: byField[f] });
+      });
+    });
+    return { mapping: m, duplicates: duplicates };
+  }
+  function colNum(l) { var n = 0; for (var i = 0; i < l.length; i++) n = n * 26 + (l.charCodeAt(i) - 64); return n; }
+
   // ===== 同じ様式かどうか =====
   // 名前のセルを除いた「見出しと結合の形」から鍵を作る。書いた人や人数が違っても、同じ様式なら同じ鍵になる。
   function formKey(sheetName, cells, merges, found) {
@@ -247,5 +309,8 @@
     }
   };
 
-  global.EntryMap = { FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, formKey: formKey, prefs: prefs };
+  global.EntryMap = {
+    FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
+    formKey: formKey, prefs: prefs
+  };
 })(typeof window !== 'undefined' ? window : this);
