@@ -340,13 +340,91 @@
   }
 
   /* ===== ⑤ 書き込む内容の確認 ===== */
-  // 書き方の選び直し（sh.fmt）を対応に当てはめた写しを返す
+  // ★ 生年月日を西暦で書くか和暦で書くか（2026-09-15、本人の要望）。
+  //   申込書に指示が無いときは、名簿の書き方に関係なく本人に選んでもらい、選ぶまで保存させない。
+  //   選んだ方は端末に覚え、次の申込書では最初から選ばれた状態にする（聞くこと自体は毎回する）。
+  //   指示があるときは聞かず、AI（または規則）が決めた書き方を使う。下の「書き方」でいつでも変えられる。
+  var BIRTH_STYLE_LS = 'dropper_entry_birth_style';
+  var SHRINK_LS = 'dropper_entry_shrink';
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  function colOf(ref) { return /^[A-Z]+/.exec(ref)[0]; }
+  var BIRTH_FIELDS = { birth: true, birthEra: true, birthYear: true };
+
+  // 生年月日の欄の見出し（最初の名前の行より上4行、結合セルは左上の文字）と、名前の行に印刷済みの文字に、
+  // 書き方の手がかり（西暦・和暦・元号・昭和・記入例など）があるかを見る
+  function birthInstruction(sh) {
+    var cols = {}, first = Infinity, nameRows = {};
+    sh.mapping.tables.forEach(function (tb) {
+      first = Math.min(first, tb.firstRow);
+      tb.fields.forEach(function (f) { if (/^birth/.test(f.field)) cols[f.col] = true; });
+    });
+    if (!Object.keys(cols).length) return { has: false, needed: false };
+    entriesOf(sh).forEach(function (e) { nameRows[e.n.row] = true; });
+    var texts = [];
+    sh.cells.forEach(function (c) {
+      if (!cols[colOf(c.ref)] || c.formula) return;
+      if ((c.row < first && c.row >= first - 4) || nameRows[c.row]) texts.push(c.text);
+    });
+    sh.merges.forEach(function (m) {
+      if (m.bottom < first - 4 || m.top >= first) return;
+      var covers = Object.keys(cols).some(function (L) { var n = X.parseRef(L + '1').col; return n >= m.left && n <= m.right; });
+      if (!covers) return;
+      var anchor = sh.cells.filter(function (c) { return c.row === m.top && c.col === m.left; })[0];
+      if (anchor) texts.push(anchor.text);
+    });
+    var s = texts.join(' ');
+    try { s = s.normalize('NFKC'); } catch (e) {}
+    var hint = /西暦|例[^0-9]{0,4}(19|20)\d\d/.test(s) ? 'seireki'
+      : /和暦|元号|年号|明治|大正|昭和|平成|令和|例[^0-9A-Z]{0,4}[MTSHR]\s?\d/i.test(s) ? 'wareki' : null;
+    return { has: true, needed: !hint, hint: hint };
+  }
+
+  // 選んだ書き方を、生年月日の欄に当てはめる（年・月・日が別の欄なら、元号の欄と年の欄で書き分ける）
+  function applyBirthStyle(m, style) {
+    m.tables.forEach(function (tb) {
+      var hasEra = tb.fields.some(function (f) { return f.field === 'birthEra'; });
+      tb.fields.forEach(function (f) {
+        if (f.field === 'birth') f.fmt = style === 'seireki' ? (/^seireki/.test(f.fmt) ? f.fmt : 'seireki-slash') : (/^wareki/.test(f.fmt) ? f.fmt : 'wareki');
+        if (f.field === 'birthYear') f.fmt = style === 'seireki' ? 'seireki' : (hasEra ? 'wareki-num' : 'wareki');
+        if (f.field === 'birthEra') f.fmt = style === 'seireki' ? 'none' : (f.fmt && f.fmt !== 'none' ? f.fmt : 'full');
+      });
+    });
+  }
+
+  function isSplitBirth(sh) {
+    return sh.mapping.tables.some(function (tb) { return tb.fields.some(function (f) { return f.field === 'birthYear'; }); });
+  }
+
+  // 書き方の選び直し（西暦／和暦の選択 → 欄ごとの sh.fmt の順）を対応に当てはめた写しを返す
   function withFmt(sh) {
     var m = JSON.parse(JSON.stringify(sh.mapping));
+    if (sh.birthNeeded && sh.birthStyle) applyBirthStyle(m, sh.birthStyle);
     m.tables.forEach(function (tb) {
       tb.fields.forEach(function (f) { if (sh.fmt[f.field]) f.fmt = sh.fmt[f.field]; });
     });
     return m;
+  }
+
+  function birthStyleBox(sh) {
+    var split = isSplitBirth(sh);
+    var name = 'birthStyle-' + sh.index;
+    var choice = function (value) {
+      var input = h('input', { type: 'radio', name: name, value: value, onchange: function () {
+        sh.birthStyle = value;
+        lsSet(BIRTH_STYLE_LS, value);
+        Object.keys(BIRTH_FIELDS).forEach(function (f) { delete sh.fmt[f]; });   // 欄ごとの選び直しより、この選択を優先する
+        renderReview();
+      } });
+      input.checked = sh.birthStyle === value;
+      return h('label', { class: 'choice' }, [input, h('span', { text: t('birthStyle.' + value + (split ? 'Split' : 'One')) })]);
+    };
+    return h('div', { class: 'ask' + (sh.birthStyle ? '' : ' pending') }, [
+      h('p', { class: 'ask-title', text: t('birthAsk') }),
+      h('div', { class: 'choices' }, [choice('seireki'), choice('wareki')]),
+      sh.birthStyle ? null : h('p', { class: 'name-note ng', text: t('birthAskNeeded') })
+    ]);
   }
 
   function computeSheet(sh) {
@@ -375,8 +453,12 @@
 
   function renderReview() {
     var body = clear(el('reviewBody'));
-    var total = 0;
+    var total = 0, waitingBirth = 0;
     state.sheets.forEach(function (sh) {
+      var bi = birthInstruction(sh);
+      sh.birthNeeded = bi.needed;
+      if (bi.needed && sh.birthStyle == null) sh.birthStyle = lsGet(BIRTH_STYLE_LS) || null;
+      if (bi.needed && !sh.birthStyle) waitingBirth++;
       var c = computeSheet(sh);
       total += c.writes.length;
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
@@ -394,6 +476,10 @@
         h('p', { class: 'hint', text: c.mapping.baseDateRaw ? t('baseDateFrom', { raw: c.mapping.baseDateRaw }) : t('baseDateNone') }),
         (usesAge && !c.base) ? h('p', { class: 'name-note ng', text: t('baseDateNeeded') }) : null
       ]));
+
+      // 生年月日は西暦か和暦か
+      if (bi.needed) sec.appendChild(birthStyleBox(sh));
+      else if (bi.has) sec.appendChild(h('p', { class: 'hint', text: t('birthFollowsForm', { style: t('birthStyleName.' + bi.hint) }) }));
 
       // 書き方（複数の書き方がある欄だけ）
       var fmtFields = [];
@@ -513,8 +599,9 @@
       sh.computed = c;
     });
     show('stepSave');
-    el('saveBtn').disabled = total === 0;
-    setMsg('saveMsg', total ? t('saveReady', { n: total }) : t('saveNothing'), total ? '' : 'ng');
+    el('saveBtn').disabled = total === 0 || waitingBirth > 0;
+    if (waitingBirth) setMsg('saveMsg', t('saveWaitBirth'), 'ng');
+    else setMsg('saveMsg', total ? t('saveReady', { n: total }) : t('saveNothing'), total ? '' : 'ng');
   }
 
   /* ===== ⑥ 保存 ===== */
@@ -528,7 +615,7 @@
       state.sheets.forEach(function (sh) {
         var c = computeSheet(sh);
         c.writes.forEach(function (w) {
-          var r = X.setCell(book, sh.index, w.ref, w.value);
+          var r = X.setCell(book, sh.index, w.ref, w.value, { shrink: el('shrinkChk').checked });
           if (r.ok) count++; else failed.push(sh.name + ' ' + r.ref + '（' + t('skip.target-is-formula', { ref: r.ref, field: '' }) + '）');
         });
       });
@@ -678,5 +765,8 @@
   wireDrop('rosterDrop', 'rosterInput', 'rosterPick', onRoster);
   el('namesNext').addEventListener('click', onNamesNext);
   el('saveBtn').addEventListener('click', onSave);
+  // 縮小して全体を表示: 既定は入れる。外した人には外したまま覚えておく
+  el('shrinkChk').checked = lsGet(SHRINK_LS) !== 'off';
+  el('shrinkChk').addEventListener('change', function () { lsSet(SHRINK_LS, el('shrinkChk').checked ? 'on' : 'off'); });
   el('keyChangeBtn').addEventListener('click', function () { askKey(true); });
 })();

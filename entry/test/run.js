@@ -203,6 +203,7 @@ function main() {
     .then(function () { return formC(roster); })
     .then(function () { return localForms(roster); })
     .then(function () { return aiSection(roster); })
+    .then(function () { return shrinkSection(roster); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -583,6 +584,103 @@ function aiSection(roster) {
       check(!/山田|伊藤|田中|渡辺|吉田|1950/.test(store.dropper_entry_maps), '保存した中身に名前も生年月日も入っていない');
       delete global.localStorage;
     });
+}
+
+// ===== 縮小して全体を表示（2026-09-15、本人の要望） =====
+// styles.xml は「書き換えたセル以外は変えない」の例外。変わるのは cellXfs の末尾への追加と count だけであること。
+function cellXfsOf(stylesXml) {
+  var m = /<cellXfs\b[^>]*count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/.exec(stylesXml);
+  return { count: Number(m[1]), xfs: m[2].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [], index: m.index, whole: m[0] };
+}
+function styleOfCell(book, sheet, ref) {
+  var s = book.sheets.filter(function (x) { return x.name === sheet; })[0];
+  var m = new RegExp('<c\\b(?=[^>]*\\sr="' + ref + '")[^>]*?\\ss="(\\d+)"').exec(book.parts[s.path]);
+  return m ? Number(m[1]) : 0;
+}
+
+function shrinkSection(roster) {
+  section('8. 縮小して全体を表示／西暦で書くときの元号の欄');
+
+  // 折り返しを外す・揃えは残す・protection より前に alignment を置く（合成した書式の一覧で）
+  var fake = { parts: { 'xl/styles.xml': '<styleSheet><cellXfs count="3"><xf numFmtId="0"/>' +
+    '<xf numFmtId="0" applyAlignment="1"><alignment horizontal="center" wrapText="1"/></xf>' +
+    '<xf numFmtId="0" applyProtection="1"><protection locked="0"/></xf></cellXfs></styleSheet>' }, dirty: {} };
+  var i1 = X.shrinkStyle(fake, '1'), i2 = X.shrinkStyle(fake, '2'), i1b = X.shrinkStyle(fake, '1');
+  var fx = cellXfsOf(fake.parts['xl/styles.xml']);
+  eq([i1, i2, i1b, fx.count, fx.xfs.length], ['3', '4', '3', 5, 5], '同じ元の書式からは写しを1つだけ作り、count も合わせる');
+  eq(fx.xfs[3], '<xf numFmtId="0" applyAlignment="1"><alignment horizontal="center" shrinkToFit="1"/></xf>', '折り返し（wrapText）を外し、中央揃えは残す');
+  eq(fx.xfs[4], '<xf numFmtId="0" applyProtection="1" applyAlignment="1"><alignment shrinkToFit="1"/><protection locked="0"/></xf>', 'alignment は protection より前に置く');
+
+  // 西暦で書くときは元号の欄を空にする
+  var yamada = roster.members[0];
+  var f = R.fill(yamada, { fields: [{ field: 'birthEra', ref: 'G14', fmt: 'none' }, { field: 'birthYear', ref: 'H14', fmt: 'seireki' }] }, { baseDate: BASE });
+  eq(f.writes, [{ ref: 'G14', value: '' }, { ref: 'H14', value: 1950 }], '西暦を選ぶと、元号の欄は空・年の欄は 1950');
+
+  var jobs = [
+    { label: '様式B', file: path.join(FIX, 'form-b-pairs.xlsx'), sheet: '個人戦', out: 'form-b-shrink.xlsx',
+      writes: { C14: '山田 太郎（とても長い名前のつもり）', C15: '山田 花子', C12: null, H20: 25, D30: '表の外（セルが無い行）' } },
+    { label: '本物の百万石', file: path.join(LOCAL, 'x'), sheet: 'ラージ個人戦申込書', out: 'local-shrink.xlsx', local: true,
+      writes: { C14: '山田 太郎（とても長い名前のつもり）', C15: '山田 花子', F14: '男', K14: 77 } }
+  ];
+  var localFile = fs.existsSync(LOCAL) && fs.readdirSync(LOCAL).filter(function (x) { return /百万石.*\.xlsx$/.test(x); })[0];
+  if (localFile) jobs[1].file = path.join(LOCAL, localFile); else jobs.pop();
+
+  return jobs.reduce(function (p, job) {
+    return p.then(function () {
+      var before;
+      return read(job.file).then(function (b0) {
+        before = b0;
+        return read(job.file);
+      }).then(function (book) {
+        var written = [];
+        Object.keys(job.writes).forEach(function (ref) {
+          var v = job.writes[ref];
+          if (v === null) return;   // 見出しには書かない（書かないセルの書式が変わらないことを見る）
+          var r = X.setCell(book, job.sheet, ref, v, { shrink: true });
+          if (r.ok) written.push(r.ref);
+        });
+        return X.save(book).then(function (bytes) {
+          if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
+          fs.writeFileSync(path.join(OUT, job.out), bytes);
+          return X.open(bytes);
+        }).then(function (after) {
+          var sb = cellXfsOf(before.parts['xl/styles.xml']), sa = cellXfsOf(after.parts['xl/styles.xml']);
+          var added = sa.xfs.slice(sb.xfs.length);
+          check(sa.xfs.slice(0, sb.xfs.length).join('') === sb.xfs.join('') && added.length >= 1 && sa.count === sa.xfs.length,
+            job.label + ': 元の書式は1つも変わらず、末尾に' + added.length + 'つ足しただけ（count ' + sb.count + '→' + sa.count + '）');
+          var outsideCellXfs = function (x) { var c = cellXfsOf(x); return x.slice(0, c.index) + x.slice(c.index + c.whole.length); };
+          check(outsideCellXfs(before.parts['xl/styles.xml']) === outsideCellXfs(after.parts['xl/styles.xml']),
+            job.label + ': 書式の一覧の cellXfs 以外（フォント・罫線・色など）は変わらない');
+          check(added.every(function (x) { return /shrinkToFit="1"/.test(x) && /applyAlignment="1"/.test(x) && !/wrapText="1"/.test(x); }),
+            job.label + ': 足した書式はすべて縮小あり・折り返しなし');
+          var bad = written.filter(function (ref) { return styleOfCell(after, job.sheet, ref) < sb.xfs.length; });
+          eq(bad, [], job.label + ': 書き込んだセルはすべて足した書式を指す');
+          var c12Before = styleOfCell(before, job.sheet, 'C12'), c12After = styleOfCell(after, job.sheet, 'C12');
+          eq(c12After, c12Before, job.label + ': 書き込んでいないセル（見出し C12）の書式は変わらない');
+          // 同じ元の書式を使っていたセルは、同じ写しを指す（写しが増えすぎない）
+          var sameBase = written.filter(function (ref) { return styleOfCell(before, job.sheet, ref) === styleOfCell(before, job.sheet, written[0]); });
+          check(sameBase.every(function (ref) { return styleOfCell(after, job.sheet, ref) === styleOfCell(after, job.sheet, written[0]); }),
+            job.label + ': 元の書式が同じセルは、同じ写しを指す');
+          var by = {}; by[job.sheet] = written;
+          // 書式の一覧以外は、書いたセルを除いて変わらない（assertPreserved は styles.xml を「変えていない部品」として比べるので、ここでは外して比べる）
+          var changed = [];
+          before.entries.forEach(function (e) {
+            if (e.name === 'xl/styles.xml') return;
+            var sheet = before.sheets.filter(function (s) { return s.path === e.name; })[0];
+            if (sheet && sheet.name === job.sheet) {
+              if (stripCells(before.parts[e.name], written) !== stripCells(after.parts[e.name], written)) changed.push(e.name);
+              return;
+            }
+            if (Buffer.compare(Buffer.from(e.raw), Buffer.from(after.byName[e.name].raw)) !== 0) changed.push(e.name);
+          });
+          eq(changed, [], job.label + ': 書式の一覧と書いたセル以外は、1バイトも変わらない');
+          assertOrdered(after, job.label);
+          var vals = {}; written.forEach(function (ref) { vals[ref] = job.writes[ref]; });
+          expectForExcel.push({ file: job.out, sheet: job.sheet, cells: vals, shrink: written });
+        });
+      });
+    });
+  }, Promise.resolve());
 }
 
 main().catch(function (e) { console.error(e); process.exit(1); });

@@ -386,7 +386,10 @@
           else if (f.fmt === 'seireki-kanji') put(f, b.y + '年' + b.m + '月' + b.d + '日');
           else put(f, b.y + '/' + b.m + '/' + b.d);
           break;
-        case 'birthEra': if (!b) miss(f, 'birth-missing'); else put(f, f.fmt === 'short' ? w.short : w.era); break;
+        case 'birthEra':
+          if (f.fmt === 'none') { put(f, ''); break; }   // 西暦で書くときは元号の欄を空にする
+          if (!b) miss(f, 'birth-missing'); else put(f, f.fmt === 'short' ? w.short : w.era);
+          break;
         case 'birthYear':
           if (!b) { miss(f, 'birth-missing'); break; }
           if (f.fmt === 'wareki') put(f, w.era + w.n);

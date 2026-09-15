@@ -212,6 +212,7 @@
         r[2].replace(/<si(?:\s[^>]*)?(?:\/>|>([\s\S]*?)<\/si>)/g, function (_, inner) { book.sst.push(richText(inner)); });
       }
       book.dateStyles = dateStyles(r[3] || '');
+      if (r[3]) book.parts['xl/styles.xml'] = r[3];   // 縮小して全体を表示を足すときに使う（使わなければ保存しても元のバイト列のまま）
       return Promise.all(book.sheets.map(function (s) {
         return text(s.path).then(function (x) {
           if (x == null) throw fail('broken-xlsx', s.path);
@@ -317,12 +318,14 @@
 
   // ===== 書く =====
   // value: 数値 → 数値のセル／文字列 → 文字のセル（inlineStr）／null・'' → 空にする（書式は残す）
+  // opts.shrink: true なら、そのセルの書式の写しに「縮小して全体を表示」を付けて使う（shrinkStyle）
   // 戻り値: { ok, ref, reason }。★ 式の入ったセルは上書きしない（reason: 'formula'）。
-  function setCell(book, sheet, ref, value) {
+  function setCell(book, sheet, ref, value, opts) {
     var s = sheetOf(book, sheet);
     ref = anchorOf(book, sheet, ref);
     var pos = parseRef(ref);
     var xml = book.parts[s.path];
+    var shrink = !!(opts && opts.shrink) && !(value === null || value === undefined || value === '');
 
     var cellRe = new RegExp('<c\\b(?=[^>]*\\sr="' + ref + '")([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)');
     var hit = cellRe.exec(xml);
@@ -333,6 +336,7 @@
       style = a.s || '';
     }
     var build = function (st) {
+      if (shrink) st = shrinkStyle(book, st);
       var head = '<c r="' + ref + '"' + (st ? ' s="' + st + '"' : '');
       if (value === null || value === undefined || value === '') return head + '/>';
       if (typeof value === 'number' && isFinite(value)) return head + '><v>' + value + '</v></c>';
@@ -347,6 +351,54 @@
     book.parts[s.path] = xml;
     book.dirty[s.path] = true;
     return { ok: true, ref: ref };
+  }
+
+  // ===== 縮小して全体を表示 =====
+  // Excel の書式は styles.xml の cellXfs に並んだ <xf> の番号でセルから指される。
+  // 元の書式（罫線・フォント・揃え）を写した <xf> を末尾に足し、alignment に shrinkToFit="1" を付ける。
+  // ★ 元の <xf> は書き換えない。同じ書式を使うほかのセル（見出しなど）まで縮小されてしまうため。
+  // ★ styles.xml は「書き換えたセル以外は変えない」の例外。変わるのは cellXfs の末尾への追加と count だけ
+  //   （run.js が確かめる）。同じ元の書式からの写しは1つだけ作る（book.shrinkMap）。
+  // ★ wrapText（折り返して全体を表示）があると Excel は縮小しないので、写しからは外す。
+  function shrinkStyle(book, st) {
+    var path = 'xl/styles.xml';
+    var xml = book.parts[path];
+    if (!xml) return st;   // 書式の一覧が無いブック（まず無い）は、縮小を付けずに書く
+    book.shrinkMap = book.shrinkMap || {};
+    var key = st || '0';
+    if (book.shrinkMap[key] != null) return book.shrinkMap[key];
+
+    var block = /<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/.exec(xml);
+    if (!block) return st;
+    var xfs = block[2].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var base = xfs[Number(key)] || xfs[0];
+    if (!base) return st;
+
+    var clone;
+    var open = /^<xf\b([^>]*?)(\/?)>/.exec(base);
+    var attrsPart = open[1].replace(/\s+applyAlignment="[^"]*"/, '') + ' applyAlignment="1"';
+    if (open[2] === '/') {
+      clone = '<xf' + attrsPart + '><alignment shrinkToFit="1"/></xf>';
+    } else {
+      var inner = base.slice(open[0].length, base.length - '</xf>'.length);
+      if (/<alignment\b/.test(inner)) {
+        inner = inner.replace(/<alignment\b([^>]*?)(\/?)>/, function (_, a, slash) {
+          a = a.replace(/\s+shrinkToFit="[^"]*"/, '').replace(/\s+wrapText="[^"]*"/, '');
+          return '<alignment' + a + ' shrinkToFit="1"' + slash + '>';
+        });
+      } else {
+        inner = '<alignment shrinkToFit="1"/>' + inner;   // alignment は protection より前に置く決まり
+      }
+      clone = '<xf' + attrsPart + '>' + inner + '</xf>';
+    }
+
+    var index = xfs.length;
+    var head = block[1].replace(/\s+count="\d+"/, '') + ' count="' + (index + 1) + '"';
+    var newBlock = '<cellXfs' + head + '>' + block[2] + clone + '</cellXfs>';
+    book.parts[path] = xml.slice(0, block.index) + newBlock + xml.slice(block.index + block[0].length);
+    book.dirty[path] = true;
+    book.shrinkMap[key] = String(index);
+    return String(index);
   }
 
   // セルが無いところへ書くときは、列順を守って行に差し込む。書式は行か列の設定を引き継ぐ。
@@ -428,7 +480,7 @@
 
   global.EntryXlsx = {
     open: open, sheetNames: sheetNames, cells: cells, merges: merges, anchorOf: anchorOf,
-    setCell: setCell, save: save, parseRef: parseRef, toRef: toRef,
+    setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }
   };

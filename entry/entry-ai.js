@@ -45,7 +45,7 @@
     gender: ['kanji', 'full'],
     genderMale: [], genderFemale: [],
     birth: ['wareki', 'seireki-slash', 'seireki-kanji', 'wareki-short'],
-    birthEra: ['full', 'short'],
+    birthEra: ['full', 'short', 'none'],   // none: 西暦で書くとき、元号の欄を空にする（画面で選ぶ。AI には案内していない）
     birthYear: ['wareki', 'seireki', 'wareki-num', 'wareki-short'],
     birthMonth: [], birthDay: [],
     age: [],

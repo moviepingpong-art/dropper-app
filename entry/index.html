@@ -104,6 +104,15 @@
     .name-note.ng { color:var(--ng); font-weight:700; }
     .name-row select { margin-top:6px; width:100%; }
 
+    /* ===== 本人に選んでもらう問い（生年月日の書き方）・チェック ===== */
+    .ask { border:2px solid var(--teal); border-radius:14px; padding:11px 13px; margin:10px 0 4px; background:#f7fffd; }
+    .ask.pending { border-color:var(--warn-line); background:var(--warn-bg); }
+    .ask-title { margin:0 0 6px; font-size:13.5px; font-weight:700; }
+    .choices { display:flex; flex-wrap:wrap; gap:8px 18px; }
+    .choice { display:inline-flex; align-items:center; gap:7px; font-size:14px; cursor:pointer; }
+    .choice input { width:18px; height:18px; accent-color:var(--teal); margin:0; }
+    .choice.check { font-weight:700; margin:2px 0 0; }
+
     /* ===== AI に送る内容 ===== */
     pre.preview { white-space:pre-wrap; word-break:break-all; font-size:12px; line-height:1.6; background:#f7fffd;
       border:1px solid var(--line); border-radius:10px; padding:10px 12px; max-height:320px; overflow:auto; margin:8px 0 0; }
@@ -229,6 +238,11 @@
 
     <section class="card" id="stepSave" hidden>
       <h2 data-i18n="step6Title">⑥ 保存</h2>
+      <label class="choice check">
+        <input type="checkbox" id="shrinkChk" checked>
+        <span data-i18n="shrinkLabel">セルに収まらない文字は、小さくして収める</span>
+      </label>
+      <p class="hint" data-i18n="shrinkNote">Excel の「縮小して全体を表示」を付けます。</p>
       <div class="btns"><button type="button" id="saveBtn" data-i18n="saveBtn">記入済みの申込書を保存</button></div>
       <p class="hint" data-i18n="saveNote">元の申込書は変わりません。</p>
       <p class="msg" id="saveMsg"></p>
