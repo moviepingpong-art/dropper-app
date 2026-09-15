@@ -10,7 +10,8 @@
 //   3. ★ 書き換えたセル以外が1バイトも変わっていないこと（書式を壊していない証拠）
 //   5. entry/test/local/ に本物の様式があれば、それでも 2〜3 を流す（無ければ飛ばす）
 //   6. 欄の対応づくり（見出しの規則。AI は使わない）。規則の答えが、2 で手で書いた欄の対応と一致すること。
-//      通信するコードが無いこと（名簿も申込書もどこにも送らない）
+//      通信は、このサイトの postal/ を読む1か所だけであること（名簿も申込書もどこにも送らない）
+//   9. 郵便番号から住所（tools/make-postal.js の変換と entry-postal.js の引き当て）
 var fs = require('fs');
 var path = require('path');
 
@@ -19,7 +20,9 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-xlsx.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-roster.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-rules.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-map.js'), 'utf8'));
-var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap;
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-postal.js'), 'utf8'));
+var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap, P = window.EntryPostal;
+var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
 
 // 手で書いた欄の対応を、見出しの規則の答えと比べるために取っておく
 var HAND = {};
@@ -187,6 +190,7 @@ function main() {
     .then(function () { return localForms(roster); })
     .then(function () { return mapSection(roster); })
     .then(function () { return shrinkSection(roster); })
+    .then(function () { return postalSection(); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -382,12 +386,21 @@ function sortedNames(found) {
 function mapSection(roster) {
   section('7. 欄の対応づくり（見出しの規則。AI は使わない）');
 
-  // --- どこにも送らない（通信するコードが無い） ---
-  var netRe = /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|generativelanguage|googleapis\.com\/(?!css)/;
-  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js'].filter(function (f) {
-    return netRe.test(fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\/\/[^\n]*/g, ''));
+  // --- どこにも送らない（通信は、このサイトの postal/ を読む1か所だけ） ---
+  var netRe = /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|importScripts|generativelanguage|googleapis\.com\/(?!css)/;
+  var POSTAL_FETCH = "fetch(BASE + digit + '.json', { credentials: 'omit' })";
+  var srcOf = function (f) { return fs.readFileSync(path.join(__dirname, '..', f), 'utf8'); };
+  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js', 'entry-postal.js'].filter(function (f) {
+    var code = srcOf(f).split(POSTAL_FETCH).join('');
+    return netRe.test(code.replace(/\/\/[^\n]*/g, ''));
   });
-  eq(talkers, [], '申込書ドロッパーの JS に、通信するコードが1つも無い（名簿も申込書もどこにも送らない）');
+  eq(talkers, [], '申込書ドロッパーの JS に、postal/ を読むこと以外の通信が無い（名簿も申込書もどこにも送らない）');
+  var postalSrc = srcOf('entry-postal.js');
+  eq(postalSrc.split(POSTAL_FETCH).length - 1, 1, '郵便番号データを読む fetch は entry-postal.js の1か所だけ');
+  check((postalSrc.match(/\bBASE\s*=/g) || []).length === 1 && postalSrc.indexOf("var BASE = 'postal/';") >= 0,
+    '読みに行く先は、このサイトの相対パス postal/ だけ（ほかへ付け替えていない）');
+  var urlLines = postalSrc.split(/\r?\n/).filter(function (l) { return /https?:|\/\/[a-z0-9.-]+\.[a-z]/i.test(l) && !/^\s*\/\//.test(l); });
+  eq(urlLines, [], 'entry-postal.js のコメント以外に、よそのサイトの URL が無い');
   check(!fs.existsSync(path.join(__dirname, '..', 'entry-ai.js')), 'Gemini を呼ぶ entry-ai.js は無い');
   var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   check(!/gtag|googletagmanager|hits\.sh|key-modal|entry-ai\.js/.test(html), 'index.html に解析・訪問者カウンター・キー入力・entry-ai.js が無い（試作中）');
@@ -731,6 +744,108 @@ function shrinkSection(roster) {
       });
     });
   }, Promise.resolve());
+}
+
+// ===== 郵便番号から住所 =====
+function postalSection() {
+  section('9. 郵便番号から住所（tools/make-postal.js の変換・entry-postal.js の引き当て）');
+
+  // --- 入力の受け付け ---
+  eq(['924-0001', '〒９２４－０００１', '924 0001', '９２４ー０００１', '9240001'].map(P.normalize),
+    ['9240001', '9240001', '9240001', '9240001', '9240001'], '郵便番号: ハイフン・全角・〒・空白・長音の入力を7桁にする');
+  eq(['92400', '92400012', '924-000a', '', null].map(P.normalize), [null, null, null, null, null], '郵便番号: 7桁にならない入力は受け付けない');
+
+  // --- 町域名から、住所に書かない文字を取り除く ---
+  var ct = MAKE_POSTAL.cleanTown;
+  eq([ct('札幌市中央区', '以下に掲載がない場合'), ct('岡谷市', '岡谷市の次に番地がくる場合'), ct('利島村', '利島村一円')],
+    ['', '', ''], '決まり文句（以下に掲載がない場合・○○の次に番地がくる場合・○○村一円）は町域を空にする');
+  eq(ct('犬上郡多賀町', '一円'), '一円', '★ 多賀町の「一円」は本当の地名なので残す');
+  eq([ct('札幌市南区', '常盤（その他）'), ct('名古屋市中村区', '名駅ミッドランドスクエア（高層棟）（１階）'),
+      ct('宮古市', '川井（第９地割〜第１１地割）'), ct('白山市', '八田町')],
+    ['常盤', '名駅ミッドランドスクエア', '川井', '八田町'], '括弧書きは括弧から後ろを取り除く');
+
+  // --- 変換（架空の行で） ---
+  var row = function (code, pref, city, town, upd) {
+    return ['00000', '"' + code.slice(0, 3) + '  "', '"' + code + '"', '"ア"', '"イ"', '"ウ"',
+      '"' + pref + '"', '"' + city + '"', '"' + town + '"', '0', '0', '0', '0', upd || '0', '0'].join(',');
+  };
+  var csv = String.fromCharCode(0xFEFF) + [
+    row('9240001', '石川県', '白山市', '八田町'),
+    row('2600822', '千葉県', '千葉市中央区', '蘇我'),
+    row('2600822', '千葉県', '千葉市中央区', '蘇我町'),
+    row('9806101', '宮城県', '仙台市青葉区', '中央アエル（１階）'),
+    row('9806101', '宮城県', '仙台市青葉区', '中央アエル（地階・階層不明）'),
+    row('1900100', '東京都', 'あきる野市', '以下に掲載がない場合'),
+    row('1900100', '東京都', '西多摩郡日の出町', '以下に掲載がない場合'),
+    row('9240002', '石川県', '白山市', '八田中町', '2')
+  ].join('\r\n') + '\r\n';
+  var built = MAKE_POSTAL.build(csv, '2026-08-31');
+  eq(Object.keys(built).sort(), ['1', '2', '9'], '変換: 先頭1桁ごとに分ける（BOM と CRLF を受け付ける）');
+  eq(P.fromChunk(built['9'], '9240001'), [{ pref: '石川県', city: '白山市', town: '八田町' }], '変換: 1つの番号に1つの町域');
+  eq(P.fromChunk(built['9'], '9240002'), [], '変換: 廃止（更新フラグ 2）の行は入れない');
+  eq(P.fromChunk(built['2'], '2600822').map(function (c) { return c.town; }), ['蘇我', '蘇我町'], '変換: 1つの番号に町域が2つあれば、候補を2つとも残す');
+  eq(P.fromChunk(built['9'], '9806101').map(function (c) { return c.town; }), ['中央アエル'], '変換: 括弧を取り除いて同じになった候補は1つにする');
+  eq(P.fromChunk(built['1'], '1900100').map(function (c) { return c.city + '/' + c.town; }), ['あきる野市/', '西多摩郡日の出町/'],
+    '変換: 市区町村から違う候補も残す');
+  eq(built['9'].places, [['石川県', '白山市'], ['宮城県', '仙台市青葉区']], '変換: 都道府県と市区町村の組は1回だけ書く');
+
+  // --- 置いてあるデータ（entry/postal/） ---
+  var POSTAL = path.join(__dirname, '..', 'postal');
+  var files = fs.existsSync(POSTAL) ? fs.readdirSync(POSTAL).sort() : [];
+  eq(files, ['0.json', '1.json', '2.json', '3.json', '4.json', '5.json', '6.json', '7.json', '8.json', '9.json'],
+    'entry/postal/ に 0.json〜9.json がそろっている（ほかのファイルは置かない）');
+  if (files.length !== 10) return Promise.resolve();
+  var chunks = {};
+  files.forEach(function (f) { chunks[f[0]] = JSON.parse(fs.readFileSync(path.join(POSTAL, f), 'utf8')); });
+  var updates = Object.keys(chunks).map(function (d) { return chunks[d].updated; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  check(updates.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(updates[0]), 'データ: 10個とも同じ更新日（' + updates.join(',') + '）');
+  var total = 0, leftovers = [];
+  Object.keys(chunks).forEach(function (d) {
+    var c = chunks[d];
+    Object.keys(c.codes).forEach(function (k) {
+      total++;
+      c.codes[k].forEach(function (e) {
+        if (/[（）]|以下に掲載がない場合|の次に番地がくる場合/.test(e[1]) || !c.places[e[0]]) leftovers.push(d + k + ':' + e[1]);
+      });
+    });
+  });
+  check(total > 100000, 'データ: 郵便番号が10万個より多い（' + total + ' 個。途中で切れていない）');
+  eq(leftovers.slice(0, 5), [], 'データ: 括弧書き・決まり文句が残っていない／市区町村の番号が壊れていない');
+
+  var fromFiles = function (d) { return Promise.resolve(chunks[d]); };
+  var townsOf = function (r) { return r.candidates.map(function (c) { return c.pref + c.city + '|' + c.town; }); };
+  return P.lookup('924-0001', fromFiles).then(function (r) {
+    eq([r.code, townsOf(r)], ['9240001', ['石川県白山市|八田町']], '引き当て: 924-0001 → 石川県 白山市 八田町');
+    return P.lookup('〒522-0317', fromFiles);
+  }).then(function (r) {
+    eq(townsOf(r), ['滋賀県犬上郡多賀町|一円'], '引き当て: 522-0317 → 多賀町 一円（本当の地名）');
+    return P.lookup('2600822', fromFiles);
+  }).then(function (r) {
+    eq(townsOf(r), ['千葉県千葉市中央区|蘇我', '千葉県千葉市中央区|蘇我町'], '引き当て: 260-0822 → 候補が2つ');
+    return P.lookup('1900100', fromFiles);
+  }).then(function (r) {
+    eq(townsOf(r), ['東京都あきる野市|', '東京都西多摩郡日の出町|'], '引き当て: 190-0100 → 市区町村から違う候補が2つ（町域は空）');
+    return P.lookup('060-0000', fromFiles);
+  }).then(function (r) {
+    eq(townsOf(r), ['北海道札幌市中央区|'], '引き当て: 060-0000 → 札幌市中央区（以下に掲載がない場合 → 町域は空）');
+    return P.lookup('9999999', fromFiles);
+  }).then(function (r) {
+    eq(r.candidates, [], '引き当て: 無い郵便番号は候補0');
+    return P.lookup('92400', fromFiles).then(function () { bad('7桁でない入力が通った'); }, function (e) { eq(e.code, 'postal-bad', '引き当て: 7桁でない入力は postal-bad'); });
+  }).then(function () {
+    var calls = 0;
+    var failing = function () { calls++; return Promise.reject(new Error('offline')); };
+    return P.lookup('3000000', failing).then(function () { bad('読めないのに通った'); }, function (e) {
+      eq(e.code, 'postal-load', '引き当て: データを読めなければ postal-load');
+      return P.lookup('3000000', fromFiles).then(function (r) {
+        check(r.candidates.length >= 1 && calls === 1, '引き当て: 読めなかった桁は覚えず、次に入れ直せば読みに行く');
+      }, function () { bad('引き当て: 読めなかった桁を覚えてしまい、入れ直しても読みに行かない'); });
+    }).then(function () {
+      return P.lookup('3000000', failing).then(function () {
+        eq(calls, 1, '引き当て: 読めた桁は覚えていて、2回は読みに行かない');
+      }, function () { bad('引き当て: 読めたはずの桁で失敗した（読みに行った回数 ' + calls + '）'); });
+    });
+  });
 }
 
 main().catch(function (e) { console.error(e); process.exit(1); });
