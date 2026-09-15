@@ -12,6 +12,7 @@
 //   6. 欄の対応づくり（見出しの規則。AI は使わない）。規則の答えが、2 で手で書いた欄の対応と一致すること。
 //      通信は、このサイトの postal/ を読む1か所だけであること（名簿も申込書もどこにも送らない）
 //   9. 郵便番号から住所（tools/make-postal.js の変換と entry-postal.js の引き当て）
+//  10. 名簿ファイル（entry-book.js で作る・読む・申込書に書く形にする）
 var fs = require('fs');
 var path = require('path');
 
@@ -21,7 +22,8 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-roster.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-rules.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-map.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-postal.js'), 'utf8'));
-var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap, P = window.EntryPostal;
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
+var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap, P = window.EntryPostal, B = window.EntryBook;
 var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
 
 // 手で書いた欄の対応を、見出しの規則の答えと比べるために取っておく
@@ -191,6 +193,7 @@ function main() {
     .then(function () { return mapSection(roster); })
     .then(function () { return shrinkSection(roster); })
     .then(function () { return postalSection(); })
+    .then(function () { return bookSection(); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -390,7 +393,7 @@ function mapSection(roster) {
   var netRe = /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|importScripts|generativelanguage|googleapis\.com\/(?!css)/;
   var POSTAL_FETCH = "fetch(BASE + digit + '.json', { credentials: 'omit' })";
   var srcOf = function (f) { return fs.readFileSync(path.join(__dirname, '..', f), 'utf8'); };
-  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js', 'entry-postal.js'].filter(function (f) {
+  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js', 'entry-postal.js', 'entry-book.js'].filter(function (f) {
     var code = srcOf(f).split(POSTAL_FETCH).join('');
     return netRe.test(code.replace(/\/\/[^\n]*/g, ''));
   });
@@ -845,6 +848,128 @@ function postalSection() {
         eq(calls, 1, '引き当て: 読めた桁は覚えていて、2回は読みに行かない');
       }, function () { bad('引き当て: 読めたはずの桁で失敗した（読みに行った回数 ' + calls + '）'); });
     });
+  });
+}
+
+// ===== 名簿ファイル =====
+// 人・団体・住所・電話番号はすべて架空
+function bookSection() {
+  section('10. 名簿ファイル（作る・読む・申込書に書く形にする）');
+
+  var data = {
+    org: '架空ラージボール卓球クラブ',
+    today: '2026-09-16',
+    extraHeaders: { 男子: ['備考'], 女子: [] },
+    people: {
+      男子: [
+        { family: '山田', given: '太郎', kanaFamily: 'ヤマダ', kanaGiven: 'タロウ', birth: { y: 1950, m: 4, d: 1 },
+          postal: '924-0001', pref: '石川県', address: '白山市八田町1-2-3', phone: '090-0000-0001', extras: ['会計'] },
+        { family: '髙橋', given: '一郎', kanaFamily: 'タカハシ', kanaGiven: 'イチロウ', birth: { y: 1948, m: 12, d: 25 },
+          postal: '060-0000', pref: '北海道', address: '札幌市中央区1-1', phone: '090-0000-0003', extras: [] },
+        { family: '佐藤', given: '実', kanaFamily: 'サトウ', kanaGiven: 'ミノル', birth: null, birthText: '',
+          postal: '', pref: '', address: '', phone: '', extras: [] }
+      ],
+      女子: [
+        { family: '鈴木', given: '花子', kanaFamily: 'スズキ', kanaGiven: 'ハナコ', birth: { y: 1952, m: 5, d: 10 },
+          postal: '924-0002', pref: '石川県', address: '白山市八田中町4-5', phone: '090-0000-0002', extras: [] }
+      ]
+    }
+  };
+
+  eq(B.fileName('架空ラージボール卓球クラブ'), '名簿_架空ラージボール卓球クラブ.xlsx', 'ファイル名は団体名から作る');
+  eq(B.fileName('  '), '名簿.xlsx', '団体名が空ならファイル名は 名簿.xlsx');
+  eq(B.fileName('架空/クラブ:1'), '名簿_架空クラブ1.xlsx', 'ファイル名に使えない文字は落とす');
+
+  var first;
+  return B.make(data).then(function (bytes) {
+    first = bytes;
+    fs.writeFileSync(path.join(OUT, 'roster-book.xlsx'), Buffer.from(bytes));
+    return X.open(bytes);
+  }).then(function (book) {
+    eq(X.sheetNames(book), ['男子', '女子', 'この名簿について'], 'シートは 男子・女子・この名簿について');
+    var got = B.read(book);
+    check(got.ok, '作った名簿ファイルを読める');
+    eq([got.org, got.version], ['架空ラージボール卓球クラブ', 1], '団体名と形式の版を読み取る');
+    eq(got.extraHeaders, { 男子: ['備考'], 女子: [] }, '自分で足した列の見出しを読み取る');
+    eq(got.people['男子'].map(function (p) { return p.family + p.given; }), ['山田太郎', '髙橋一郎', '佐藤実'], '男子の並びは入れた順のまま');
+    var t = got.people['男子'][0];
+    eq([t.kanaFamily, t.kanaGiven, t.postal, t.pref, t.address, t.phone, t.extras[0], t.row],
+      ['ヤマダ', 'タロウ', '924-0001', '石川県', '白山市八田町1-2-3', '090-0000-0001', '会計', 2], '1人ぶんの中身が往復する');
+    eq(got.people['男子'][0].birth, { y: 1950, m: 4, d: 1 }, '生年月日は Excel の日付として往復する');
+    eq(got.people['男子'][1].postal, '060-0000', '★ 郵便番号の先頭の 0 が消えない（文字として書く）');
+    // ★ 往復するだけでは足りない。Excel で開いたときの持ち方（書式）まで見る
+    var byRef = {};
+    X.cells(book, '男子').forEach(function (c) { byRef[c.ref] = c; });
+    var numFmtOf = function (style) {
+      var xfs = (/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(book.parts['xl/styles.xml']) || ['', ''])[1];
+      var list = xfs.match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+      var m = /numFmtId="(\d+)"/.exec(list[Number(style || 0)] || '');
+      return m ? m[1] : '';
+    };
+    eq([numFmtOf(byRef['F2'].style), numFmtOf(byRef['I2'].style)], ['49', '49'],
+      '★ 郵便番号と電話は「文字」の書式（Excel で入れ直しても先頭の 0 が消えないように）');
+    check(byRef['E2'].isDate && byRef['E2'].value === B.serialOf({ y: 1950, m: 4, d: 1 }),
+      '★ 生年月日は Excel の日付（数値＋日付の書式）で入っている（並べ替えや計算ができるように）');
+    eq(got.people['女子'][0].phone, '090-0000-0002', '電話の先頭の 0 が消えない');
+    eq(got.problems.map(function (p) { return p.family + p.given + ':' + p.problems.join('+'); }),
+      ['佐藤実:birth-empty+address-empty+phone-empty'], '空欄のある人だけを知らせる（止めはしない）');
+
+    // 申込書に書く形
+    var roster = B.toRoster(got.people);
+    eq(roster.members.map(function (m) { return m.name + '/' + m.gender; }),
+      ['山田 太郎/男', '髙橋 一郎/男', '佐藤 実/男', '鈴木 花子/女'], '★ 性別はシートから決まる（性別の列は無い）');
+    eq(roster.members[0].kana, 'ヤマダ タロウ', 'フリガナは姓と名をつなげる');
+    eq(roster.members[0].address, '石川県白山市八田町1-2-3', '住所は都道府県とそれ以下をつなげる（1つの欄しかない申込書のため）');
+    eq(R.matchName(roster, '山田太郎').status, 'exact', '名前の突き合わせに使える');
+    eq(R.matchName(roster, '高橋一郎').status, 'variant', '異体字（髙/高）の突き合わせも効く');
+    var filled = R.fill(roster.members[3], { fields: [{ ref: 'C5', field: 'gender' }, { ref: 'D5', field: 'age' }] }, { baseDate: BASE });
+    eq(filled.writes.map(function (w) { return w.ref + '=' + w.value; }), ['C5=女', 'D5=74'], '性別と年齢を申込書に書く値にできる');
+
+    return B.make(got).then(function (again) {
+      eq(Buffer.compare(Buffer.from(again), Buffer.from(first)), 0, '読んでから作り直すと、1バイトも変わらない');
+    });
+  }).then(function () {
+    // 人が Excel で直したあと（生年月日を文字で書く・空行を空ける・余分な列を足す）
+    return X.open(first).then(function (book) {
+      X.setCell(book, '男子', 'E4', 'S30.2.28');
+      X.setCell(book, '女子', 'A4', '田中');
+      X.setCell(book, '女子', 'B4', '幸子');
+      return X.save(book);
+    }).then(function (bytes) { return X.open(bytes); }).then(function (book) {
+      var got = B.read(book);
+      check(got.ok, 'Excel で直したあとでも読める');
+      eq(got.people['男子'][2].birth, { y: 1955, m: 2, d: 28 }, '★ 生年月日を文字（S30.2.28）で直しても読む');
+      eq(got.people['女子'].map(function (p) { return p.family + p.given + '@' + p.row; }), ['鈴木花子@2', '田中幸子@4'],
+        '空けた行は飛ばし、その下の人も読む');
+    });
+  }).then(function () {
+    // 見出しを変えたファイルは読まない
+    return X.open(first).then(function (book) {
+      X.setCell(book, '男子', 'C1', 'ふりがな');
+      return X.save(book);
+    }).then(function (bytes) { return X.open(bytes); }).then(function (book) {
+      var got = B.read(book);
+      eq([got.ok, got.code], [false, 'book-header'], '★ 見出しを変えたファイルは読まない（どの列が何かを推測しない）');
+      check(/男子/.test(got.detail) && /C1/.test(got.detail), 'どのシートのどのセルが違うかを知らせる（' + got.detail + '）');
+    });
+  }).then(function () {
+    // 形式の版が新しいファイル
+    return X.open(first).then(function (book) {
+      X.setCell(book, B.INFO_SHEET, 'B2', '2');
+      return X.save(book);
+    }).then(function (bytes) { return X.open(bytes); }).then(function (book) {
+      eq(B.read(book).code, 'book-newer', '新しい版の名簿ファイルは、読まずに知らせる');
+    });
+  }).then(function () {
+    // 名簿ではない Excel（申込書）
+    return read(path.join(FIX, 'form-a-all-fields.xlsx')).then(function (book) {
+      eq(B.read(book).code, 'book-sheets', '名簿でない Excel は「男子・女子のシートが無い」と知らせる');
+    });
+  }).then(function () {
+    var vals = {};
+    vals['A2'] = '山田'; vals['B2'] = '太郎'; vals['C2'] = 'ヤマダ';
+    vals['E2'] = String(B.serialOf({ y: 1950, m: 4, d: 1 })); vals['F2'] = '924-0001'; vals['I2'] = '090-0000-0001';
+    expectForExcel.push({ file: 'roster-book.xlsx', sheet: '男子', cells: vals });
   });
 }
 
