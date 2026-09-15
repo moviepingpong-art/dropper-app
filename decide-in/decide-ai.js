@@ -16,7 +16,10 @@
   'use strict';
 
   // 主モデル → 混雑時のフォールバック。イベント／予定表ドロッパーと揃える。
-  var MODELS = ['gemini-flash-latest', 'gemini-2.0-flash'];
+  // ★ 予備に版番号つきの名前を使わない（2026-09-15）。gemini-2.0-flash は提供が終わって 404 を返し、
+  //   主モデルが混雑（503）や上限（429）のとき必ず失敗していた。「latest」の名前は提供終了で消えない。
+  //   ※ 画像（スクショ・手書きメモ）を軽量版で読んだときの質は、切り替えた時点では確かめていない
+  var MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
   var MIN_INTERVAL_MS = 5000;            // レート制限対策のスロットル。外さないこと
   var MAX_TOTAL_BYTES = 15 * 1024 * 1024;   // 全画像の合計に対する安全側の目安
   var MAX_FILES = 10;                    // 1回に渡せる枚数の上限

@@ -2141,7 +2141,9 @@ function renderWarnings_(li, warnings) {
 // AIモデル。先頭が主モデル、以降は混雑(500/502/503/504)時のフォールバック先。
 // 混雑したら「同じモデルで待って再試行」ではなく「別モデルへ即切り替え」で回数と待ち時間を抑える。
 // レート上限(RPD)はプロジェクト単位でモデル非依存なので、フォールバックは混雑回避のみが目的（上限突破ではない）。
-var AI_MODELS = ['gemini-flash-latest', 'gemini-2.0-flash'];
+// ★ 予備に版番号つきの名前を使わない（2026-09-15）。gemini-2.0-flash は提供が終わって 404 を返し、
+//   主モデルが混雑したとき必ず失敗していた。「latest」の名前は提供終了で消えない。3本とも同じ。
+var AI_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
 var AI_MODEL = AI_MODELS[0];   // 後方互換（他所からの参照用）。主モデル
 var AI_KEY_STORE = 'dropper_ai_key';
 
