@@ -1,4 +1,4 @@
-// 申込書ドロッパーの中核（entry-xlsx.js / entry-roster.js）を Node で確かめる。
+// 申込書ドロッパーの中核（entry-xlsx.js / entry-roster.js / entry-ai.js）を Node で確かめる。
 //
 //   node entry/test/make-fixtures.js     … 試験用データを作り直す（fixtures/）
 //   node entry/test/run.js               … 確かめる。落ちたら終了コード 1
@@ -10,13 +10,19 @@
 //   3. ★ 書き換えたセル以外が1バイトも変わっていないこと（書式を壊していない証拠）
 //   4. ★ 伏せ字にした内容に、名簿の名前が1つも残っていないこと（AI に名前を送らない証拠）
 //   5. entry/test/local/ に本物の様式があれば、それでも 2〜3 を流す（無ければ飛ばす）
+//   6. AI の欄の対応づくり。★ 本物の Gemini は呼ばない（偽の応答で確かめる）。
+//      「正しく読めた AI の答え」を当てはめた結果が、2 で手で書いた欄の対応と一致すること
 var fs = require('fs');
 var path = require('path');
 
 global.window = global;
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-xlsx.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-roster.js'), 'utf8'));
-var X = window.EntryXlsx, R = window.EntryRoster;
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-ai.js'), 'utf8'));
+var X = window.EntryXlsx, R = window.EntryRoster, AI = window.EntryAI;
+
+// 手で書いた欄の対応を、AI の答えと比べるために取っておく
+var HAND = {};
 
 var FIX = path.join(__dirname, 'fixtures');
 var OUT = path.join(__dirname, 'out');
@@ -196,6 +202,7 @@ function main() {
   }).then(function () { return formB(roster); })
     .then(function () { return formC(roster); })
     .then(function () { return localForms(roster); })
+    .then(function () { return aiSection(roster); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -229,9 +236,10 @@ function formA(roster) {
       return { fields: [
         { field: 'name', ref: 'B' + r }, { field: 'kana', ref: 'C' + r }, { field: 'gender', ref: 'D' + r, fmt: 'kanji' },
         { field: 'birth', ref: 'E' + r, fmt: 'seireki-slash' }, { field: 'age', ref: 'F' + r },
-        { field: 'postal', ref: 'G' + r }, { field: 'address', ref: 'H' + r }, { field: 'phone', ref: 'I' + r }
+        { field: 'postal', ref: 'G' + r }, { field: 'address', ref: 'H' + r, fmt: 'plain' }, { field: 'phone', ref: 'I' + r }
       ] };
     });
+    HAND.A = { slots: slots, names: found.names.concat(found.suspects), cells: cells, book: book, sheet: '申込書', found: found };
     return writeForm('様式A', file, book, '申込書', roster, rows.map(function (r) { return pick[r]; }), slots, null, 'form-a.xlsx', {
       values: {
         B7: '山田 太郎', D7: '男', E7: '1950/4/1', F7: 77, G7: '920-0001', H7: '石川県金沢市テスト町1-1', I7: '076-000-0001',
@@ -266,10 +274,11 @@ function formB(roster) {
     var slots = rows.map(function (r) {
       return { fields: [
         { field: 'name', ref: 'C' + r }, { field: 'gender', ref: 'F' + r, fmt: 'kanji' },
-        { field: 'birthEra', ref: 'G' + r }, { field: 'birthYear', ref: 'H' + r, fmt: 'wareki-num' },
+        { field: 'birthEra', ref: 'G' + r, fmt: 'full' }, { field: 'birthYear', ref: 'H' + r, fmt: 'wareki-num' },
         { field: 'birthMonth', ref: 'I' + r }, { field: 'birthDay', ref: 'J' + r }, { field: 'age', ref: 'K' + r }
       ] };
     });
+    HAND.B = { slots: slots.slice(0, 6), names: found.names, cells: cells, book: book, sheet: '個人戦', found: found };
     var members = rows.map(function (r) {
       var n = found.names.filter(function (x) { return x.row === r; })[0];
       return n ? n.match.member : null;
@@ -309,11 +318,12 @@ function formC(roster) {
     var slots = rows.map(function (r) {
       return { fields: [
         { field: 'family', ref: 'B' + r }, { field: 'given', ref: 'C' + r },
-        { field: 'genderMale', ref: 'D' + r }, { field: 'genderFemale', ref: 'E' + r },
+        { field: 'genderMale', ref: 'D' + r, mark: '○' }, { field: 'genderFemale', ref: 'E' + r, mark: '○' },
         { field: 'birth', ref: 'F' + r, fmt: 'seireki-kanji' }, { field: 'age', ref: 'G' + r },
         { field: 'addressPref', ref: 'H' + r }, { field: 'addressRest', ref: 'I' + r }, { field: 'phone', ref: 'J' + r }
       ] };
     });
+    HAND.C = { slots: slots, names: found.names, cells: cells, book: book, sheet: '申込書', found: found };
     return writeForm('様式C', file, book, '申込書', roster, found.names.map(function (n) { return n.match.member; }), slots, null, 'form-c.xlsx', {
       values: {
         // ○を付けない側は「空にする」（罫線は残る）ので、読み直すと値が無い
@@ -366,6 +376,213 @@ function localForms(roster) {
       problems: ['C17 age:age-differs']
     });
   });
+}
+
+// ===== AI の欄の対応づくり（Gemini は偽物） =====
+// 「正しく読めた AI」の答え（expected-maps.json。live-ai.js と共用）。
+// これを当てはめた結果が、上で手で書いた欄の対応と一致すること。
+var EXPECTED = JSON.parse(fs.readFileSync(path.join(__dirname, 'expected-maps.json'), 'utf8'));
+var GOOD = { A: EXPECTED.A.answer, B: EXPECTED.B.answer, C: EXPECTED.C.answer };
+
+function fakeGemini(script, calls) {
+  return function (url, init) {
+    calls.push({ url: url, body: init.body });
+    var step = script.shift();
+    return Promise.resolve({
+      status: step.status, ok: step.status >= 200 && step.status < 300,
+      text: function () { return Promise.resolve(step.text || ''); },
+      json: function () { return Promise.resolve({ candidates: [{ content: { parts: [{ text: JSON.stringify(step.answer) }] } }] }); }
+    });
+  };
+}
+
+function aiSection(roster) {
+  section('7. AI の欄の対応づくり（Gemini は偽物）');
+  var sorted = function (list) { return list.slice().sort(function (a, b) { return a.row - b.row || a.col - b.col; }); };
+  var lays = {};
+
+  ['A', 'B', 'C'].forEach(function (k) {
+    var h = HAND[k];
+    var lay = AI.layout(h.sheet, h.cells, X.merges(h.book, h.sheet), h.found);
+    lays[k] = lay;
+    var text = AI.prompt(lay);
+    var passed = true;
+    try { AI.guard(text, roster, h.found); } catch (e) { passed = false; }
+    check(passed, '様式' + k + ': 送る本文に名前が無い（関所を通る）');
+    // 説明文には書き方の例（1950/4/1 など）があるので、様式のセルを載せた部分だけを見る
+    var sheetPart = text.slice(text.indexOf('■ シート'));
+    var personal = [];
+    roster.members.forEach(function (mb) {
+      [mb.phone, mb.address, mb.postal, mb.birth && (mb.birth.y + '/' + mb.birth.m + '/' + mb.birth.d)]
+        .forEach(function (v) { if (v && sheetPart.indexOf(v) >= 0) personal.push(v); });
+    });
+    check(sheetPart.indexOf('〔氏名1') >= 0 && personal.length === 0,
+      '様式' + k + ': 伏せ字が入り、名簿の生年月日・電話・住所が載っていない' + (personal.length ? ' → ' + personal.join(', ') : ''));
+
+    var mapping = AI.normalize(GOOD[k]);
+    eq(mapping.problems, [], '様式' + k + ': 正しい答えに問題が出ない');
+    eq(mapping.baseDate, { y: 2027, m: 4, d: 1 }, '様式' + k + ': 基準日を原文から読む（' + GOOD[k].baseDateRaw + '）');
+    var res = AI.slotsFor(mapping, sorted(h.names), { cells: h.cells, anchorOf: function (r) { return X.anchorOf(h.book, h.sheet, r); } });
+    eq(res.problems, [], '様式' + k + ': 当てはめに問題が出ない');
+    eq(res.slots.map(function (s) { return s.fields; }), h.slots.map(function (s) { return s.fields; }),
+      '様式' + k + ': 行の型を当てはめると、手で書いた欄の対応と一致する');
+    if (k === 'B') {
+      eq(res.groups.map(function (g) { return g.ageSum + '=' + g.slots.join('+'); }), ['L14=0+1', 'L16=2+3', 'L18=4+5'],
+        '様式B: 2人1組の合計年齢の欄（結合セルの左上）');
+    }
+  });
+
+  // --- 変な答えを捨てる ---
+  var weird = AI.normalize({
+    baseDateRaw: '令和9年4月1日', baseDate: '2026-04-01',
+    tables: [
+      { nameCol: 'C', firstRow: 14, lastRow: 21, fields: [
+        { field: 'grade', col: 'M', rowOffset: 0 },               // 無い種類
+        { field: 'gender', col: 'ZZZZ', rowOffset: 0 },           // ありえない列
+        { field: 'age', col: 'K', rowOffset: 9 },                 // ありえない行の差
+        { field: 'name', col: 'C', rowOffset: 0 },                // 名前の欄は受け取らない（黙って捨てる）
+        { field: 'birthYear', col: 'H', rowOffset: 0, fmt: '???' },   // 知らない書き方 → 既定
+        { field: 'birthMonth', col: 'H', rowOffset: 0 }           // 同じ欄に2つ
+      ] },
+      { nameCol: '', firstRow: 1, lastRow: 2, fields: [] },       // 名前の列が無い
+      { nameCol: 'B', firstRow: 9, lastRow: 3, fields: [] }       // 行が逆
+    ]
+  });
+  eq(weird.problems.map(function (p) { return p.code + (p.field ? ':' + p.field : ''); }),
+    ['base-date-differs', 'unknown-field:grade', 'bad-position:gender', 'bad-position:age', 'same-cell-twice:birthMonth',
+     'table-no-name-col', 'table-bad-rows'], '変な答えは捨てて、理由を残す');
+  eq(weird.baseDate, { y: 2027, m: 4, d: 1 }, '基準日が食い違ったら、AI の西暦ではなく原文（令和9年）を採る');
+  eq(weird.tables[0].fields, [{ field: 'birthYear', col: 'H', rowOffset: 0, fmt: 'wareki' }], '使える欄だけ残り、知らない書き方は既定に戻す');
+
+  // 列の書き方の揺れ（2026-09-15、本物の百万石で名前の列が読めず表ごと捨てた）
+  eq(['C', 'c', 'C14', 'C:E', 'C14:E14', '$C', 'C列', 'Ｃ', 'AB', 'AB7', '14', '', '列C'].map(function (v) {
+    var t = AI.normalize({ tables: [{ nameCol: v, firstRow: 1, lastRow: 2, fields: [] }] }).tables[0];
+    return t ? t.nameCol : '-';
+  }), ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'AB', 'AB', '-', '-', '-'], '列は「C14」「C:E」「$C」「C列」「Ｃ」でも C と読む。数字だけ・空・前に語があるものは読まない');
+
+  // 見出しの上や名前の欄に書かせない
+  var hA = HAND.A;
+  var wrongA = AI.normalize({ tables: [{ nameCol: 'B', firstRow: 7, lastRow: 12, fields: [
+    { field: 'kana', col: 'A', rowOffset: 0 },     // No の列（数字が入っている）
+    { field: 'phone', col: 'B', rowOffset: 0 },    // 名前の欄そのもの
+    { field: 'age', col: 'F', rowOffset: -1 }      // 1行上＝ほかの人の行（先頭の人なら見出し「年齢」の上）
+  ] }] });
+  var wr = AI.slotsFor(wrongA, sorted(hA.names), { cells: hA.cells });
+  eq(wr.problems.filter(function (p) { return p.name === 'B7'; }).map(function (p) { return p.code + ':' + p.ref; }),
+    ['target-has-text:A7', 'target-is-name:B7', 'offset-crosses-person:F6'],
+    '文字の入った欄・名前の欄・ほかの人の行には書かない');
+
+  // 2026-09-15 に本物の百万石で軽量版が返した答えの再現: 生年月日の4欄を名前の1行下と答えた。
+  // 1人1行の表なので、そのまま書くと1人目の生年月日が2人目の行に入る（しかも空欄なので黙って入る）
+  var hB0 = HAND.B;
+  var shifted = JSON.parse(JSON.stringify(GOOD.B));
+  shifted.tables[0].fields.forEach(function (f) { if (/^birth/.test(f.field)) f.rowOffset = 1; });
+  var sh = AI.slotsFor(AI.normalize(shifted), sorted(hB0.names), { cells: hB0.cells, anchorOf: function (r) { return X.anchorOf(hB0.book, hB0.sheet, r); } });
+  eq([sh.problems.length, sh.problems.every(function (p) { return p.code === 'offset-crosses-person'; })], [24, true],
+    '1人1行の表で1行ずれた指示は、ほかの人の行に書かずに知らせる（6人×生年月日4欄）');
+  eq(sh.slots[0].fields.map(function (f) { return f.field + '@' + f.ref; }), ['name@C14', 'gender@F14', 'age@K14'],
+    'ずれていない欄（性別・年齢）はそのまま残る');
+
+  // 2行で1人の様式（ふりがなが名前の1行下）なら、1行下は正しい。止めすぎていないこと
+  var kanaBelow = AI.normalize({ tables: [{ nameCol: 'B', firstRow: 7, lastRow: 12, fields: [{ field: 'kana', col: 'B', rowOffset: 1 }] }] });
+  var everyOther = sorted(hA.names).filter(function (n) { return n.row === 7 || n.row === 9 || n.row === 11; });
+  var kb = AI.slotsFor(kanaBelow, everyOther, { cells: [] });
+  eq([kb.problems, kb.slots[0].fields[1]], [[], { field: 'kana', ref: 'B8' }], '名前が1行おきなら、1行下（ふりがなの欄）には書ける');
+
+  var unpaired = JSON.parse(JSON.stringify(GOOD.C));
+  unpaired.tables[0].fields = unpaired.tables[0].fields.filter(function (f) { return f.field !== 'genderMale'; });
+  eq(AI.normalize(unpaired).problems, [{ code: 'gender-mark-unpaired', table: 0, missing: 'genderMale' }],
+    '男・女の列が片方だけなら知らせる（2026-09-15、軽量版が「男」の列を落とした）');
+  eq(wr.slots[0].fields, [{ field: 'name', ref: 'B7' }], '書けない欄を除いた対応だけが残る');
+  // 2026-09-15 に本物の Gemini が返した答えの再現: 様式Cの表の下の「年齢合計」（G10、式のセル）を4人1組の合計欄と読んだ
+  var hC = HAND.C;
+  var realC = JSON.parse(JSON.stringify(GOOD.C));
+  realC.tables[0].pairSize = 4; realC.tables[0].ageSumCol = 'G'; realC.tables[0].ageSumRowOffset = 4;
+  var rc = AI.slotsFor(AI.normalize(realC), sorted(hC.names), { cells: hC.cells });
+  eq([rc.groups.length, rc.problems.map(function (p) { return p.code + ':' + p.ref; })], [0, ['target-is-formula:G10']],
+    '合計年齢の欄が式のセルなら書かない（4人で1回だけ知らせる）');
+  eq(rc.slots.map(function (s) { return s.fields; }), hC.slots.map(function (s) { return s.fields; }), '合計欄を捨てても、1人ずつの欄はそのまま');
+
+  var outside = AI.slotsFor(AI.normalize(GOOD.A), [{ refs: ['B20'], row: 20, col: 2, text: 'x' }], { cells: [] });
+  eq(outside.problems.map(function (p) { return p.code; }), ['name-outside-table'], '表の範囲の外の名前は知らせる');
+
+  // --- 関所：名前が紛れ込んだら送らない ---
+  var hB = HAND.B;
+  var leakCells = hB.cells.map(function (c) { return c.ref === 'B22' ? { ref: c.ref, row: c.row, col: c.col, text: '記入者：山田太郎' } : c; });
+  var leakLay = AI.layout(hB.sheet, leakCells, X.merges(hB.book, hB.sheet), hB.found);
+  var leakCalls = [];
+
+  // --- 同じ様式の鍵 ---
+  return AI.map(leakLay, { apiKey: 'test', roster: roster, found: hB.found, throttle: false, fetch: fakeGemini([], leakCalls) })
+    .then(function () { bad('名前が入った本文を送ってしまった'); }, function (e) {
+      eq([e.code, leakCalls.length], ['name-leak', 0], '見出しに名前が紛れ込んだら、送らずに止める（通信0回）');
+    })
+    .then(function () {
+      var calls = [];
+      return AI.map(lays.B, { apiKey: 'test-key', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 200, answer: GOOD.B }], calls) }).then(function (m) {
+        eq(m, AI.normalize(GOOD.B), 'AI の答えを受け取って整える');
+        check(calls.length === 1 && calls[0].url.indexOf(AI.MODELS[0]) >= 0, '主モデルに1回だけ聞く');
+        var sent = JSON.parse(calls[0].body).contents[0].parts[0].text;
+        var leaked = roster.members.filter(function (mb) { return R.nameKey(sent).indexOf(mb.key) >= 0; });
+        eq(leaked.length, 0, '実際に送った本文にも名前が無い');
+      });
+    })
+    .then(function () {
+      var calls = [];
+      return AI.map(lays.B, { apiKey: 'k', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 503 }, { status: 200, answer: GOOD.B }], calls) }).then(function () {
+        check(calls.length === 2 && calls[1].url.indexOf(AI.MODELS[1]) >= 0, '混雑（503）なら予備のモデルに聞き直す');
+      });
+    })
+    .then(function () {
+      var calls = [];
+      return AI.map(lays.B, { apiKey: 'k', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 404, text: '{"error":{"code":404,"status":"NOT_FOUND"}}' }, { status: 200, answer: GOOD.B }], calls) }).then(function () {
+        check(calls.length === 2, 'モデルが無い（404）なら次のモデルに聞き直す');
+      });
+    })
+    .then(function () {
+      // 2026-09-15 に本物で起きた形: 主モデルが断り、予備のモデルは「もう無い」
+      return AI.map(lays.B, { apiKey: 'k', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 429, text: 'GenerateRequestsPerMinute' }, { status: 404, text: 'no longer available' }], []) })
+        .then(function () { bad('404 なのに成功した'); }, function (e) { eq(e.code, 'model-unavailable', '最後のモデルまで無ければ model-unavailable（ツール側の直しが要る）'); });
+    })
+    .then(function () {
+      return AI.map(lays.B, { apiKey: 'k', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 429, text: 'Quota exceeded for quota metric GenerateRequestsPerMinute' },
+                           { status: 429, text: 'Quota exceeded for quota metric GenerateRequestsPerMinute' }], []) })
+        .then(function () { bad('429 なのに成功した'); }, function (e) { eq(e.code, 'rate-minute', '429（1分あたり）を区別する'); });
+    })
+    .then(function () {
+      return AI.map(lays.B, { apiKey: 'k', roster: roster, found: hB.found, throttle: false,
+        fetch: fakeGemini([{ status: 200, answer: 'これは JSON ではありません' }], []) })
+        .then(function () { bad('壊れた答えなのに成功した'); }, function (e) { eq(e.code, 'bad-json', 'JSON でない答えは止める'); });
+    })
+    .then(function () {
+      // 同じ様式Bに、別の名前を別の行へ書いた版を作る
+      return read(path.join(FIX, 'form-b-pairs.xlsx')).then(function (book) {
+        X.setCell(book, '個人戦', 'C14', '加藤健'); X.setCell(book, '個人戦', 'C15', '');
+        X.setCell(book, '個人戦', 'C20', '小林さくら');
+        var cells = X.cells(book, '個人戦');
+        var found = R.findNames(cells, roster);
+        var lay2 = AI.layout('個人戦', cells, X.merges(book, '個人戦'), found);
+        var res2 = AI.slotsFor(AI.normalize(GOOD.B), found.names, { cells: cells, anchorOf: function (r) { return X.anchorOf(book, '個人戦', r); } });
+        eq(res2.slots.map(function (s) { return s.name.refs[0] + '→' + s.fields[s.fields.length - 1].ref; }),
+          ['C14→K14', 'C16→K16', 'C17→K17', 'C18→K18', 'C19→K19', 'C20→K20'], '名前の位置が変わっても、保存した対応をそのまま当てはめられる');
+        return Promise.all([AI.cacheKey(lays.B), AI.cacheKey(lay2), AI.cacheKey(lays.A)]);
+      });
+    })
+    .then(function (keys) {
+      check(keys[0] === keys[1], '同じ様式なら、名前が違っても同じ鍵');
+      check(keys[0] !== keys[2], '別の様式なら別の鍵');
+      var store = {};
+      global.localStorage = { getItem: function (k) { return store[k] || null; }, setItem: function (k, v) { store[k] = String(v); } };
+      AI.cache.put(keys[0], AI.normalize(GOOD.B));
+      eq(AI.cache.get(keys[1]), AI.normalize(GOOD.B), '保存した対応を、同じ様式の2回目に取り出せる');
+      check(!/山田|伊藤|田中|渡辺|吉田|1950/.test(store.dropper_entry_maps), '保存した中身に名前も生年月日も入っていない');
+      delete global.localStorage;
+    });
 }
 
 main().catch(function (e) { console.error(e); process.exit(1); });

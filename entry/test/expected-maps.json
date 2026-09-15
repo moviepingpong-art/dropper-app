@@ -1,0 +1,49 @@
+{
+  "A": {
+    "file": "form-a-all-fields.xlsx", "sheet": "申込書",
+    "answer": {
+      "baseDateRaw": "年齢は2027年4月1日現在で記入してください", "baseDate": "2027-04-01",
+      "tables": [{ "nameCol": "B", "firstRow": 7, "lastRow": 12, "pairSize": 1, "fields": [
+        { "field": "kana", "col": "C", "rowOffset": 0 },
+        { "field": "gender", "col": "D", "rowOffset": 0, "fmt": "kanji" },
+        { "field": "birth", "col": "E", "rowOffset": 0, "fmt": "seireki-slash" },
+        { "field": "age", "col": "F", "rowOffset": 0 },
+        { "field": "postal", "col": "G", "rowOffset": 0 },
+        { "field": "address", "col": "H", "rowOffset": 0, "fmt": "plain" },
+        { "field": "phone", "col": "I", "rowOffset": 0 }
+      ] }],
+      "extras": []
+    }
+  },
+  "B": {
+    "file": "form-b-pairs.xlsx", "sheet": "個人戦",
+    "answer": {
+      "baseDateRaw": "（年齢は、令和９年４月１日現在をご記入下さい）", "baseDate": "2027-04-01",
+      "tables": [{ "nameCol": "C", "firstRow": 14, "lastRow": 21, "pairSize": 2, "ageSumCol": "L", "ageSumRowOffset": 0, "fields": [
+        { "field": "gender", "col": "F", "rowOffset": 0, "fmt": "kanji" },
+        { "field": "birthEra", "col": "G", "rowOffset": 0, "fmt": "full" },
+        { "field": "birthYear", "col": "H", "rowOffset": 0, "fmt": "wareki-num" },
+        { "field": "birthMonth", "col": "I", "rowOffset": 0 },
+        { "field": "birthDay", "col": "J", "rowOffset": 0 },
+        { "field": "age", "col": "K", "rowOffset": 0 }
+      ] }],
+      "extras": [{ "col": "M", "label": "参加種目" }]
+    }
+  },
+  "C": {
+    "file": "form-c-split.xlsx", "sheet": "申込書",
+    "answer": {
+      "baseDateRaw": "年齢は2027年4月1日現在", "baseDate": "2027-04-01",
+      "tables": [{ "nameCol": "", "familyCol": "B", "givenCol": "C", "firstRow": 6, "lastRow": 9, "pairSize": 1, "fields": [
+        { "field": "genderMale", "col": "D", "rowOffset": 0, "mark": "○" },
+        { "field": "genderFemale", "col": "E", "rowOffset": 0 },
+        { "field": "birth", "col": "F", "rowOffset": 0, "fmt": "seireki-kanji" },
+        { "field": "age", "col": "G", "rowOffset": 0 },
+        { "field": "addressPref", "col": "H", "rowOffset": 0 },
+        { "field": "addressRest", "col": "I", "rowOffset": 0 },
+        { "field": "phone", "col": "J", "rowOffset": 0 }
+      ] }],
+      "extras": []
+    }
+  }
+}
