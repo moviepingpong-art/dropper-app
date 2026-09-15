@@ -14,7 +14,10 @@
 
   // 主モデル → 混雑時のフォールバック。イベントドロッパー（app.js の AI_MODELS）と揃える。
   // 無料枠はモデルごとに数えられるため、実績のあるモデルを主に使う。
-  var MODELS = ['gemini-flash-latest', 'gemini-2.0-flash'];
+  // ★ 予備に版番号つきの名前を使わない（2026-09-15）。gemini-2.0-flash は提供が終わって 404 を返し、
+  //   主モデルが混雑（503）や上限（429）のとき必ず失敗していた。「latest」の名前は提供終了で消えない。
+  //   ※ 画像（マス目のカレンダー）を軽量版で読んだときの質は、切り替えた時点では確かめていない
+  var MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
   var MIN_INTERVAL_MS = 5000;      // レート制限対策のスロットル。外さないこと
   var MAX_BYTES = 15 * 1024 * 1024;   // Geminiのインライン送信の上限に対する安全側の目安
   var lastCallAt = 0;
