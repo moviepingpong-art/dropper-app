@@ -294,7 +294,8 @@
     if (opts && opts.onchange) input.addEventListener('change', opts.onchange);
     if (opts && opts.mode) input.setAttribute('inputmode', opts.mode);
     return h('div', { class: 'pf-item' + (opts && opts.wide ? ' wide' : '') },
-      [h('label', { for: 'pf-' + id, text: label }), input]);
+      [h('label', { for: 'pf-' + id, text: label }), input,
+       opts && opts.note ? h('p', { class: 'pf-note', text: opts.note }) : null]);
   }
   function pfVal(id) { return el('pf-' + id) ? el('pf-' + id).value : ''; }
 
@@ -312,10 +313,11 @@
       field('given', t('colGiven'), p.given),
       field('kanaFamily', t('colKanaFamily'), p.kanaFamily, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
       field('kanaGiven', t('colKanaGiven'), p.kanaGiven, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
-      field('birthText', t('colBirth'), p.birthText, { oninput: showBirth, hint: t('phBirth') }),
-      field('postal', t('colPostal'), p.postal, { mode: 'numeric', oninput: onPostalInput, hint: t('phPostal') }),
+      field('birthText', t('colBirth'), p.birthText, { oninput: showBirth, hint: t('phBirth'), note: t('noteBirth') }),
+      field('postal', t('colPostal'), p.postal, { mode: 'numeric', oninput: onPostalInput, hint: t('phPostal'), note: t('notePostal') }),
       field('pref', t('colPref'), p.pref),
-      field('address', t('colAddress'), p.address, { wide: true, oninput: onAddressInput, onchange: onAddressChange, hint: t('phAddress') }),
+      field('address', t('colAddress'), p.address, { wide: true, oninput: onAddressInput, onchange: onAddressChange,
+        hint: t('phAddress'), note: t('noteAddress') }),
       field('phone', t('colPhone'), p.phone, { mode: 'tel' })
     ]);
     box.appendChild(grid);
