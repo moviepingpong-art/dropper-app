@@ -1,11 +1,13 @@
-// entry-roster.js — 申込書ドロッパーの名簿まわり
-// window.EntryRoster = { rowsFromCells, decodeCsv, rowsFromCsv, load, matchName, findNames,
-//                        fill, parseBirth, ageAt, toWareki, nameKey, foldKey } を公開する。
+// entry-roster.js — 申込書ドロッパーの「名前の突き合わせ」と「書き込む値づくり」
+// window.EntryRoster = { matchName, findNames, fill, parseBirth, ageAt, toWareki,
+//                        nameKey, foldKey, distance } を公開する。
 //
 // ★ 名簿は個人情報そのもの。このファイルは通信を一切しない。
 //   どこにも送らない（2026-09-15 までは AI に送る前に伏せ字にしていたが、AI をやめたので伏せ字の関数も無くした）。
+// ★ 2026-09-16: 手持ちの名簿を読み取る処理（列の推測・CSV・Shift_JIS・性別や住所の書き方の吸収）は
+//   ここから無くした。名簿は entry-book.js が決まった形で作り・読む。
 //
-// 流れ: 名簿を load() → 様式のセルから findNames() → 確認 → entry-rules.js が欄の対応を作る
+// 流れ: entry-book.js が名簿を読む → 様式のセルから findNames() → 確認 → entry-rules.js が欄の対応を作る
 //       → 設定（slots）と名簿から fill() → EntryXlsx.setCell で書き込む
 (function (global) {
   'use strict';
@@ -48,138 +50,10 @@
     return prev[b.length];
   }
 
-  // ===== 名簿の表 =====
-  // 表は「行の配列、行はセルの配列」。セルは { text, value, isDate } か文字列。
-  function rowsFromCells(cells) {
-    var rows = [];
-    cells.forEach(function (c) {
-      if (!rows[c.row - 1]) rows[c.row - 1] = [];
-      rows[c.row - 1][c.col - 1] = { text: c.text, value: c.value, isDate: c.isDate };
-    });
-    for (var i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
-    return rows;
-  }
-
-  // CSV は Excel が書くと Shift_JIS になる。UTF-8 として正しく読めなければ Shift_JIS で読む。
-  function decodeCsv(u8) {
-    if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) return new TextDecoder('utf-8').decode(u8.subarray(3));
-    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); }
-    catch (e) { return new TextDecoder('shift_jis').decode(u8); }
-  }
-  function rowsFromCsv(text) {
-    var rows = [], row = [], field = '', q = false;
-    for (var i = 0; i < text.length; i++) {
-      var ch = text.charAt(i);
-      if (q) {
-        if (ch === '"') { if (text.charAt(i + 1) === '"') { field += '"'; i++; } else q = false; }
-        else field += ch;
-      } else if (ch === '"') q = true;
-      else if (ch === ',') { row.push(field); field = ''; }
-      else if (ch === '\n' || ch === '\r') {
-        if (ch === '\r' && text.charAt(i + 1) === '\n') i++;
-        row.push(field); rows.push(row); row = []; field = '';
-      } else field += ch;
-    }
-    if (field !== '' || row.length) { row.push(field); rows.push(row); }
-    return rows.map(function (r) { return r.map(function (t) { return { text: t, value: null, isDate: false }; }); });
-  }
-
-  // 見出しの言い方。★ 並び順に意味がある——「氏名（フリガナ）」はフリガナ、を先に判定するため。
-  var HEADER_RULES = [
-    ['kana', /(フリガナ|ふりがな|カナ|よみがな|ヨミガナ)/],
-    ['birth', /(生年月日|誕生日|生まれ)/],
-    ['age', /年齢/],
-    ['gender', /(性別|男女)/],
-    ['postal', /(郵便|〒)/],
-    ['address', /(住所|所在地)/],
-    ['phone', /(電話|TEL|携帯|連絡先)/i],
-    ['family', /^(姓|苗字|名字)$/],
-    ['given', /^名$/],
-    ['name', /(氏名|名前|選手名|会員名|フルネーム)/]
-  ];
-
+  // ===== 生年月日 =====
+  // 名簿ファイルの生年月日は Excel の日付だが、人が Excel で直すと文字になることがあるので、
+  // S27.5.10・昭和30年2月28日・19600303 なども読めるままにしてある
   function cellText(c) { return c == null ? '' : (typeof c === 'string' ? c : c.text || ''); }
-
-  // 見出しの行を探して、どの列が何かを推測する。本人に確認してもらう前提の「推測」。
-  function guessColumns(rows) {
-    var best = null;
-    for (var r = 0; r < Math.min(rows.length, 20); r++) {
-      var cols = {}, hits = 0;
-      (rows[r] || []).forEach(function (c, i) {
-        var t = nfkc(cellText(c)).replace(/\s+/g, '');
-        if (!t) return;
-        for (var k = 0; k < HEADER_RULES.length; k++) {
-          var key = HEADER_RULES[k][0];
-          if (HEADER_RULES[k][1].test(t)) { if (cols[key] === undefined) { cols[key] = i; hits++; } break; }
-        }
-      });
-      var hasName = cols.name !== undefined || (cols.family !== undefined && cols.given !== undefined);
-      if (hasName && hits >= 2 && (!best || hits > best.hits)) best = { headerRow: r, columns: cols, hits: hits };
-    }
-    return best;
-  }
-
-  // ===== 名簿を読む =====
-  // columns を渡さなければ推測する。戻り値の columns を画面で見せ、直されたら渡し直す。
-  function load(rows, columns, headerRow) {
-    if (!columns) {
-      var g = guessColumns(rows);
-      if (!g) return { ok: false, code: 'no-header' };
-      columns = g.columns; headerRow = g.headerRow;
-    }
-    var members = [], byKey = {}, byFold = {};
-    for (var r = headerRow + 1; r < rows.length; r++) {
-      var row = rows[r] || [];
-      var at = function (key) { return columns[key] === undefined ? null : row[columns[key]]; };
-      var name = columns.name !== undefined ? nfkc(cellText(at('name'))).replace(/\s+/g, ' ')
-        : [nfkc(cellText(at('family'))), nfkc(cellText(at('given')))].filter(Boolean).join(' ');
-      if (!nameKey(name)) continue;
-      var m = { row: r + 1, name: name, problems: [] };
-      var parts = name.split(' ');
-      if (columns.family !== undefined && columns.name === undefined) { m.family = nfkc(cellText(at('family'))); m.given = nfkc(cellText(at('given'))); }
-      else if (parts.length === 2) { m.family = parts[0]; m.given = parts[1]; }
-      else { m.family = null; m.given = null; }
-      m.kana = columns.kana !== undefined ? (nfkc(cellText(at('kana'))) || null) : null;
-
-      var bc = at('birth');
-      m.birth = columns.birth === undefined ? null : parseBirth(bc);
-      if (columns.birth !== undefined) {
-        if (!cellText(bc) && (bc == null || bc.value == null)) m.problems.push('birth-empty');
-        else if (!m.birth) m.problems.push('birth-unreadable');
-      }
-
-      var gRaw = nfkc(cellText(at('gender')));
-      m.gender = parseGender(gRaw);
-      if (columns.gender !== undefined && !m.gender) m.problems.push(gRaw ? 'gender-unreadable' : 'gender-empty');
-
-      var ac = at('age');
-      m.rosterAge = ac && ac.value != null ? ac.value : (/^\d+$/.test(nfkc(cellText(ac))) ? Number(nfkc(cellText(ac))) : null);
-
-      var addr = splitAddress(nfkc(cellText(at('address'))));
-      var postal = nfkc(cellText(at('postal'))).replace(/^〒\s*/, '');
-      m.postal = postal || addr.postal;
-      m.address = addr.body;
-      m.pref = addr.pref;
-      m.addressRest = addr.rest;
-
-      var pc = at('phone');
-      m.phone = nfkc(cellText(pc)) || null;
-      // Excel が電話番号を数値にすると、先頭の 0 が消える（09012345678 → 9012345678）
-      if (pc && pc.value != null && /^[1-9]\d{8,9}$/.test(String(pc.value))) {
-        m.phone = '0' + pc.value;
-        m.problems.push('phone-zero-restored');
-      }
-
-      m.key = nameKey(name);
-      m.fold = foldKey(name);
-      (byKey[m.key] = byKey[m.key] || []).push(m);
-      (byFold[m.fold] = byFold[m.fold] || []).push(m);
-      members.push(m);
-    }
-    return { ok: true, columns: columns, headerRow: headerRow, members: members, byKey: byKey, byFold: byFold };
-  }
-
-  // ===== 生年月日・性別・住所 =====
   var ERAS = [   // 始まりの日。和暦の年 = 西暦 - base + 1
     { name: '令和', short: 'R', base: 2019, start: [2019, 5, 1] },
     { name: '平成', short: 'H', base: 1989, start: [1989, 1, 8] },
@@ -230,23 +104,6 @@
     if (!b || !base) return null;
     return base.y - b.y - ((base.m < b.m || (base.m === b.m && base.d < b.d)) ? 1 : 0);
   }
-  function parseGender(s) {
-    s = nfkc(s).replace(/\s+/g, '').toLowerCase();
-    if (/^(男|男性|m|male|♂)$/.test(s)) return '男';
-    if (/^(女|女性|f|female|♀)$/.test(s)) return '女';
-    return null;
-  }
-  var PREF_RE = /^(北海道|東京都|京都府|大阪府|.{2,3}県)/;
-  function splitAddress(s) {
-    var out = { postal: null, body: s || null, pref: null, rest: null };
-    if (!s) return out;
-    var m = /^〒?\s*(\d{3})-?(\d{4})\s*/.exec(s);
-    if (m) { out.postal = m[1] + '-' + m[2]; out.body = s.slice(m[0].length); }
-    var p = PREF_RE.exec(out.body);
-    if (p) { out.pref = p[1]; out.rest = out.body.slice(p[1].length).trim(); }
-    return out;
-  }
-
   // ===== 名前の突き合わせ =====
   // status: exact（一致）/ variant（表記ゆれで一致）/ ambiguous（同姓同名）/ none（無い。近い候補つき）
   function matchName(roster, text) {
@@ -388,10 +245,8 @@
         case 'birthDay': if (!b) miss(f, 'birth-missing'); else put(f, b.d); break;
         case 'age':
           if (age == null) { miss(f, ctx.baseDate ? 'birth-missing' : 'base-date-missing'); break; }
+          // 年齢は名簿に持たず、生年月日と基準日から毎回計算する（大会ごとに基準日が違うため）
           put(f, age);
-          // 名簿の年齢は「名簿を作った日」の値なので、基準日と1歳ずれるのは普通。
-          // 2歳以上ずれたら、名簿の生年月日か年齢のどちらかが誤っている疑いとして知らせる
-          if (member.rosterAge != null && Math.abs(member.rosterAge - age) >= 2) problems.push({ ref: f.ref, field: 'age', code: 'age-differs', roster: member.rosterAge, computed: age });
           break;
         case 'postal': if (member.postal) put(f, member.postal); else miss(f, 'not-in-roster'); break;
         case 'address':
@@ -408,9 +263,7 @@
   }
 
   global.EntryRoster = {
-    rowsFromCells: rowsFromCells, decodeCsv: decodeCsv, rowsFromCsv: rowsFromCsv,
-    guessColumns: guessColumns, load: load, matchName: matchName, findNames: findNames,
-    fill: fill, parseBirth: parseBirth, parseGender: parseGender, splitAddress: splitAddress,
+    matchName: matchName, findNames: findNames, fill: fill, parseBirth: parseBirth,
     ageAt: ageAt, toWareki: toWareki, nameKey: nameKey, foldKey: foldKey, distance: distance
   };
 })(typeof window !== 'undefined' ? window : this);

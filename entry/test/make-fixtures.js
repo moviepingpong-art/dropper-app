@@ -6,7 +6,8 @@
 // ★ 本物の大会の様式も置かない（主催者の文書のため）。本物で試すときは entry/test/local/ に置く（.gitignore 済み）。
 //
 // 作るもの（fixtures/）:
-//   roster.xlsx / roster.csv … 架空の名簿。表記ゆれ・同姓同名・空欄などの罠を仕込んである
+//   roster.xlsx              … 架空の名簿。★ ツールが作る形（entry-book.js）で作る。
+//                              表記ゆれ・同姓同名・空欄などの罠を仕込んである
 //   form-a-all-fields.xlsx   … 全項目型。1人1行。セルが無いところへ書き込む道を通す
 //   form-b-pairs.xlsx        … 百万石型。2人1組・結合セル・年月日の3欄。罫線つきの空セルを置き換える道を通す
 //   form-c-split.xlsx        … 分割型。姓と名が別欄・男女の列に○・都道府県が別欄・式のセル
@@ -16,29 +17,47 @@ var path = require('path');
 
 global.window = global;
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-xlsx.js'), 'utf8'));
-var X = window.EntryXlsx;
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-roster.js'), 'utf8'));
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
+var X = window.EntryXlsx, B = window.EntryBook;
 
 var OUT = path.join(__dirname, 'fixtures');
 
-// ===== 架空の名簿 =====
-// birth: 文字列はそのまま文字で、[y,m,d] は Excel の日付（数値＋日付の書式）で入れる
-// age は「名簿を作った日（2026-09-15）」時点の値。田中 誠だけ、わざと古い値にしてある
-var MEMBERS = [
-  ['山田 太郎', '男', [1950, 4, 1], 76, '〒920-0001 石川県金沢市テスト町1-1', '076-000-0001'],
-  ['山田 花子', '女性', 'S27.5.10', 74, '石川県白山市テスト町2-2', '090-0000-0002'],
-  ['髙橋 一郎', 'M', [1948, 12, 25], 77, '〒924-0001 石川県白山市サンプル1-3', 9000000003],  // 電話が数値（先頭の0が消えた）
-  ['佐藤 次郎', '男', [1955, 1, 1], 71, '石川県野々市市テスト3-3', '076-000-0004'],          // 同姓同名その1
-  ['佐藤 次郎', '男', [1960, 7, 7], 66, '石川県能美市テスト4-4', '076-000-0005'],            // 同姓同名その2
-  ['中﨑 良子', 'F', '昭和30年2月28日', 71, '富山県高岡市サンプル5-5', '0766-00-0006'],
-  ['鈴木 和子', '女', '', 70, '石川県小松市テスト6-6', '0761-00-0007'],                      // 生年月日が空
-  ['田中 誠', '男', [1945, 3, 3], 78, '福井県福井市サンプル7-7', '0776-00-0008'],            // 年齢が古い（計算では82）
-  ['伊藤 美穂', '女', '1958-08-15', 68, '〒921-0009 石川県金沢市テスト8-8', '076-000-0009'],
-  ['渡辺 明', '男', '平成元年1月8日', 37, '石川県加賀市テスト9-9', '090-0000-0010'],
-  ['小林 さくら', '女', '19600303', 66, '石川県白山市サンプル10', '080-0000-0011'],
-  ['加藤 健', '男性', [1952, 6, 6], 74, '東京都千代田区テスト11', '03-0000-0012'],
-  ['吉田 恵', '女', [1956, 9, 9], 70, '大阪府大阪市テスト12', '06-0000-0013'],
-  ['斉藤 光', '', [1962, 2, 2], 64, 'テスト市13', '']                                          // 性別が空・都道府県なし・電話なし
-];
+// ===== 架空の名簿（ツールが作る形） =====
+// [姓, 名, セイ, メイ, 生年月日（[y,m,d] か、人が Excel で直したときの文字）, 郵便番号, 都道府県, 住所, 電話]
+var PEOPLE = {
+  男子: [
+    ['山田', '太郎', 'ヤマダ', 'タロウ', [1950, 4, 1], '920-0001', '石川県', '金沢市テスト町1-1', '076-000-0001'],
+    ['髙橋', '一郎', 'タカハシ', 'イチロウ', [1948, 12, 25], '924-0001', '石川県', '白山市サンプル1-3', '090-0000-0003'],
+    ['佐藤', '次郎', 'サトウ', 'ジロウ', [1955, 1, 1], '', '石川県', '野々市市テスト3-3', '076-000-0004'],   // 同姓同名その1
+    ['佐藤', '次郎', 'サトウ', 'ジロウ', [1960, 7, 7], '', '石川県', '能美市テスト4-4', '076-000-0005'],     // 同姓同名その2
+    ['田中', '誠', 'タナカ', 'マコト', [1945, 3, 3], '', '福井県', '福井市サンプル7-7', '0776-00-0008'],
+    ['渡辺', '明', 'ワタナベ', 'アキラ', '平成元年1月8日', '', '石川県', '加賀市テスト9-9', '090-0000-0010'], // 人が文字で直した生年月日
+    ['加藤', '健', 'カトウ', 'ケン', [1952, 6, 6], '', '東京都', '千代田区テスト11', '03-0000-0012'],
+    ['斉藤', '光', '', '', [1962, 2, 2], '', '', 'テスト市13', '']                                            // フリガナ・都道府県・電話が空
+  ],
+  女子: [
+    ['山田', '花子', 'ヤマダ', 'ハナコ', [1952, 5, 10], '', '石川県', '白山市テスト町2-2', '090-0000-0002'],
+    ['中﨑', '良子', 'ナカサキ', 'リョウコ', [1955, 2, 28], '', '富山県', '高岡市サンプル5-5', '0766-00-0006'],
+    ['鈴木', '和子', 'スズキ', 'カズコ', '', '', '石川県', '小松市テスト6-6', '0761-00-0007'],                // 生年月日が空
+    ['伊藤', '美穂', 'イトウ', 'ミホ', [1958, 8, 15], '921-0009', '石川県', '金沢市テスト8-8', '076-000-0009'],
+    ['小林', 'さくら', 'コバヤシ', 'サクラ', [1960, 3, 3], '', '石川県', '白山市サンプル10', '080-0000-0011'],
+    ['吉田', '恵', 'ヨシダ', 'メグミ', [1956, 9, 9], '', '大阪府', '大阪市テスト12', '06-0000-0013']
+  ]
+};
+
+function rosterBook() {
+  var people = {};
+  Object.keys(PEOPLE).forEach(function (g) {
+    people[g] = PEOPLE[g].map(function (m) {
+      return { family: m[0], given: m[1], kanaFamily: m[2], kanaGiven: m[3],
+        birth: Array.isArray(m[4]) ? { y: m[4][0], m: m[4][1], d: m[4][2] } : null,
+        birthText: Array.isArray(m[4]) ? '' : m[4],
+        postal: m[5], pref: m[6], address: m[7], phone: m[8], extras: [] };
+    });
+  });
+  return B.make({ org: '白山テストクラブ（架空）', today: '2026-09-16', people: people, extraHeaders: {} });
+}
 
 function serial(y, m, d) { return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 86400000); }
 
@@ -153,38 +172,6 @@ function box(cells, from, to, s) {
   }
 }
 
-// ===== 名簿 =====
-function rosterSheet() {
-  var cells = {
-    A1: { v: '白山テストクラブ 会員名簿（架空のデータ）', s: 4 },
-    A3: { v: 'No', s: 2 }, B3: { v: '氏名', s: 2 }, C3: { v: '性別', s: 2 }, D3: { v: '生年月日', s: 2 },
-    E3: { v: '年齢', s: 2 }, F3: { v: '住所', s: 2 }, G3: { v: '電話番号', s: 2 }
-  };
-  MEMBERS.forEach(function (m, i) {
-    var r = 4 + i;
-    cells['A' + r] = { v: i + 1, s: 1 };
-    cells['B' + r] = { v: m[0], s: 1 };
-    cells['C' + r] = { v: m[1], s: 1 };
-    cells['D' + r] = Array.isArray(m[2]) ? { v: serial(m[2][0], m[2][1], m[2][2]), s: 3 } : { v: m[2], s: 1 };
-    cells['E' + r] = { v: m[3], s: 1 };
-    cells['F' + r] = { v: m[4], s: 1 };
-    cells['G' + r] = { v: m[5], s: 1 };
-  });
-  return { name: '名簿', cols: [5, 14, 7, 12, 6, 36, 15], cells: cells, merges: [] };
-}
-
-function rosterCsv() {
-  var lines = ['No,氏名,性別,生年月日,年齢,住所,電話番号'];
-  MEMBERS.forEach(function (m, i) {
-    var birth = Array.isArray(m[2]) ? m[2][0] + '/' + m[2][1] + '/' + m[2][2] : m[2];
-    var phone = typeof m[5] === 'number' ? '0' + m[5] : m[5];
-    lines.push([i + 1, m[0], m[1], birth, m[3], m[4], phone].map(function (v) {
-      v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-    }).join(','));
-  });
-  return '﻿' + lines.join('\r\n') + '\r\n';
-}
-
 // ===== 様式A 全項目型 =====
 function formA() {
   var cells = {
@@ -255,11 +242,10 @@ function formC() {
 
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 Promise.all([
-  buildXlsx([rosterSheet()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'roster.xlsx'), b); }),
+  rosterBook().then(function (b) { fs.writeFileSync(path.join(OUT, 'roster.xlsx'), Buffer.from(b)); }),
   buildXlsx([formA()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-a-all-fields.xlsx'), b); }),
   buildXlsx([formB()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-b-pairs.xlsx'), b); }),
   buildXlsx([formC()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-c-split.xlsx'), b); })
 ]).then(function () {
-  fs.writeFileSync(path.join(OUT, 'roster.csv'), rosterCsv(), 'utf8');
   console.log('fixtures を作りました: ' + fs.readdirSync(OUT).join(', '));
 }).catch(function (e) { console.error(e); process.exit(1); });

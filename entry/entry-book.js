@@ -34,6 +34,9 @@
     try { s = s.normalize('NFKC'); } catch (e) {}
     return s.trim();
   }
+  // 団体名は書いたとおりに残す（NFKC だと「（架空）」が「(架空)」になってしまう）。
+  // 名前や住所は突き合わせに使うので、NFKC でそろえる。
+  function plain(s) { return s == null ? '' : String(s).trim(); }
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
@@ -53,7 +56,7 @@
   }
 
   function fileName(org) {
-    var name = nfkc(org).replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
+    var name = plain(org).replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
     return name ? '名簿_' + name + '.xlsx' : '名簿.xlsx';
   }
 
@@ -132,8 +135,8 @@
     var info = [
       ['このファイルは「申込書ドロッパー」の名簿です', ''],
       ['形式', String(VERSION)],
-      ['団体名', nfkc(data.org)],
-      ['作った日', nfkc(data.today)],
+      ['団体名', plain(data.org)],
+      ['作った日', plain(data.today)],
       ['注意', '1行目の見出しを変えたり、列を入れ替えたりしないでください。読めなくなります'],
       ['', 'J 列から先に足した列は、そのまま残します'],
       ['', '個人情報です。ファイルの置き場所と渡し方に気をつけてください'],
@@ -203,7 +206,7 @@
       var row = key.slice(1).split('C')[0];
       var label = nfkc(info[key].text), right = info['R' + row + 'C2'];
       if (!right) return;
-      if (label === '団体名') org = nfkc(right.text);
+      if (label === '団体名') org = plain(right.text);
       if (label === '作った日') today = nfkc(right.text);
       if (label === '形式') version = Number(nfkc(right.text)) || version;
     });
@@ -296,10 +299,10 @@
         var m = {
           row: p.row, sheet: g, name: name, family: p.family || null, given: p.given || null,
           kana: kana || null, gender: g === '男子' ? '男' : '女', birth: p.birth || null,
-          rosterAge: null, postal: p.postal || null,
+          postal: p.postal || null,
           pref: p.pref || null, addressRest: p.address || null,
           address: [p.pref, p.address].filter(Boolean).join('') || null,
-          phone: p.phone || null, problems: p.problems.slice()
+          phone: p.phone || null, problems: (p.problems || problemsOf(p)).slice()
         };
         m.key = R.nameKey(name);
         m.fold = R.foldKey(name);

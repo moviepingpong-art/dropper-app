@@ -149,34 +149,33 @@ function writeForm(label, file, book, sheet, roster, assignments, slots, groups,
 }
 
 function main() {
-  var roster, rosterCsv;
+  var roster;
 
-  section('1. 名簿');
+  section('1. 名簿（ツールが作った名簿ファイルを読む）');
   return read(path.join(FIX, 'roster.xlsx')).then(function (book) {
-    roster = R.load(R.rowsFromCells(X.cells(book, 0)));
-    check(roster.ok, 'xlsx の名簿を読めた');
-    eq(roster.columns, { name: 1, gender: 2, birth: 3, age: 4, address: 5, phone: 6 }, '列の推測');
+    var got = B.read(book);
+    check(got.ok, '名簿ファイルを読めた');
+    eq([got.org, (got.people['男子'] || []).length, (got.people['女子'] || []).length],
+      ['白山テストクラブ（架空）', 8, 6], '団体名と人数（男子・女子のシート）');
+    roster = B.toRoster(got.people);
     eq(roster.members.length, 14, '人数');
     eq(roster.members.map(function (m) { return m.birth ? [m.birth.y, m.birth.m, m.birth.d].join('-') : null; }),
-      ['1950-4-1', '1952-5-10', '1948-12-25', '1955-1-1', '1960-7-7', '1955-2-28', null, '1945-3-3',
-       '1958-8-15', '1989-1-8', '1960-3-3', '1952-6-6', '1956-9-9', '1962-2-2'],
-      '生年月日（Excelの日付・S27.5.10・昭和30年2月28日・1958-08-15・平成元年・19600303 が混在）');
+      ['1950-4-1', '1948-12-25', '1955-1-1', '1960-7-7', '1945-3-3', '1989-1-8', '1952-6-6', '1962-2-2',
+       '1952-5-10', '1955-2-28', null, '1958-8-15', '1960-3-3', '1956-9-9'],
+      '生年月日（Excel の日付。渡辺 明は人が文字（平成元年1月8日）で直した行）');
     eq(roster.members.map(function (m) { return m.gender; }),
-      ['男', '女', '男', '男', '男', '女', '女', '男', '女', '男', '女', '男', '女', null], '性別（男性・M・F の書き方をそろえる）');
-    var takahashi = roster.members[2];
-    eq([takahashi.phone, takahashi.postal, takahashi.pref, takahashi.addressRest],
-      ['09000000003', '924-0001', '石川県', '白山市サンプル1-3'], '電話の先頭の0を戻す／〒と都道府県を切り分ける');
-    eq(roster.members.filter(function (m) { return m.problems.length; }).map(function (m) { return m.name + ':' + m.problems.join('+'); }),
-      ['髙橋 一郎:phone-zero-restored', '鈴木 和子:birth-empty', '斉藤 光:gender-empty'], '名簿そのものの問題');
-
-    var csvText = R.decodeCsv(new Uint8Array(fs.readFileSync(path.join(FIX, 'roster.csv'))));
-    rosterCsv = R.load(R.rowsFromCsv(csvText));
-    eq(rosterCsv.members.map(function (m) { return [m.name, m.gender, m.birth && m.birth.y, m.phone]; }),
-      roster.members.map(function (m) { return [m.name, m.gender, m.birth && m.birth.y, m.phone]; }), 'CSV の名簿も同じ中身になる');
-    // 「山田」を Shift_JIS で書いたバイト列（Excel が書く CSV の文字コード）
-    eq(R.decodeCsv(new Uint8Array([0x8E, 0x52, 0x93, 0x63])), '山田', 'Shift_JIS の CSV を読める');
+      ['男', '男', '男', '男', '男', '男', '男', '男', '女', '女', '女', '女', '女', '女'], '★ 性別はシートから決まる');
+    var takahashi = roster.members[1];
+    eq([takahashi.name, takahashi.kana, takahashi.phone, takahashi.postal, takahashi.pref, takahashi.addressRest],
+      ['髙橋 一郎', 'タカハシ イチロウ', '090-0000-0003', '924-0001', '石川県', '白山市サンプル1-3'], '1人ぶんの中身');
+    eq(got.problems.map(function (p) { return p.family + ' ' + p.given + ':' + p.problems.join('+'); }),
+      ['斉藤 光:kana-empty+phone-empty', '鈴木 和子:birth-empty'], '名簿そのものの気になる点（止めずに知らせる）');
 
     section('2. 日付と年齢');
+    // 名簿は決まった形になったが、人が Excel で直すことがあるので、いろいろな書き方を読めるままにしておく
+    eq([R.parseBirth('S27.5.10'), R.parseBirth('昭和30年2月28日'), R.parseBirth('1958-08-15'), R.parseBirth('19600303')],
+      [{ y: 1952, m: 5, d: 10 }, { y: 1955, m: 2, d: 28 }, { y: 1958, m: 8, d: 15 }, { y: 1960, m: 3, d: 3 }],
+      '生年月日の書き方（S27.5.10・昭和30年2月28日・1958-08-15・19600303）');
     eq(R.toWareki({ y: 1989, m: 1, d: 7 }), { era: '昭和', short: 'S', n: 64 }, '1989-01-07 は昭和64年');
     eq(R.toWareki({ y: 1989, m: 1, d: 8 }), { era: '平成', short: 'H', n: 1 }, '1989-01-08 は平成元年');
     eq(R.toWareki({ y: 2019, m: 4, d: 30 }), { era: '平成', short: 'H', n: 31 }, '2019-04-30 は平成31年');
@@ -233,16 +232,16 @@ function formA(roster) {
     return writeForm('様式A', file, book, '申込書', roster, rows.map(function (r) { return pick[r]; }), slots, null, 'form-a.xlsx', {
       values: {
         B7: '山田 太郎', D7: '男', E7: '1950/4/1', F7: 77, G7: '920-0001', H7: '石川県金沢市テスト町1-1', I7: '076-000-0001',
-        B8: '髙橋 一郎', E8: '1948/12/25', F8: 78, I8: '09000000003',
+        B8: '髙橋 一郎', C8: 'タカハシ イチロウ', E8: '1948/12/25', F8: 78, I8: '090-0000-0003',
         B9: '中﨑 良子', D9: '女', E9: '1955/2/28', F9: 72, G9: undefined, H9: '富山県高岡市サンプル5-5',
         B10: '佐藤 次郎', E10: '1955/1/1', F10: 72,
         B11: '伊藤 美穂', F11: 68,
         B12: '鈴木 和子', D12: '女', E12: undefined, F12: undefined,
         A7: 1, A1: 'テスト大会 参加申込書（試験用の架空の様式）'
       },
-      excel: { B7: '山田 太郎', F7: 77, I8: '09000000003', B9: '中﨑 良子', E12: '', F11: 68 },
-      problems: ['B7 kana:not-in-roster', 'B8 kana:not-in-roster', 'B9 kana:not-in-roster', 'B10 kana:not-in-roster',
-                 'B11 kana:not-in-roster', 'B12 kana:not-in-roster', 'B9 postal:not-in-roster', 'B10 postal:not-in-roster',
+      excel: { B7: '山田 太郎', F7: 77, I8: '090-0000-0003', B9: '中﨑 良子', E12: '', F11: 68 },
+      // フリガナは名簿に入るようになったので「名簿に無い」とは言わない。郵便番号を入れていない人だけ知らせる
+      problems: ['B9 postal:not-in-roster', 'B10 postal:not-in-roster',
                  'B12 postal:not-in-roster', 'B12 birth:birth-missing', 'B12 age:birth-missing']
     });
   });
@@ -282,7 +281,7 @@ function formB(roster) {
         C18: '渡辺 明', G18: '平成', H18: 1, K18: 38, L18: 108,
         L20: undefined, B14: 1, C12: '氏　　　名'
       },
-      problems: ['C17 age:age-differs']
+      problems: []
     });
   });
 }
@@ -357,7 +356,7 @@ function localForms(roster) {
     var groups = [{ slots: [0, 1], ageSum: 'L14' }, { slots: [2, 3], ageSum: 'L16' }];
     return writeForm('本物の様式', typedPath, book, sheet, roster, found.names.map(function (n) { return n.match.member; }), slots, groups, 'local-filled.xlsx', {
       values: { C14: '山田 太郎', F14: '男', G14: '昭和', H14: 25, I14: 4, J14: 1, K14: 77, C15: '山田 花子', L14: 151, K17: 82, L16: 150 },
-      problems: ['C17 age:age-differs']
+      problems: []
     });
   });
 }
@@ -922,6 +921,14 @@ function bookSection() {
     eq(roster.members[0].address, '石川県白山市八田町1-2-3', '住所は都道府県とそれ以下をつなげる（1つの欄しかない申込書のため）');
     eq(R.matchName(roster, '山田太郎').status, 'exact', '名前の突き合わせに使える');
     eq(R.matchName(roster, '高橋一郎').status, 'variant', '異体字（髙/高）の突き合わせも効く');
+    // ★ 画面で足したばかりの人は「気になる点」をまだ持っていない。それでも突き合わせに使えること
+    //   （2026-09-16、ここで止まって③に反映されない不具合があった）
+    var justAdded = { family: '新井', given: '一', kanaFamily: '', kanaGiven: '', birth: null, birthText: '',
+      postal: '', pref: '', address: '', phone: '', extras: [] };
+    var r2 = B.toRoster({ 男子: [justAdded], 女子: [] });
+    eq([r2.members.length, r2.members[0].name, r2.members[0].gender, r2.members[0].problems.length > 0],
+      [1, '新井 一', '男', true], '★ 画面で足したばかりの人（気になる点をまだ持たない）でも突き合わせに使える');
+
     var filled = R.fill(roster.members[3], { fields: [{ ref: 'C5', field: 'gender' }, { ref: 'D5', field: 'age' }] }, { baseDate: BASE });
     eq(filled.writes.map(function (w) { return w.ref + '=' + w.value; }), ['C5=女', 'D5=74'], '性別と年齢を申込書に書く値にできる');
 

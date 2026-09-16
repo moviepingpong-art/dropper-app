@@ -67,6 +67,10 @@
       rosterDirty: '⚠ 保存していない変更があります。このまま閉じると消えます。',
       rosterSaved: '「{name}」を保存しました（{n}人）。次に使うときは、このファイルを入れてください。',
       rosterNewMsg: '新しい名簿を作り始めました。',
+      addToRosterLabel: '名簿に無い人なら、ここから足せます：',
+      addToRoster: '{g}に足す',
+      addFromNames: '「{name}」を{g}に足します。生年月日や住所を入れて「この人を入れる」を押してください。',
+      splitNameHint: '申込書の名前を姓と名に分けられませんでした。姓の欄から名を切り分けてください。',
 
       step2Title: '② 申込書を入れる',
       formDropTitle: '名前だけ書いた申込書（Excel）',
@@ -78,7 +82,8 @@
       step3Hint: '申込書に書かれた名前を、名簿と突き合わせました。⚠ の人は選んでください。',
       namesNext: '次へ',
 
-      // 画面の段は ①申込書 ②名簿 ③名前の確認 ④書き込む内容の確認 ⑤保存（2026-09-15 に AI の段を無くして振り直した）
+      // 画面の段は ①名簿 ②申込書 ③名前の確認 ④書き込む内容の確認 ⑤保存
+      // （2026-09-15 に AI の段を無くし、2026-09-16 に名簿を①へ移した。キー名は step5Title / step6Title のまま）
       step5Title: '④ 書き込む内容の確認',
       step5Hint: 'この内容で申込書に書き込みます。値は名簿から作っています。どの欄に書くかは申込書の見出しから決めたので、表の見出しの下の小さな文字（申込書の見出し）が合っているかも見てください。直したいときは名簿を直して入れ直すか、保存したあと Excel で直してください。',
       step6Title: '⑤ 保存',
@@ -87,18 +92,12 @@
 
       reading: '読み込んでいます…',
       formOk: '「{name}」を読み込みました（シート{n}枚）。',
-      rosterOk: '名簿を{n}人ぶん読み込みました。',
-      rosterProblemsCount: 'うち{n}人は名簿に気になる点があります（下の「名簿の気になる点」）。',
-      rosterProblemsTitle: '名簿の気になる点',
-      rosterRow: '{row}行目 {name}',
-      colHint: '名簿の列を次のように読みました。違っていれば選び直してください。',
-      colNone: '（なし）',
 
       dateText: '{y}年{m}月{d}日生',
       noBirth: '生年月日なし',
       memberLabel: '{name}（{birth}）',
       sheetTitle: 'シート「{name}」',
-      noNamesFound: '申込書に、名簿の人の名前が見つかりませんでした。名前を書いた申込書か、名簿の「氏名」の列が合っているかをご確認ください。',
+      noNamesFound: '申込書に、名簿の人の名前が見つかりませんでした。申込書に名前を書いてから入れてください。名簿にまだ入っていない人は、①で足せます。',
       nameExact: '✅ 名簿と一致',
       nameVariant: '🔤 名簿の「{name}」として書きます（字の違いをそろえました）',
       nameAmbiguous: '👥 名簿に同じ名前が{n}人います。どの人か選んでください',
@@ -169,9 +168,6 @@
 
       'prob.birth-empty': '生年月日が空',
       'prob.birth-unreadable': '生年月日が読めない',
-      'prob.gender-empty': '性別が空',
-      'prob.gender-unreadable': '性別が読めない',
-      'prob.phone-zero-restored': '電話番号の先頭の0が消えていたので戻した',
       'prob.given-empty': '名が空',
       'prob.kana-empty': 'フリガナが空',
       'prob.address-empty': '住所が空',
@@ -185,8 +181,6 @@
       'note.base-date-missing': 'は、基準日が無いので書きません',
       'note.address-unsplit': 'は、住所から都道府県を切り分けられないので書きません',
       'note.unknown-field': 'は書き方が分からないので書きません',
-      'note.age-differs': '{who}：名簿の年齢（{roster}歳）と、生年月日から計算した年齢（{computed}歳）が2歳以上違います。名簿の生年月日をご確認ください',
-      'note.phone-zero-restored': '{who}：名簿の電話番号の先頭の0が消えていたので、0を付けて書きます',
 
       'skip.target-is-formula': '式の入ったセル',
       'skipGroup.name-outside-table': '欄の並びの外にある名前には、何も書きません：{refs}',

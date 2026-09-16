@@ -99,6 +99,7 @@
     state.filter = '';
     state.dirty = false;
     el('rosterEditor').hidden = false;
+    el('orgInput').value = data.org || '';   // 開いた名簿の団体名を入力欄に戻す（保存するファイル名になる）
     setMsg('rosterMsg', msg || '', 'ok');
     renderRoster();
     rebuildRoster();
@@ -243,8 +244,12 @@
 
   function editingPerson() {
     var e = state.editing;
-    if (e.index == null) return { family: '', given: '', kanaFamily: '', kanaGiven: '', birthText: '',
-      postal: '', pref: '', address: '', phone: '', extras: [] };
+    if (e.index == null) {
+      var blankPerson = { family: '', given: '', kanaFamily: '', kanaGiven: '', birthText: '',
+        postal: '', pref: '', address: '', phone: '', extras: [] };
+      if (e.prefill) Object.keys(e.prefill).forEach(function (k) { blankPerson[k] = e.prefill[k]; });
+      return blankPerson;
+    }
     var p = peopleOf(e.gender)[e.index];
     var copy = { extras: (p.extras || []).slice() };
     PF.forEach(function (k) { copy[k] = k === 'birthText' ? (p.birth ? p.birth.y + '/' + p.birth.m + '/' + p.birth.d : (p.birthText || '')) : (p[k] || ''); });
@@ -287,7 +292,12 @@
       h('button', { type: 'button', class: 'btn-sub', text: t('formCancel'),
         onclick: function () { state.editing = null; renderRoster(); } })
     ]));
-    setTimeout(function () { if (el('pf-family')) el('pf-family').focus(); showBirth(); }, 0);
+    setTimeout(function () {
+      if (el('pf-family')) el('pf-family').focus();
+      showBirth();
+      // 申込書から持ってきた名前を分けられなかったときは、その場で知らせる
+      if (state.editing && state.editing.prefill && !p.given) setMsg('pfMsg', t('splitNameHint'), 'wait');
+    }, 0);
     return box;
   }
 
@@ -372,10 +382,44 @@
     });
     if (same && !window.confirm(t('sameConfirm', { name: personName(p) }))) return;
 
+    p.problems = B.problemsOf(p);   // 一覧の ⚠ と、③の突き合わせに使う
     if (e.index == null) list.push(p); else list[e.index] = p;
     state.editing = null;
     markDirty();
     rebuildRoster();
+    // ③から足しに来たときは、③へ戻る（突き合わせはやり直してある）
+    if (state.backToNames && !el('stepNames').hidden) {
+      state.backToNames = false;
+      el('stepNames').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // 申込書には「山田太郎」と区切らずに書かれることが多い。名簿にある姓と見比べて切り分ける。
+  // 見つからなければ姓の欄に全部入れて、本人に分けてもらう（間違った位置で切らない）
+  function splitByKnownFamily(s) {
+    var families = {};
+    GENDERS.forEach(function (g) { peopleOf(g).forEach(function (p) { if (p.family) families[p.family] = true; }); });
+    var best = '';
+    Object.keys(families).forEach(function (f) {
+      if (s.length > f.length && s.slice(0, f.length) === f && f.length > best.length) best = f;
+    });
+    return best ? { family: best, given: s.slice(best.length) } : { family: s, given: '' };
+  }
+
+  // ③ で「名簿に無い」と出た名前を、そのまま①の入力欄に入れて足す
+  function addFromNames(typed, gender) {
+    if (!state.book) return;
+    var s = String(typed || '').replace(/[\s　]+/g, ' ').trim();
+    var parts = s.split(' ');
+    var prefill;
+    if (parts.length >= 2) prefill = { family: parts[0], given: parts.slice(1).join(' ') };
+    else prefill = splitByKnownFamily(s);
+    state.tab = gender;
+    state.editing = { gender: gender, index: null, prefill: prefill };
+    state.backToNames = true;
+    renderRoster();
+    el('rosterEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setMsg('rosterMsg', t('addFromNames', { name: s, g: gender }), 'wait');
   }
 
   // ===== 保存 =====
@@ -494,6 +538,15 @@
           var cur = sh.pick[key];
           sel.value = !cur ? '' : cur === 'not-name' ? 'not-name' : idx(cur);
           li.appendChild(sel);
+          // 名簿に無い人は、その場で名簿に足せる（①に戻って入力欄を開く）
+          if (e.kind === 'suspect') {
+            var row = h('p', { class: 'small add-row' }, [h('span', { class: 'hint', text: t('addToRosterLabel') })]);
+            GENDERS.forEach(function (g) {
+              row.appendChild(h('button', { type: 'button', class: 'link-btn', text: t('addToRoster', { g: g }),
+                onclick: function () { addFromNames(e.n.text, g); } }));
+            });
+            li.appendChild(row);
+          }
         }
 
         var m = memberOf(sh, e);
@@ -837,15 +890,10 @@
       var notes = [], grouped = {}, order = [];
       c.people.forEach(function (p) {
         p.fill.problems.forEach(function (pr) {
-          if (pr.code === 'age-differs') {
-            notes.push(t('note.age-differs', { who: p.member.name + '（' + p.slot.fields[0].ref + '）', roster: pr.roster, computed: pr.computed }));
-            return;
-          }
           var k = pr.field + '|' + pr.code;
           if (!grouped[k]) { grouped[k] = []; order.push(k); }
           grouped[k].push(p.member.name);
         });
-        if (p.member.problems.indexOf('phone-zero-restored') >= 0) notes.push(t('note.phone-zero-restored', { who: p.member.name }));
       });
       order.forEach(function (k) {
         var parts = k.split('|');
