@@ -36,8 +36,10 @@
   function fetchMembers(raw, load) {
     var orgId = parseOrgId(raw);
     if (!orgId) return Promise.reject(fail('attend-bad-id'));
+    // ★ 合図は action=members。a=members だと「行事の一覧」が返り、名簿が無いのに ok:true なので
+    //   「0人」に見えて黙って通る（2026-09-16 に踏んだ）。だから下で返事の形も確かめる
     var get = load || function (id) {
-      return fetch(API_BASE + '?a=members&s=' + encodeURIComponent(id), { credentials: 'omit' }).then(function (res) {
+      return fetch(API_BASE + '?action=members&s=' + encodeURIComponent(id), { credentials: 'omit' }).then(function (res) {
         if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
       });
@@ -48,7 +50,9 @@
       throw err;
     }).then(function (data) {
       if (!data || !data.ok) throw fail(data && data.code === 'orgNotFound' ? 'attend-not-found' : 'attend-load');
-      var members = (data.members || []).filter(function (m) { return m && String(m.name || '').trim(); })
+      // ★ 名簿の返事かどうかを確かめる。ほかの返事（行事の一覧など）は「0人」に見えるだけで、間違いに気づけない
+      if (!Array.isArray(data.members)) throw fail('attend-bad-answer');
+      var members = data.members.filter(function (m) { return m && String(m.name || '').trim(); })
         .map(function (m) {
           var g = String(m.gender || '').trim();
           return { name: String(m.name).trim(), gender: g === '男' ? '男子' : (g === '女' ? '女子' : '') };

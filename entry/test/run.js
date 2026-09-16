@@ -398,7 +398,7 @@ function mapSection(roster) {
   var POSTAL_FETCHES = [
     "fetch(BASE + digit + '.json', { credentials: 'omit' })",
     "fetch(BASE + 'rev/' + code + '.json', { credentials: 'omit' })",
-    "fetch(API_BASE + '?a=members&s=' + encodeURIComponent(id), { credentials: 'omit' })"
+    "fetch(API_BASE + '?action=members&s=' + encodeURIComponent(id), { credentials: 'omit' })"
   ];
   var srcOf = function (f) { return fs.readFileSync(path.join(__dirname, '..', f), 'utf8'); };
   var strip = function (code) {
@@ -979,6 +979,17 @@ function attendSection() {
     var broken = function () { return Promise.resolve({ ok: false, code: 'somethingElse' }); };
     return AT.fetchMembers('abcdefghij', broken).then(function () { bad('ok でない返事が通った'); },
       function (e) { eq(e.code, 'attend-load', 'ok でない返事も止める'); });
+  }).then(function () {
+    // ★ 2026-09-16 に踏んだ: 合図を action ではなく a と書いていたので、API が「行事の一覧」を返し、
+    //   ok:true のまま名簿が空（0人）に見えていた。返事の形まで見ないと、間違いに気づけない
+    var eventsAnswer = function () { return Promise.resolve({ ok: true, org: '架空クラブ', lang: 'ja', member: null, events: [] }); };
+    return AT.fetchMembers('abcdefghij', eventsAnswer).then(function () { bad('名簿でない返事が「0人」として通った'); },
+      function (e) { eq(e.code, 'attend-bad-answer', '★ 名簿とは違う返事（行事の一覧）は、0人ではなく間違いとして止める'); });
+  }).then(function () {
+    // 呼び出しの合図が action=members であること（a=members だと上の間違いが起きる）
+    var src = fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8');
+    check(src.indexOf("'?action=members&s='") >= 0 && src.indexOf("'?a=members&s='") < 0,
+      '★ 出欠システムを呼ぶ合図は action=members');
   });
 }
 
