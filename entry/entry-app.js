@@ -52,7 +52,9 @@
   function byPos(a, b) { return a.n.row - b.n.row || a.n.col - b.n.col; }
 
   // book: 名簿ファイルの中身（作業中のもの）／roster: 名前の突き合わせに使う形／dirty: 保存していない変更
-  var state = { form: null, book: null, roster: null, sheets: [], tab: null, editing: null, filter: '', dirty: false };
+  // autoPostal: こちらが住所から入れた郵便番号（本人が入れた番号は勝手に書き換えないための目印）
+  var state = { form: null, book: null, roster: null, sheets: [], tab: null, editing: null, filter: '', dirty: false,
+    autoPostal: null, kanaTouched: {} };
 
   /* ===== ② 申込書 ===== */
   function readFile(file) {
@@ -256,6 +258,35 @@
     return copy;
   }
 
+  // ★ 姓・名を打つと、セイ・メイが入る（2026-09-16、本人の要望）。
+  //   漢字から読みは分からないので、**日本語入力の変換前の読み**を拾う（confirm する直前の ひらがな）。
+  //   変換が始まると候補（漢字）が来るので、**ひらがなだけの間の文字を覚えておき**、確定したときにカタカナで足す。
+  //   ローマ字入力・かな入力のどちらでも効く。貼り付けや、日本語入力を使わない入力では入らない（そのときは手で）。
+  //   フリガナの欄を自分で打った人には、もう触らない。
+  function wireKana(nameId, kanaId) {
+    var name = el(nameId), kana = el(kanaId);
+    if (!name || !kana) return;
+    var reading = '', before = '';
+    name.addEventListener('compositionstart', function () { reading = ''; before = name.value; });
+    name.addEventListener('compositionupdate', function (ev) {
+      var s = String(ev.data == null ? '' : ev.data);
+      if (s && /^[ぁ-んーゝゞ・]+$/.test(s)) reading = s;   // 変換前のよみだけ覚える
+    });
+    name.addEventListener('compositionend', function () {
+      if (!reading || state.kanaTouched[kanaId]) { reading = ''; return; }
+      // 打ち足したのか、打ち直したのか。打ち直し（前の名前が頭に残っていない）なら、フリガナも入れ直す
+      var added = before && name.value.indexOf(before) === 0;
+      kana.value = added ? kana.value + toKatakana(reading) : toKatakana(reading);
+      reading = '';
+    });
+    name.addEventListener('input', function (ev) {
+      if (ev.isComposing) return;
+      // 名前を消したら、こちらが入れたフリガナも消す（打ち直しのとき二重にならないように）
+      if (!name.value && !state.kanaTouched[kanaId]) kana.value = '';
+    });
+    kana.addEventListener('input', function () { state.kanaTouched[kanaId] = true; });
+  }
+
   function field(id, label, value, opts) {
     var input = h('input', { type: 'text', id: 'pf-' + id, value: value || '', autocomplete: 'off',
       placeholder: opts && opts.hint ? opts.hint : null });
@@ -269,6 +300,9 @@
 
   function personForm() {
     var p = editingPerson();
+    state.autoPostal = null;      // 入力欄を開くたびに、目印をまっさらにする
+    // すでにフリガナが入っている人を直すときは、勝手に足さない
+    state.kanaTouched = { 'pf-kanaFamily': !!p.kanaFamily, 'pf-kanaGiven': !!p.kanaGiven };
     var box = h('div', { class: 'person-form' });
     box.appendChild(h('p', { class: 'sub-title',
       text: state.editing.index == null ? t('formAdd', { g: state.editing.gender }) : t('formEdit', { g: state.editing.gender }) }));
@@ -281,7 +315,7 @@
       field('birthText', t('colBirth'), p.birthText, { oninput: showBirth, hint: t('phBirth') }),
       field('postal', t('colPostal'), p.postal, { mode: 'numeric', oninput: onPostalInput, hint: t('phPostal') }),
       field('pref', t('colPref'), p.pref),
-      field('address', t('colAddress'), p.address, { wide: true, onchange: onAddressChange, hint: t('phAddress') }),
+      field('address', t('colAddress'), p.address, { wide: true, oninput: onAddressInput, onchange: onAddressChange, hint: t('phAddress') }),
       field('phone', t('colPhone'), p.phone, { mode: 'tel' })
     ]);
     box.appendChild(grid);
@@ -296,6 +330,8 @@
     ]));
     setTimeout(function () {
       if (el('pf-family')) el('pf-family').focus();
+      wireKana('pf-family', 'pf-kanaFamily');
+      wireKana('pf-given', 'pf-kanaGiven');
       showBirth();
       // 申込書から持ってきた名前を分けられなかったときは、その場で知らせる
       if (state.editing && state.editing.prefill && !p.given) setMsg('pfMsg', t('splitNameHint'), 'wait');
@@ -322,6 +358,7 @@
   function onPostalInput() {
     var box = el('pfPostal');
     if (!box) return;
+    state.autoPostal = null;   // 本人が郵便番号を打ったので、以後この欄は住所から書き換えない
     var code = P.normalize(pfVal('postal'));
     if (!code || code === postalBusy) return;
     postalBusy = code;
@@ -349,16 +386,30 @@
     });
   }
   // 住所 → 郵便番号（都道府県ごとのデータを読む）。郵便番号が空のときだけ、入れ終わったら自動で引く
+  var addrTimer = null;
+  function onAddressInput() {
+    // 打ち終わるのを待ってから引く（1文字ごとに引かない）
+    if (addrTimer) clearTimeout(addrTimer);
+    addrTimer = setTimeout(onAddressChange, 500);
+  }
+
   function onAddressChange() {
     if (!el('pf-address')) return;
     movePrefFromAddress();
-    if (pfVal('postal').trim() || !pfVal('address').trim() || !pfVal('pref').trim()) return;
+    // ★ 自分で入れた郵便番号は触らない。ただし、こちらが自動で入れた番号は入れ直す。
+    //   「白山市」まで打った時点で 9240000 が入り、そのあと町名を足しても直らなかった
+    //   （2026-09-16、本人が発見）。打ちかけ・ブラウザの自動入力が残っているときも引き直す
+    var now = pfVal('postal');
+    if (P.normalize(now) && now !== state.autoPostal) return;
+    if (!pfVal('address').trim() || !pfVal('pref').trim()) return;
     var pref = pfVal('pref'), address = pfVal('address');
     P.lookupPostal(pref, address).then(function (r) {
-      if (!el('pf-postal') || pfVal('postal').trim()) return;
+      var cur = el('pf-postal') ? pfVal('postal') : null;
+      if (cur === null || (P.normalize(cur) && cur !== state.autoPostal)) return;
       if (!r) { setMsg('pfMsg', t('postalRevNone'), 'wait'); return; }
       if (r.candidates.length === 1) {
         el('pf-postal').value = r.candidates[0].code;
+        state.autoPostal = r.candidates[0].code;
         setMsg('pfMsg', t('postalRevOk', { town: r.matched, code: r.candidates[0].code }), 'ok');
         clear(el('pfPostal'));
         return;
@@ -368,7 +419,10 @@
       var box = clear(el('pfPostal'));
       box.appendChild(h('p', { class: 'hint', text: t('postalRevPick', { town: r.matched }) }));
       var sel = h('select', { onchange: function (ev) {
-        if (ev.target.value && el('pf-postal')) el('pf-postal').value = ev.target.value;
+        if (ev.target.value && el('pf-postal')) {
+          el('pf-postal').value = ev.target.value;
+          state.autoPostal = ev.target.value;
+        }
       } });
       sel.appendChild(h('option', { value: '', text: t('postalPickNone') }));
       r.candidates.forEach(function (c) {
