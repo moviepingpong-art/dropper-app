@@ -2,7 +2,8 @@
 // make-postal.js — 日本郵便の郵便番号データから、申込書ドロッパーの住所の自動入力に使うデータを作る
 //
 //   node tools/make-postal.js <utf_ken_all.csv> <更新日 YYYY-MM-DD>
-//   → entry/postal/0.json 〜 9.json（郵便番号の先頭1桁ごと）
+//   → entry/postal/0.json 〜 9.json      郵便番号 → 住所（郵便番号の先頭1桁ごと）
+//   → entry/postal/rev/01.json 〜 47.json 住所 → 郵便番号（都道府県ごと。番号は全国地方公共団体コードの上2桁）
 //
 // 元データ: 日本郵便「住所の郵便番号（1レコード1行、UTF-8形式）（CSV形式）」の utf_ken_all.zip を展開した CSV。
 //   https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html
@@ -85,6 +86,36 @@ function build(csvText, updated) {
   return chunks;
 }
 
+// 住所 → 郵便番号（都道府県ごと）
+// { source, updated, code: '17', pref: '石川県', towns: { '白山市八田町': [['9240001', '（但し書き）']] } }
+// ★ 但し書き（括弧書き）は、逆引きのときだけ残す。「次のビルを除く」などは、どの番号か選ぶ手がかりになる
+function buildRev(csvText, updated) {
+  const text = csvText.charCodeAt(0) === 0xFEFF ? csvText.slice(1) : csvText;
+  const out = {};
+  text.split(/\r?\n/).forEach(function (line) {
+    if (!line) return;
+    const r = parseLine(line);
+    if (r.length < 14 || r[13] === '2') return;
+    const jis = String(r[0]).slice(0, 2);
+    if (!/^\d{2}$/.test(jis)) throw new Error('全国地方公共団体コードが読めない行: ' + line.slice(0, 60));
+    const pref = r[6], city = r[7], raw = r[8];
+    const town = cleanTown(city, raw);
+    const i = raw.indexOf('（');
+    const note = (i >= 0 && town) ? raw.slice(i) : '';
+    const p = out[jis] = out[jis] || { source: SOURCE, updated: updated, code: jis, pref: pref, towns: {} };
+    const key = city + town;
+    const list = p.towns[key] = p.towns[key] || [];
+    if (!list.some(function (x) { return x[0] === r[2] && x[1] === note; })) list.push([r[2], note]);
+  });
+  Object.keys(out).forEach(function (jis) {
+    const p = out[jis];
+    const sorted = {};
+    Object.keys(p.towns).sort().forEach(function (k) { sorted[k] = p.towns[k]; });
+    p.towns = sorted;
+  });
+  return out;
+}
+
 function main() {
   const csv = process.argv[2], updated = process.argv[3];
   if (!csv || !/^\d{4}-\d{2}-\d{2}$/.test(updated || '')) {
@@ -107,7 +138,33 @@ function main() {
     console.log(d + '.json  ' + n + ' 個  ' + Buffer.byteLength(body) + ' バイト');
   });
   console.log('郵便番号 ' + codes + ' 個（候補が2つ以上: ' + multi + ' 個）、合計 ' + bytes + ' バイト、更新日 ' + updated);
+
+  // 住所 → 郵便番号
+  const revDir = path.join(outDir, 'rev');
+  fs.mkdirSync(revDir, { recursive: true });
+  const rev = buildRev(fs.readFileSync(csv, 'utf8'), updated);
+  const jisList = Object.keys(rev).sort();
+  if (jisList.length !== 47) throw new Error('都道府県が47ではない（' + jisList.length + '）');
+  let towns = 0, revMulti = 0, revBytes = 0;
+  jisList.forEach(function (jis) {
+    const p = rev[jis];
+    const body = JSON.stringify(p) + '\n';
+    fs.writeFileSync(path.join(revDir, jis + '.json'), body, 'utf8');
+    const keys = Object.keys(p.towns);
+    towns += keys.length;
+    revMulti += keys.filter(function (k) {
+      const cs = p.towns[k].map(function (x) { return x[0]; });
+      return cs.filter(function (v, i, a) { return a.indexOf(v) === i; }).length > 1;
+    }).length;
+    revBytes += Buffer.byteLength(body);
+  });
+  console.log('逆引き: 都道府県47、住所 ' + towns + ' 種類（郵便番号が2つ以上: ' + revMulti + ' 種類）、合計 ' + revBytes + ' バイト');
+
+  // 古いファイルが残っていないか（都道府県が減ることは無いが、作り方を変えたときの取り残しを見る）
+  fs.readdirSync(revDir).forEach(function (f) {
+    if (!/^\d{2}\.json$/.test(f)) console.log('!! 見覚えのないファイルが rev/ にあります: ' + f);
+  });
 }
 
 if (require.main === module) main();
-module.exports = { parseLine: parseLine, cleanTown: cleanTown, build: build };
+module.exports = { parseLine: parseLine, cleanTown: cleanTown, build: build, buildRev: buildRev };

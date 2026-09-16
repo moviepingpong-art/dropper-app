@@ -12,7 +12,7 @@
   'use strict';
 
   var X = window.EntryXlsx, R = window.EntryRoster, M = window.EntryMap,
-      B = window.EntryBook, P = window.EntryPostal;
+      B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend;
 
   function t(k, v) { return window.I18N.t(k, v); }
   function has(k) { return Object.prototype.hasOwnProperty.call(window.I18N.dict(), k); }
@@ -257,7 +257,8 @@
   }
 
   function field(id, label, value, opts) {
-    var input = h('input', { type: 'text', id: 'pf-' + id, value: value || '', autocomplete: 'off' });
+    var input = h('input', { type: 'text', id: 'pf-' + id, value: value || '', autocomplete: 'off',
+      placeholder: opts && opts.hint ? opts.hint : null });
     if (opts && opts.oninput) input.addEventListener('input', opts.oninput);
     if (opts && opts.onchange) input.addEventListener('change', opts.onchange);
     if (opts && opts.mode) input.setAttribute('inputmode', opts.mode);
@@ -277,13 +278,14 @@
       field('given', t('colGiven'), p.given),
       field('kanaFamily', t('colKanaFamily'), p.kanaFamily, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
       field('kanaGiven', t('colKanaGiven'), p.kanaGiven, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
-      field('birthText', t('colBirth'), p.birthText, { oninput: showBirth }),
-      field('postal', t('colPostal'), p.postal, { mode: 'numeric', oninput: onPostalInput }),
+      field('birthText', t('colBirth'), p.birthText, { oninput: showBirth, hint: t('phBirth') }),
+      field('postal', t('colPostal'), p.postal, { mode: 'numeric', oninput: onPostalInput, hint: t('phPostal') }),
       field('pref', t('colPref'), p.pref),
-      field('address', t('colAddress'), p.address, { wide: true }),
+      field('address', t('colAddress'), p.address, { wide: true, onchange: onAddressChange, hint: t('phAddress') }),
       field('phone', t('colPhone'), p.phone, { mode: 'tel' })
     ]);
     box.appendChild(grid);
+    box.appendChild(h('p', { class: 'hint', text: t('formHint') }));
     box.appendChild(h('p', { class: 'msg', id: 'pfBirthMsg' }));
     box.appendChild(h('div', { id: 'pfPostal' }));
     box.appendChild(h('p', { class: 'msg', id: 'pfMsg' }));
@@ -346,6 +348,52 @@
       setMsg('pfMsg', errText(e), 'ng');
     });
   }
+  // 住所 → 郵便番号（都道府県ごとのデータを読む）。郵便番号が空のときだけ、入れ終わったら自動で引く
+  function onAddressChange() {
+    if (!el('pf-address')) return;
+    movePrefFromAddress();
+    if (pfVal('postal').trim() || !pfVal('address').trim() || !pfVal('pref').trim()) return;
+    var pref = pfVal('pref'), address = pfVal('address');
+    P.lookupPostal(pref, address).then(function (r) {
+      if (!el('pf-postal') || pfVal('postal').trim()) return;
+      if (!r) { setMsg('pfMsg', t('postalRevNone'), 'wait'); return; }
+      if (r.candidates.length === 1) {
+        el('pf-postal').value = r.candidates[0].code;
+        setMsg('pfMsg', t('postalRevOk', { town: r.matched, code: r.candidates[0].code }), 'ok');
+        clear(el('pfPostal'));
+        return;
+      }
+      // 同じ町名に郵便番号が2つ以上ある（丁目やビルで分かれている）
+      setMsg('pfMsg', '', '');
+      var box = clear(el('pfPostal'));
+      box.appendChild(h('p', { class: 'hint', text: t('postalRevPick', { town: r.matched }) }));
+      var sel = h('select', { onchange: function (ev) {
+        if (ev.target.value && el('pf-postal')) el('pf-postal').value = ev.target.value;
+      } });
+      sel.appendChild(h('option', { value: '', text: t('postalPickNone') }));
+      r.candidates.forEach(function (c) {
+        sel.appendChild(h('option', { value: c.code, text: c.code + (c.note ? ' ' + c.note : '') }));
+      });
+      box.appendChild(sel);
+    }).catch(function (e) {
+      if (e && e.code === 'postal-no-pref') return;   // 都道府県が空か、知らない書き方。黙って何もしない
+      setMsg('pfMsg', errText(e), 'ng');
+    });
+  }
+
+  // 住所の欄に「石川県白山市…」と都道府県から書かれていたら、都道府県の欄へ移す
+  function movePrefFromAddress() {
+    var address = pfVal('address').trim();
+    if (!address || pfVal('pref').trim()) return;
+    for (var i = 0; i < P.PREFS.length; i++) {
+      if (address.indexOf(P.PREFS[i]) === 0) {
+        el('pf-pref').value = P.PREFS[i];
+        el('pf-address').value = address.slice(P.PREFS[i].length);
+        return;
+      }
+    }
+  }
+
   function putAddress(c) {
     if (el('pf-pref')) el('pf-pref').value = c.pref;
     if (el('pf-address')) {
@@ -394,6 +442,14 @@
     }
   }
 
+  // 「山田 太郎」なら空白で、「山田太郎」なら名簿にある姓と見比べて切り分ける
+  function splitName(raw) {
+    var s = String(raw || '').replace(/[\s　]+/g, ' ').trim();
+    var parts = s.split(' ');
+    if (parts.length >= 2) return { family: parts[0], given: parts.slice(1).join(' ') };
+    return splitByKnownFamily(s);
+  }
+
   // 申込書には「山田太郎」と区切らずに書かれることが多い。名簿にある姓と見比べて切り分ける。
   // 見つからなければ姓の欄に全部入れて、本人に分けてもらう（間違った位置で切らない）
   function splitByKnownFamily(s) {
@@ -410,16 +466,123 @@
   function addFromNames(typed, gender) {
     if (!state.book) return;
     var s = String(typed || '').replace(/[\s　]+/g, ' ').trim();
-    var parts = s.split(' ');
-    var prefill;
-    if (parts.length >= 2) prefill = { family: parts[0], given: parts.slice(1).join(' ') };
-    else prefill = splitByKnownFamily(s);
+    var prefill = splitName(s);
     state.tab = gender;
     state.editing = { gender: gender, index: null, prefill: prefill };
     state.backToNames = true;
     renderRoster();
     el('rosterEditor').scrollIntoView({ behavior: 'smooth', block: 'start' });
     setMsg('rosterMsg', t('addFromNames', { name: s, g: gender }), 'wait');
+  }
+
+  /* ===== 出欠システムから名前を取り込む ===== */
+  // ★ 取れるのは 団体名・氏名・性別 だけ（生年月日・住所・電話は向こうに無い）。
+  //   送るのは団体IDだけで、名簿の中身は送らない。
+  function onAttendOpen() {
+    if (!state.book) openRoster(B.blank(), t('rosterNewMsg'));
+    state.attend = null;
+    renderAttendBox();
+    el('attendBox').hidden = false;
+    el('attendId').focus();
+  }
+
+  function renderAttendBox() {
+    var box = clear(el('attendBox'));
+    box.appendChild(h('p', { class: 'sub-title', text: t('attendTitle') }));
+    box.appendChild(h('p', { class: 'hint', text: t('attendHint') }));
+    var input = h('input', { type: 'text', id: 'attendId', autocomplete: 'off', placeholder: t('attendPlaceholder') });
+    input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); onAttendFetch(); } });
+    box.appendChild(h('div', { class: 'field' }, [input]));
+    box.appendChild(h('div', { class: 'btns' }, [
+      h('button', { type: 'button', text: t('attendFetch'), onclick: onAttendFetch }),
+      h('button', { type: 'button', class: 'btn-sub', text: t('formCancel'),
+        onclick: function () { el('attendBox').hidden = true; state.attend = null; } })
+    ]));
+    box.appendChild(h('p', { class: 'msg', id: 'attendMsg' }));
+    box.appendChild(h('div', { id: 'attendList' }));
+  }
+
+  function onAttendFetch() {
+    var raw = el('attendId').value;
+    setMsg('attendMsg', t('attendFetching'), 'wait');
+    clear(el('attendList'));
+    A.fetchMembers(raw).then(function (r) {
+      state.attend = r;
+      renderAttendPreview();
+    }).catch(function (e) { setMsg('attendMsg', errText(e), 'ng'); });
+  }
+
+  // 取り込む前に見せる。すでに名簿にいる人は飛ばし、性別が空の人は男子か女子かを選んでもらう
+  function renderAttendPreview() {
+    var r = state.attend;
+    var box = clear(el('attendList'));
+    var have = {};
+    GENDERS.forEach(function (g) { peopleOf(g).forEach(function (p) { have[R.nameKey(personName(p))] = g; }); });
+
+    var fresh = [], already = 0;
+    r.members.forEach(function (m) {
+      if (have[R.nameKey(m.name)]) { already++; return; }
+      fresh.push(m);
+    });
+    r.fresh = fresh;
+    setMsg('attendMsg', t('attendFound', { org: r.org, n: r.members.length, add: fresh.length, skip: already }), 'ok');
+    if (!fresh.length) return;
+
+    // 手当てが要る人だけ出す: 性別が空／姓と名に分けられない（出欠の名前は空白なしのことがある）
+    var needsGender = fresh.filter(function (m) { return !m.gender; });
+    var needsSplit = fresh.filter(function (m) { return !splitName(m.name).given; });
+    if (needsGender.length) box.appendChild(h('p', { class: 'hint', text: t('attendPickGender', { n: needsGender.length }) }));
+    if (needsSplit.length) box.appendChild(h('p', { class: 'hint', text: t('attendSplitHint', { n: needsSplit.length }) }));
+    if (needsGender.length || needsSplit.length) {
+      var list = h('div', { class: 'attend-picks' });
+      fresh.forEach(function (m) {
+        var needName = needsSplit.indexOf(m) >= 0, needGender = needsGender.indexOf(m) >= 0;
+        if (!needName && !needGender) return;
+        var row = h('label', { class: 'attend-pick' });
+        if (needName) {
+          row.appendChild(h('input', { type: 'text', value: m.name, onchange: function (ev) { m.name = ev.target.value; } }));
+        } else {
+          row.appendChild(h('span', { text: m.name }));
+        }
+        if (needGender) {
+          var sel = h('select', { onchange: function (ev) { m.gender = ev.target.value; } });
+          sel.appendChild(h('option', { value: '', text: t('attendSkip') }));
+          GENDERS.forEach(function (g) { sel.appendChild(h('option', { value: g, text: g })); });
+          row.appendChild(sel);
+        } else {
+          row.appendChild(h('span', { class: 'hint', text: m.gender }));
+        }
+        list.appendChild(row);
+      });
+      box.appendChild(list);
+    }
+    box.appendChild(h('div', { class: 'btns' }, [
+      h('button', { type: 'button', text: t('attendImport', { n: fresh.length }), onclick: onAttendImport })
+    ]));
+  }
+
+  function onAttendImport() {
+    var r = state.attend;
+    if (!r) return;
+    var added = 0, skipped = 0;
+    r.fresh.forEach(function (m) {
+      if (!m.gender) { skipped++; return; }   // 男子か女子かを選ばなかった人は入れない
+      var parts = splitName(m.name);
+      var p = { family: parts.family, given: parts.given, kanaFamily: '', kanaGiven: '', birth: null, birthText: '',
+        postal: '', pref: '', address: '', phone: '', extras: [] };
+      p.problems = B.problemsOf(p);
+      peopleOf(m.gender).push(p);
+      added++;
+    });
+    if (!el('orgInput').value.trim() && r.org) {
+      el('orgInput').value = r.org;
+      state.book.org = r.org;
+    }
+    state.attend = null;
+    el('attendBox').hidden = true;
+    markDirty();
+    rebuildRoster();
+    setMsg('rosterMsg', t('attendDone', { n: added, skip: skipped }), 'ok');
   }
 
   // ===== 保存 =====
@@ -1004,6 +1167,7 @@
   wireDrop('formDrop', 'formInput', 'formPick', onForm);
   wireDrop('rosterDrop', 'rosterInput', 'rosterPick', onRosterFile);
   el('rosterNew').addEventListener('click', function (ev) { ev.stopPropagation(); onNewRoster(); });
+  el('attendOpen').addEventListener('click', function (ev) { ev.stopPropagation(); onAttendOpen(); });
   el('orgInput').addEventListener('input', function () { if (state.book) { state.book.org = el('orgInput').value; markDirty(); } });
   // ★ 名簿はブラウザに覚えないので、保存しないまま閉じると消える
   window.addEventListener('beforeunload', function (ev) {

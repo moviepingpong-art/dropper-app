@@ -23,7 +23,9 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-rules.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-map.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-postal.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
-var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap, P = window.EntryPostal, B = window.EntryBook;
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8'));
+var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap,
+    P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend;
 var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
 
 // 手で書いた欄の対応を、見出しの規則の答えと比べるために取っておく
@@ -192,6 +194,8 @@ function main() {
     .then(function () { return mapSection(roster); })
     .then(function () { return shrinkSection(roster); })
     .then(function () { return postalSection(); })
+    .then(function () { return revSection(); })
+    .then(function () { return attendSection(); })
     .then(function () { return bookSection(); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
@@ -390,15 +394,31 @@ function mapSection(roster) {
 
   // --- どこにも送らない（通信は、このサイトの postal/ を読む1か所だけ） ---
   var netRe = /\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|importScripts|generativelanguage|googleapis\.com\/(?!css)/;
-  var POSTAL_FETCH = "fetch(BASE + digit + '.json', { credentials: 'omit' })";
+  // ★ 通信してよいのはこの3か所だけ。ここを変えるときは、変えてよいのかを先に考えること
+  var POSTAL_FETCHES = [
+    "fetch(BASE + digit + '.json', { credentials: 'omit' })",
+    "fetch(BASE + 'rev/' + code + '.json', { credentials: 'omit' })",
+    "fetch(API_BASE + '?a=members&s=' + encodeURIComponent(id), { credentials: 'omit' })"
+  ];
   var srcOf = function (f) { return fs.readFileSync(path.join(__dirname, '..', f), 'utf8'); };
-  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js', 'entry-postal.js', 'entry-book.js'].filter(function (f) {
-    var code = srcOf(f).split(POSTAL_FETCH).join('');
-    return netRe.test(code.replace(/\/\/[^\n]*/g, ''));
+  var strip = function (code) {
+    POSTAL_FETCHES.forEach(function (x) { code = code.split(x).join(''); });
+    return code;
+  };
+  var talkers = ['entry-app.js', 'entry-map.js', 'entry-rules.js', 'entry-roster.js', 'entry-xlsx.js', 'entry-i18n.js',
+    'entry-postal.js', 'entry-book.js', 'entry-attend.js'].filter(function (f) {
+    return netRe.test(strip(srcOf(f)).replace(/\/\/[^\n]*/g, ''));
   });
-  eq(talkers, [], '申込書ドロッパーの JS に、postal/ を読むこと以外の通信が無い（名簿も申込書もどこにも送らない）');
+  eq(talkers, [], '申込書ドロッパーの JS に、郵便番号データと出欠システムの名前以外の通信が無い（名簿も申込書も送らない）');
+
+  var attendSrc = srcOf('entry-attend.js');
+  eq(attendSrc.split(POSTAL_FETCHES[2]).length - 1, 1, '出欠システムを呼ぶ fetch は entry-attend.js の1か所だけ');
+  check(attendSrc.indexOf("var API_BASE = 'https://api.dropper-tools.com/';") >= 0 &&
+    (attendSrc.match(/\bAPI_BASE\s*=/g) || []).length === 1, '呼び先は出欠システムの API だけ（ほかへ付け替えていない）');
+  check(!/method\s*:\s*'POST'|body\s*:/.test(attendSrc), '★ 出欠システムへは団体IDを付けて読むだけ（何も送りつけない）');
   var postalSrc = srcOf('entry-postal.js');
-  eq(postalSrc.split(POSTAL_FETCH).length - 1, 1, '郵便番号データを読む fetch は entry-postal.js の1か所だけ');
+  eq(POSTAL_FETCHES.slice(0, 2).map(function (x) { return postalSrc.split(x).length - 1; }), [1, 1],
+    '郵便番号データを読む fetch は entry-postal.js の2か所だけ（郵便番号から住所／住所から郵便番号）');
   check((postalSrc.match(/\bBASE\s*=/g) || []).length === 1 && postalSrc.indexOf("var BASE = 'postal/';") >= 0,
     '読みに行く先は、このサイトの相対パス postal/ だけ（ほかへ付け替えていない）');
   var urlLines = postalSrc.split(/\r?\n/).filter(function (l) { return /https?:|\/\/[a-z0-9.-]+\.[a-z]/i.test(l) && !/^\s*\/\//.test(l); });
@@ -794,11 +814,12 @@ function postalSection() {
   // --- 置いてあるデータ（entry/postal/） ---
   var POSTAL = path.join(__dirname, '..', 'postal');
   var files = fs.existsSync(POSTAL) ? fs.readdirSync(POSTAL).sort() : [];
-  eq(files, ['0.json', '1.json', '2.json', '3.json', '4.json', '5.json', '6.json', '7.json', '8.json', '9.json'],
-    'entry/postal/ に 0.json〜9.json がそろっている（ほかのファイルは置かない）');
-  if (files.length !== 10) return Promise.resolve();
+  eq(files, ['0.json', '1.json', '2.json', '3.json', '4.json', '5.json', '6.json', '7.json', '8.json', '9.json', 'rev'],
+    'entry/postal/ に 0.json〜9.json と rev/ がそろっている（ほかのファイルは置かない）');
+  var chunkFiles = files.filter(function (f) { return /^\d\.json$/.test(f); });
+  if (chunkFiles.length !== 10) return Promise.resolve();
   var chunks = {};
-  files.forEach(function (f) { chunks[f[0]] = JSON.parse(fs.readFileSync(path.join(POSTAL, f), 'utf8')); });
+  chunkFiles.forEach(function (f) { chunks[f[0]] = JSON.parse(fs.readFileSync(path.join(POSTAL, f), 'utf8')); });
   var updates = Object.keys(chunks).map(function (d) { return chunks[d].updated; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
   check(updates.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(updates[0]), 'データ: 10個とも同じ更新日（' + updates.join(',') + '）');
   var total = 0, leftovers = [];
@@ -847,6 +868,117 @@ function postalSection() {
         eq(calls, 1, '引き当て: 読めた桁は覚えていて、2回は読みに行かない');
       }, function () { bad('引き当て: 読めたはずの桁で失敗した（読みに行った回数 ' + calls + '）'); });
     });
+  });
+}
+
+// ===== 住所 → 郵便番号（逆引き） =====
+function revSection() {
+  section('9b. 住所から郵便番号（逆引き）');
+
+  eq([P.prefCode('石川県'), P.prefCode('北海道'), P.prefCode('沖縄県'), P.prefCode('ほげ県'), P.prefCode('')],
+    ['17', '01', '47', null, null], '都道府県名 → ファイルの番号（全国地方公共団体コードの上2桁）');
+
+  // 変換（架空の行で）
+  var row = function (jis, code, pref, city, town) {
+    return [jis + '000', '"' + code.slice(0, 3) + '  "', '"' + code + '"', '"ア"', '"イ"', '"ウ"',
+      '"' + pref + '"', '"' + city + '"', '"' + town + '"', '0', '0', '0', '0', '0', '0'].join(',');
+  };
+  var csv = [
+    row('17', '9240001', '石川県', '白山市', '八田町'),
+    row('13', '1000013', '東京都', '千代田区', '霞が関（次のビルを除く）'),
+    row('13', '1006001', '東京都', '千代田区', '霞が関霞が関ビル（１階）'),
+    row('12', '2600822', '千葉県', '千葉市中央区', '蘇我'),
+    row('12', '2600823', '千葉県', '千葉市中央区', '蘇我（丁目）')
+  ].join('\r\n') + '\r\n';
+  var rev = MAKE_POSTAL.buildRev(csv, '2026-08-31');
+  eq(Object.keys(rev).sort(), ['12', '13', '17'], '逆引き: 都道府県ごとに分ける');
+  eq(P.fromPrefData(rev['17'], '白山市八田町1-2-3'), { matched: '白山市八田町', candidates: [{ code: '9240001', note: '' }] },
+    '★ 番地が付いていても、町名の部分で当たる');
+  eq(P.fromPrefData(rev['12'], '千葉市中央区蘇我5-1').candidates.map(function (c) { return c.code; }), ['2600822', '2600823'],
+    '★ 同じ町名に郵便番号が2つ以上あれば、候補をすべて返す（画面で選ばせる）');
+  eq(P.fromPrefData(rev['13'], '千代田区霞が関霞が関ビル3階').matched, '千代田区霞が関霞が関ビル',
+    '★ いちばん長く前から一致する住所を採る（ビル名のほうが町名より長い）');
+  eq(P.fromPrefData(rev['13'], '千代田区霞が関1-1-1').candidates[0].note, '（次のビルを除く）',
+    '逆引きでは但し書き（括弧書き）を残す（どの番号か選ぶ手がかり）');
+  eq(P.fromPrefData(rev['17'], '金沢市どこか1-1'), null, '当たらなければ null');
+  eq(P.fromPrefData(rev['17'], '白山市八田町１ー２'), { matched: '白山市八田町', candidates: [{ code: '9240001', note: '' }] },
+    '全角の数字が混じっても当たる');
+
+  // 置いてあるデータ
+  var REV = path.join(__dirname, '..', 'postal', 'rev');
+  var revFiles = fs.existsSync(REV) ? fs.readdirSync(REV).sort() : [];
+  eq(revFiles.length, 47, 'entry/postal/rev/ に47都道府県ぶんある');
+  eq(revFiles.filter(function (f) { return !/^\d{2}\.json$/.test(f); }), [], 'rev/ にはファイル名が2桁の数字のものだけ');
+  if (revFiles.length !== 47) return Promise.resolve();
+
+  var loadPref = function (code) {
+    return Promise.resolve(JSON.parse(fs.readFileSync(path.join(REV, code + '.json'), 'utf8')));
+  };
+  var cases = [
+    ['石川県', '白山市八田町1-2-3', '9240001'],
+    ['石川県', '小松市白江町ろ11', '9230811'],
+    ['石川県', 'かほく市宇野気ニ100', '9291125'],
+    ['富山県', '高岡市末広町1-8', '9330023'],
+    ['大阪府', '大阪市北区梅田1-1-1', '5300001']
+  ];
+  return cases.reduce(function (p, c) {
+    return p.then(function () {
+      return P.lookupPostal(c[0], c[1], loadPref).then(function (r) {
+        eq(r && r.candidates[0].code, c[2], '引き当て: ' + c[0] + c[1] + ' → ' + c[2]);
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    return P.lookupPostal('ほげ県', 'どこか1-1', loadPref).then(function () { bad('知らない都道府県が通った'); },
+      function (e) { eq(e.code, 'postal-no-pref', '知らない都道府県は postal-no-pref'); });
+  }).then(function () {
+    var calls = 0;
+    var counting = function (code) { calls++; return loadPref(code); };
+    return P.lookupPostal('東京都', '千代田区霞が関1-1', counting).then(function (r) {
+      check(r && r.candidates.length >= 1, '引き当て: 東京都千代田区霞が関');
+      return P.lookupPostal('東京都', '港区赤坂1-1', counting);
+    }).then(function () {
+      eq(calls, 1, '読んだ都道府県は覚えていて、2回は読みに行かない');
+    });
+  });
+}
+
+// ===== 出欠システムから名前を取り込む =====
+function attendSection() {
+  section('9c. 出欠システムから名前を取り込む（entry-attend.js）');
+
+  eq(['abcdefghij', 'https://app.dropper-tools.com/attend/?s=abcdefghij', 'attend/?s=abcdefghij#my',
+      'https://app.dropper-tools.com/attend/', 'abc', ''].map(AT.parseOrgId),
+    ['abcdefghij', 'abcdefghij', 'abcdefghij', '', '', ''], '団体ID: URL からも取り出す。短すぎる・無いものは受け付けない');
+
+  // 出欠システムの応答（本物と同じ形の、架空の返事）
+  var answer = { ok: true, org: '架空ラージボール卓球クラブ', lang: 'ja', members: [
+    { name: '山田 太郎', gender: '男', note: '', retired: false },
+    { name: '鈴木 花子', gender: '女', note: '', retired: false },
+    { name: '斉藤 光', gender: '', note: '', retired: false },
+    { name: '  ', gender: '男', note: '', retired: false }
+  ] };
+  var calls = [];
+  var fake = function (id) { calls.push(id); return Promise.resolve(answer); };
+
+  return AT.fetchMembers('https://app.dropper-tools.com/attend/?s=abcdefghij', fake).then(function (r) {
+    eq(calls, ['abcdefghij'], '★ 送るのは団体IDだけ');
+    eq(r.org, '架空ラージボール卓球クラブ', '団体名を受け取る');
+    eq(r.members.map(function (m) { return m.name + '/' + m.gender; }),
+      ['山田 太郎/男子', '鈴木 花子/女子', '斉藤 光/'], '性別は男子・女子のシートに読み替える。名前が空の人は捨てる');
+    return AT.fetchMembers('abc', fake).then(function () { bad('短すぎるIDが通った'); },
+      function (e) { eq(e.code, 'attend-bad-id', '団体IDが読めなければ attend-bad-id'); });
+  }).then(function () {
+    var notFound = function () { return Promise.resolve({ ok: false, notFound: true, code: 'orgNotFound' }); };
+    return AT.fetchMembers('abcdefghij', notFound).then(function () { bad('無い団体が通った'); },
+      function (e) { eq(e.code, 'attend-not-found', '見つからない団体は attend-not-found'); });
+  }).then(function () {
+    var offline = function () { return Promise.reject(new Error('offline')); };
+    return AT.fetchMembers('abcdefghij', offline).then(function () { bad('通信できないのに通った'); },
+      function (e) { eq(e.code, 'attend-load', '問い合わせられなければ attend-load'); });
+  }).then(function () {
+    var broken = function () { return Promise.resolve({ ok: false, code: 'somethingElse' }); };
+    return AT.fetchMembers('abcdefghij', broken).then(function () { bad('ok でない返事が通った'); },
+      function (e) { eq(e.code, 'attend-load', 'ok でない返事も止める'); });
   });
 }
 
