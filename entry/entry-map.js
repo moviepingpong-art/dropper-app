@@ -29,7 +29,7 @@
     birthMonth: [], birthDay: [],
     age: [],
     postal: [],
-    address: ['plain', 'with-postal'],
+    address: ['plain', 'keep-pref', 'with-postal'],   // plain = いちばん多い都道府県を省く
     addressPref: [], addressRest: [],
     phone: []
   };

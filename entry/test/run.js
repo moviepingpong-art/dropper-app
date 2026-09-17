@@ -173,6 +173,17 @@ function main() {
     eq(got.problems.map(function (p) { return p.family + ' ' + p.given + ':' + p.problems.join('+'); }),
       ['斉藤 光:kana-empty+phone-empty', '鈴木 和子:birth-empty'], '名簿そのものの気になる点（止めずに知らせる）');
 
+    // ★ 住所は、いちばん多い都道府県を省いて市区町村から書く（2026-09-18、本人の要望）
+    var addrOf = function (m, fmt, ctx) {
+      return R.fill(m, { fields: [{ ref: 'A1', field: 'address', fmt: fmt }] }, ctx).writes[0].value;
+    };
+    var yamada = roster.members[0], tanaka = roster.members[4];   // 石川県 / 福井県
+    eq([addrOf(yamada, 'plain', { dropPref: '石川県' }), addrOf(tanaka, 'plain', { dropPref: '石川県' })],
+      ['金沢市テスト町1-1', '福井県福井市サンプル7-7'], '住所: 多い県は省き、ちがう県の人には県名を付ける');
+    eq(addrOf(yamada, 'keep-pref', { dropPref: '石川県' }), '石川県金沢市テスト町1-1', '住所: 「都道府県から書く」を選べば省かない');
+    eq(addrOf(yamada, 'plain', {}), '石川県金沢市テスト町1-1', '住所: 省く県が決まっていなければ、そのまま書く');
+    eq(addrOf(yamada, 'with-postal', { dropPref: '石川県' }), '〒920-0001 金沢市テスト町1-1', '住所: 〒から書くときも県名を省く');
+
     section('2. 日付と年齢');
     // 名簿は決まった形になったが、人が Excel で直すことがあるので、いろいろな書き方を読めるままにしておく
     eq([R.parseBirth('S27.5.10'), R.parseBirth('昭和30年2月28日'), R.parseBirth('1958-08-15'), R.parseBirth('19600303')],

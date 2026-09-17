@@ -251,7 +251,12 @@
         case 'postal': if (member.postal) put(f, member.postal); else miss(f, 'not-in-roster'); break;
         case 'address':
           if (!member.address) { miss(f, 'not-in-roster'); break; }
-          put(f, f.fmt === 'with-postal' && member.postal ? '〒' + member.postal + ' ' + member.address : member.address);
+          // ★ いちばん多い都道府県は省いて、市区町村から書く（2026-09-18、本人の要望）。
+          //   ほとんどが同じ県なので、そのほうが読みやすい。ちがう県の人には県名を付ける。
+          //   省く県は画面が ctx.dropPref で渡す（名簿には県名を持ったまま）
+          var addr = member.address;
+          if (f.fmt !== 'keep-pref' && ctx.dropPref && member.pref === ctx.dropPref && member.addressRest) addr = member.addressRest;
+          put(f, f.fmt === 'with-postal' && member.postal ? '〒' + member.postal + ' ' + addr : addr);
           break;
         case 'addressPref': if (member.pref) put(f, member.pref); else miss(f, 'address-unsplit'); break;
         case 'addressRest': if (member.addressRest) put(f, member.addressRest); else miss(f, 'address-unsplit'); break;

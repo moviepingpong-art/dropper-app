@@ -998,7 +998,8 @@
     var people = res.slots.map(function (slot) {
       var e = entries.filter(function (x) { return x.n === slot.name; })[0];
       var member = memberOf(sh, e);
-      return { entry: e, member: member, slot: slot, fill: R.fill(member, slot, { baseDate: base }) };
+      return { entry: e, member: member, slot: slot,
+        fill: R.fill(member, slot, { baseDate: base, dropPref: state.dropPref && state.dropPref.pref }) };
     });
     var groups = res.groups.map(function (g) {
       var ages = g.slots.map(function (i) { return people[i] ? people[i].fill.age : null; });
@@ -1013,9 +1014,29 @@
 
   function display(v) { return v == null ? '' : String(v); }
 
+  // ★ この申込書に書く人のうち、いちばん多い都道府県。単独で最多なら省いて市区町村から書く
+  //   （2026-09-18、本人の要望。ほとんどが同じ県なので、そのほうが読みやすい）。
+  //   同数で並んだら省かない（どちらを省いても分かりにくいため）
+  function majorityPref() {
+    var counts = {}, total = 0;
+    state.sheets.forEach(function (sh) {
+      entriesOf(sh).forEach(function (e) {
+        var m = memberOf(sh, e);
+        if (!m || !m.pref || !m.addressRest) return;
+        counts[m.pref] = (counts[m.pref] || 0) + 1;
+        total++;
+      });
+    });
+    var prefs = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (!prefs.length) return null;
+    if (prefs.length > 1 && counts[prefs[0]] === counts[prefs[1]]) return null;   // 同数で並んだ
+    return { pref: prefs[0], n: counts[prefs[0]], total: total };
+  }
+
   function renderReview() {
     var body = clear(el('reviewBody'));
     var total = 0, waitingBirth = 0;
+    state.dropPref = majorityPref();
     state.sheets.forEach(function (sh) {
       var bi = birthInstruction(sh);
       sh.birthNeeded = bi.needed;
@@ -1070,6 +1091,13 @@
         });
         sec.appendChild(h('p', { class: 'sub-title', text: t('fmtTitle') }));
         sec.appendChild(fmtBox);
+      }
+      // 住所の県名を省いたときは、そう書いたことを見せる（黙って省かない）
+      var writesAddress = c.mapping.tables.some(function (tb) {
+        return tb.fields.some(function (f) { return f.field === 'address' && f.fmt !== 'keep-pref'; });
+      });
+      if (state.dropPref && writesAddress) {
+        sec.appendChild(h('p', { class: 'hint', text: t('dropPrefNote', state.dropPref) }));
       }
 
       // 表：人ごとに書く値

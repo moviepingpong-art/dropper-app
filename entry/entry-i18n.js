@@ -159,6 +159,7 @@
       baseDateNone: '申込書から基準日を読み取れませんでした。',
       baseDateNeeded: '⚠ 年齢を書くには基準日が要ります。入れてください。',
       fmtTitle: '書き方',
+      dropPrefNote: '住所は「{pref}」を省いて市区町村から書きます（この申込書の{total}人中{n}人が{pref}）。ほかの県の人には県名を付けます。県名から書きたいときは、上の「書き方」で選び直してください。',
       birthAsk: '📅 申込書に生年月日の書き方の指示がありません。どちらで書きますか？',
       birthAskNeeded: '⚠ 西暦か和暦を選んでください（選ぶまで保存できません）。',
       'birthStyle.seirekiOne': '西暦（1950/4/1）',
@@ -193,7 +194,8 @@
       'fmt.birthEra.full': '昭和', 'fmt.birthEra.short': 'S', 'fmt.birthEra.none': '空にする（西暦）',
       'fmt.birthYear.wareki': '昭和25', 'fmt.birthYear.seireki': '1950',
       'fmt.birthYear.wareki-num': '25（元号は別の欄）', 'fmt.birthYear.wareki-short': 'S25',
-      'fmt.address.plain': '住所だけ', 'fmt.address.with-postal': '〒から書く',
+      'fmt.address.plain': '多い都道府県は省く（市区町村から）', 'fmt.address.keep-pref': '都道府県から書く',
+      'fmt.address.with-postal': '〒から書く',
 
       'prob.birth-empty': '生年月日が空',
       'prob.birth-unreadable': '生年月日が読めない',
