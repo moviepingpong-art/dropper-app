@@ -676,8 +676,11 @@
       var cells = X.cells(book, i);
       var found = R.findNames(cells, state.roster);
       if (!found.names.length && !found.suspects.length) return;
-      state.sheets.push({ index: i, name: s.name, cells: cells, merges: X.merges(book, i), found: found,
-        pick: {}, key: null, mapping: null, fmt: {}, baseDate: null });
+      var sh = { index: i, name: s.name, cells: cells, merges: X.merges(book, i), found: found,
+        pick: {}, key: null, mapping: null, fmt: {}, baseDate: null };
+      // ③で「同じ人が2回」を表ごとに見るために、欄の対応をここで作っておく（規則なので一瞬）
+      sh.rules = M.normalize(window.EntryRules.map(cells, sh.merges, found));
+      state.sheets.push(sh);
     });
     hideFrom('stepNames');
     show('stepNames');
@@ -709,6 +712,20 @@
     }, 0);
   }
   function memberLabel(m) { return t('memberLabel', { name: m.name, birth: ymdText(m.birth) }); }
+
+  // その名前がどの表のものか。見出しの規則が分けた表（連絡責任者／選手 など）の番号を返す。
+  // どの表にも入らなければ、その場所そのものを鍵にする（ほかと混ざらないように）
+  function tableOf(sh, n) {
+    var tables = (sh.rules && sh.rules.tables) || [];
+    for (var i = 0; i < tables.length; i++) {
+      var tb = tables[i];
+      if (n.row < tb.firstRow || n.row > tb.lastRow) continue;
+      var cols = [tb.nameCol, tb.familyCol, tb.givenCol].filter(Boolean);
+      var col = X.toRef(n.col, 1).replace(/\d+$/, '');
+      if (cols.indexOf(col) >= 0) return 'T' + i;
+    }
+    return 'R' + n.row + 'C' + n.col;
+  }
 
   function renderNames() {
     var body = clear(el('namesBody'));
@@ -768,10 +785,13 @@
           }
         }
 
+        // ★ 「同じ人が2回」は表ごとに見る。連絡責任者・監督の欄と選手の表に同じ人がいるのは
+        //   ふつうのこと（2026-09-18、本人の指摘）。防ぎたいのは、選手の表に同じ人が2回入ること
         var m = memberOf(sh, e);
         if (m) {
-          if (chosen[m.key]) li.appendChild(h('p', { class: 'name-note ng', text: t('nameDuplicate', { ref: chosen[m.key] }) }));
-          else chosen[m.key] = e.n.refs[0];
+          var key = tableOf(sh, e.n) + '|' + m.key;
+          if (chosen[key]) li.appendChild(h('p', { class: 'name-note ng', text: t('nameDuplicate', { ref: chosen[key] }) }));
+          else chosen[key] = e.n.refs[0];
         }
         ul.appendChild(li);
       });
@@ -789,7 +809,7 @@
   // 様式ごとに覚えるのは、本人が④で選び直した書き方（fmt）と書く欄（fields）だけ（EntryMap.prefs。個人情報は入らない）
   function onNamesNext() {
     Promise.all(state.sheets.map(function (sh) {
-      sh.mapping = M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
+      sh.mapping = sh.rules || M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
       return M.formKey(sh.name, sh.cells, sh.merges, sh.found).then(function (k) {
         sh.key = k;
         var saved = M.prefs.get(k);
