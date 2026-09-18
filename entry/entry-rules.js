@@ -140,7 +140,7 @@
 
       // 3. 語で欄の種類を決める
       var hasBirthParent = function (ch) { return ch.some(function (t) { return /生年月日|誕生日|生まれ/.test(t); }); };
-      var fields = [], ageSum = null, undecided = [];
+      var fields = [], ageSum = null, event = null, undecided = [];
       cols.forEach(function (c) {
         var near = c.chain[0], all = c.chain.join('|');
         var f = null;
@@ -149,6 +149,8 @@
         else if (/^女(性)?$/.test(near)) f = 'genderFemale';
         else if (/性別|男女/.test(near)) f = 'gender';
         else if (/合計/.test(all) && /年齢/.test(all)) f = 'ageSum';
+        // ★ ダブルスの種目（男子／女子／混合）。組ごとに1つ書く欄（2026-09-18、本人の要望）
+        else if (/^(種目|参加種目|種別)$/.test(near)) f = 'event';
         else if (/^(年齢|年令)/.test(near)) f = 'age';
         else if (/郵便|〒/.test(near)) f = 'postal';
         else if (/都道府県/.test(near)) f = 'addressPref';
@@ -173,6 +175,7 @@
           return;
         }
         if (f === 'ageSum') { ageSum = c; return; }
+        if (f === 'event') { event = c; return; }
         fields.push({ field: f, col: numToCol(c.col), rowOffset: 0, chain: c.chain, header: c.chain.slice().reverse().join(' / ') });
       });
 
@@ -209,11 +212,20 @@
         delete f.chain;
       });
 
-      // 5. 合計年齢: 名前の行で縦に結合されていれば、その行数で組を作る
-      var pairSize = 1, ageSumCol = '';
+      // 5. 組（ダブルス）: 合計年齢や種目の欄が名前の行で縦に結合されていれば、その行数で組を作る
+      var pairSize = 1, ageSumCol = '', eventCol = '';
       if (ageSum) {
         var m = mergeOf(firstRow, ageSum.col);
         if (m && m.bottom > m.top) { pairSize = m.bottom - m.top + 1; ageSumCol = numToCol(ageSum.col); }
+      }
+      if (event) {
+        var me = mergeOf(firstRow, event.col);
+        if (me && me.bottom > me.top) {
+          eventCol = numToCol(event.col);
+          if (pairSize === 1) pairSize = me.bottom - me.top + 1;
+        } else if (pairSize > 1) {
+          eventCol = numToCol(event.col);   // 合計年齢で組が分かっていれば、結合していなくても組ごとに書く
+        }
       }
 
       // ④の「申込書の列 → 書くもの」の一覧。見出しのある列をすべて、列の順に並べる（合計年齢の列は組の決まりで扱うので出さない）
@@ -221,7 +233,8 @@
         .concat(undecided)
         .sort(function (a, b) { return colToNum(a.col) - colToNum(b.col); });
 
-      var tb = { firstRow: firstRow, lastRow: lastRow, headerRow: headerRow, pairSize: pairSize, ageSumCol: ageSumCol, ageSumRowOffset: 0,
+      var tb = { firstRow: firstRow, lastRow: lastRow, headerRow: headerRow, pairSize: pairSize,
+                 ageSumCol: ageSumCol, ageSumRowOffset: 0, eventCol: eventCol, eventRowOffset: 0,
                  fields: fields, cols: colList };
       if (g.letters.length === 2) { tb.nameCol = ''; tb.familyCol = g.letters[0]; tb.givenCol = g.letters[1]; }
       else tb.nameCol = g.letters[0];

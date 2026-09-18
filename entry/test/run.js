@@ -231,6 +231,7 @@ function main() {
     .then(function () { return attendSection(); })
     .then(function () { return bookSection(); })
     .then(function () { return blankSection(roster); })
+    .then(function () { return eventSection(); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -667,6 +668,10 @@ function mapSection(roster) {
       var res = M.slotsFor(rulesFor(book, si, cells, found), sortedNames(found), { cells: cells, anchorOf: function (r) { return X.anchorOf(book, si, r); } });
       eq(plainSlots(res.slots), expectSlots, label + ': 見出しの規則で全欄が正しい');
       eq(res.groups.map(function (g) { return g.ageSum + '=' + g.slots.join('+'); }), expectGroups, label + ': 合計年齢の欄');
+      // ★ ダブルスの種目の欄（組ごとに1つ。2026-09-18）
+      if (/百万石 個人戦/.test(label)) {
+        eq(res.groups.map(function (g) { return g.event; }), ['M14', 'M16'], label + ': ダブルスの種目の欄（組ごと）');
+      }
       return rulesFor(book, si, cells, found);
     }).then(function (mapping) {
       if (/スポレク/.test(label)) {
@@ -1046,6 +1051,48 @@ function attendSection() {
     check(src.indexOf("'?action=members&s='") >= 0 && src.indexOf("'?a=members&s='") < 0,
       '★ 出欠システムを呼ぶ合図は action=members');
   });
+}
+
+// ===== ダブルスの種目（組ごとに1つ書く欄） =====
+function eventSection() {
+  section('12. ダブルスの種目（組ごとの欄）');
+
+  // 架空の様式: C列に名前、L列に合計年齢、M列に種目。どちらも2行ずつ縦に結合（2人1組）
+  var cells = [
+    { ref: 'C1', row: 1, col: 3, text: '氏名' }, { ref: 'L1', row: 1, col: 12, text: '合計年齢' },
+    { ref: 'M1', row: 1, col: 13, text: '種目' },
+    { ref: 'C2', row: 2, col: 3, text: '山田 太郎' }, { ref: 'C3', row: 3, col: 3, text: '山田 花子' },
+    { ref: 'C4', row: 4, col: 3, text: '田中 誠' }, { ref: 'C5', row: 5, col: 3, text: '加藤 健' }
+  ];
+  var merges = [{ top: 2, bottom: 3, left: 12, right: 12 }, { top: 2, bottom: 3, left: 13, right: 13 },
+                { top: 4, bottom: 5, left: 12, right: 12 }, { top: 4, bottom: 5, left: 13, right: 13 }];
+  var names = ['C2', 'C3', 'C4', 'C5'].map(function (ref, i) {
+    var row = i + 2;
+    return { refs: [ref], row: row, col: 3, text: cells[3 + i].text, match: { status: 'exact', member: null } };
+  });
+  var mapping = M.normalize(RU.map(cells, merges, { names: names, suspects: [] }));
+  var tb = mapping.tables[0];
+  eq([tb.pairSize, tb.ageSumCol, tb.eventCol], [2, 'L', 'M'], '種目の列と、2人1組であることを見つける');
+  var res = M.slotsFor(mapping, names, { cells: cells, anchorOf: function (r) { return r; } });
+  eq(res.groups.map(function (g) { return g.ageSum + '/' + g.event + '=' + g.slots.join('+'); }),
+    ['L2/M2=0+1', 'L4/M4=2+3'], '組ごとに、合計年齢と種目の欄が決まる');
+
+  // 種目の欄しか無い様式でも、その縦結合で組が決まる
+  var cells2 = cells.filter(function (c) { return c.ref !== 'L1'; });
+  var merges2 = merges.filter(function (m) { return m.left !== 12; });
+  var mp2 = M.normalize(RU.map(cells2, merges2, { names: names, suspects: [] }));
+  eq([mp2.tables[0].pairSize, mp2.tables[0].ageSumCol, mp2.tables[0].eventCol], [2, '', 'M'],
+    '合計年齢の欄が無くても、種目の結合で組が決まる');
+  var res2 = M.slotsFor(mp2, names, { cells: cells2, anchorOf: function (r) { return r; } });
+  eq(res2.groups.map(function (g) { return (g.ageSum || '-') + '/' + g.event; }), ['-/M2', '-/M4'],
+    '合計年齢が無い組でも、種目の欄は決まる');
+
+  // ★ 種目の欄に文字が印刷されていたら書かない（ほかの欄と同じ守り）
+  var cells3 = cells.concat([{ ref: 'M2', row: 2, col: 13, text: '男子' }]);
+  var res3 = M.slotsFor(M.normalize(RU.map(cells3, merges, { names: names, suspects: [] })), names,
+    { cells: cells3, anchorOf: function (r) { return r; } });
+  eq(res3.problems.filter(function (p) { return p.field === 'event'; }).map(function (p) { return p.code + ' ' + p.ref; }),
+    ['target-has-text M2'], '種目の欄に文字が入っていたら書かずに知らせる');
 }
 
 // ===== 空の様式から「名前を書く表」を見つける =====

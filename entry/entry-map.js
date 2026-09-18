@@ -72,6 +72,7 @@
         firstRow: int(t.firstRow, 1, 100000, 0), lastRow: int(t.lastRow, 1, 100000, 0),
         headerRow: int(t.headerRow, 0, 100000, 0),
         pairSize: int(t.pairSize, 1, 6, 1), ageSumCol: col(t.ageSumCol), ageSumRowOffset: int(t.ageSumRowOffset, 0, 5, 0),
+        eventCol: col(t.eventCol), eventRowOffset: int(t.eventRowOffset, 0, 5, 0),
         fields: []
       };
       if (!tb.nameCol && !(tb.familyCol && tb.givenCol)) { out.problems.push({ code: 'table-no-name-col', table: ti }); return; }
@@ -170,7 +171,7 @@
       return step;   // 0 = 分からない
     }
 
-    var slots = [], groupsByKey = {}, problems = [];
+    var slots = [], groupsByKey = {}, problems = [], problemSeen = {};
     names.forEach(function (n) {
       var p = X.parseRef(n.refs[0]);
       var tb = tableOf(n);
@@ -202,19 +203,27 @@
       var slot = { name: n, fields: fields };
       slots.push(slot);
 
-      if (tb.pairSize > 1 && tb.ageSumCol) {
+      // 組（2人1組など）。合計年齢と種目は、組につき1つの欄に書く
+      if (tb.pairSize > 1 && (tb.ageSumCol || tb.eventCol)) {
         var idx = Math.floor((p.row - tb.firstRow) / tb.pairSize);
         var start = tb.firstRow + idx * tb.pairSize;
-        var sumRef = anchor(tb.ageSumCol + (start + tb.ageSumRowOffset));
-        // ★ 合計の欄も、式・文字・名前の入った欄には書かない（2026-09-15、Gemini が
+        var key = mapping.tables.indexOf(tb) + '#' + start;
+        // ★ 組の欄も、式・文字・名前の入った欄には書かない（2026-09-15、Gemini が
         //   表の下の「年齢合計」＝式のセルを4人1組の合計欄と読んだ）。1組につき1回だけ知らせる
-        var why = nameAt[sumRef] ? 'target-is-name' : formulaAt[sumRef] ? 'target-is-formula'
-          : (textAt[sumRef] != null && textAt[sumRef] !== '') ? 'target-has-text' : '';
-        if (why) {
-          if (!groupsByKey.hasOwnProperty(sumRef)) { groupsByKey[sumRef] = null; problems.push({ code: why, ref: sumRef, field: 'ageSum' }); }
-        } else {
-          if (!groupsByKey[sumRef]) groupsByKey[sumRef] = { slots: [], ageSum: sumRef, size: tb.pairSize };
-          groupsByKey[sumRef].slots.push(slots.length - 1);
+        var cellFor = function (colLetter, offset, field) {
+          if (!colLetter) return '';
+          var ref = anchor(colLetter + (start + offset));
+          var why = nameAt[ref] ? 'target-is-name' : formulaAt[ref] ? 'target-is-formula'
+            : (textAt[ref] != null && textAt[ref] !== '') ? 'target-has-text' : '';
+          if (!why) return ref;
+          if (!problemSeen[ref]) { problemSeen[ref] = true; problems.push({ code: why, ref: ref, field: field }); }
+          return '';
+        };
+        var sumRef = cellFor(tb.ageSumCol, tb.ageSumRowOffset, 'ageSum');
+        var eventRef = cellFor(tb.eventCol, tb.eventRowOffset, 'event');
+        if (sumRef || eventRef) {
+          if (!groupsByKey[key]) groupsByKey[key] = { slots: [], ageSum: sumRef, event: eventRef, size: tb.pairSize };
+          groupsByKey[key].slots.push(slots.length - 1);
         }
       }
     });

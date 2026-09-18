@@ -1140,10 +1140,17 @@
       return { entry: e, member: member, slot: slot,
         fill: R.fill(member, slot, { baseDate: base, dropPref: state.dropPref && state.dropPref.pref }) };
     });
-    var groups = res.groups.map(function (g) {
+    var groups = res.groups.map(function (g, gi) {
       var ages = g.slots.map(function (i) { return people[i] ? people[i].fill.age : null; });
       var ok = ages.length && ages.every(function (a) { return a != null; });
-      return { ref: g.ageSum, ages: ages, sum: ok ? ages.reduce(function (s, a) { return s + a; }, 0) : null };
+      var members = g.slots.map(function (i) { return people[i] && people[i].member; }).filter(Boolean);
+      // ★ ダブルスの種目（男子／女子／混合）。組の性別から決め、本人が直せる（2026-09-18）
+      var key = sh.index + '#' + (g.event || g.ageSum || gi);
+      var auto = eventOf(members);
+      var chosen = sh.events && sh.events[key];
+      return { ref: g.ageSum, ages: ages, sum: ok ? ages.reduce(function (s, a) { return s + a; }, 0) : null,
+        eventRef: g.event, members: members, size: g.size || g.slots.length, key: key,
+        event: chosen || auto, autoEvent: auto, warn: eventWarning(chosen || auto, members) };
     });
     var writes = [];
     // ★ 空の申込書では、名前もこちらが書く（名前が書いてある申込書では、名前はもう入っている）
@@ -1159,11 +1166,38 @@
       });
     }
     people.forEach(function (p) { p.fill.writes.forEach(function (w) { writes.push(w); }); });
-    groups.forEach(function (g) { if (g.sum != null) writes.push({ ref: g.ref, value: g.sum }); });
+    groups.forEach(function (g) {
+      if (g.sum != null && g.ref) writes.push({ ref: g.ref, value: g.sum });
+      // 組がそろっている（2人とも入っている）ときだけ種目を書く
+      if (g.eventRef && g.event && g.members.length === g.size) {
+        writes.push({ ref: g.eventRef, value: t('event.' + g.event + '.' + (sh.eventFmt || 'short')) });
+      }
+    });
     return { mapping: mapping, res: res, base: base, people: people, groups: groups, writes: writes };
   }
 
   function display(v) { return v == null ? '' : String(v); }
+
+  /* ===== ダブルスの種目（2026-09-18、本人の要望） ===== */
+  // 組の性別から種目を決める。男男→男子、女女→女子、男女→混合。
+  // ★ 男子ダブルスに女子が入ってもよい大会があるので、④で「男子」に直せる（決めつけない）
+  function eventOf(members) {
+    if (!members.length) return '';
+    var men = members.filter(function (m) { return m.gender === '男'; }).length;
+    var women = members.filter(function (m) { return m.gender === '女'; }).length;
+    if (men && !women) return 'men';
+    if (women && !men) return 'women';
+    return 'mixed';
+  }
+  // 決まりに合わない組を知らせる。★ 男子に女子が入るのは（本人の大会の決まりで）可なので知らせない
+  function eventWarning(event, members) {
+    if (!event || members.length < 2) return '';
+    var men = members.filter(function (m) { return m.gender === '男'; }).length;
+    var women = members.filter(function (m) { return m.gender === '女'; }).length;
+    if (event === 'women' && men) return 'women-has-man';
+    if (event === 'mixed' && (men !== 1 || women !== 1)) return 'mixed-not-pair';
+    return '';
+  }
 
   // ★ この申込書に書く人のうち、いちばん多い都道府県。単独で最多なら省いて市区町村から書く
   //   （2026-09-18、本人の要望。ほとんどが同じ県なので、そのほうが読みやすい）。
@@ -1292,15 +1326,54 @@
       sec.appendChild(h('div', { class: 'table-wrap' }, [table]));
 
       // 合計年齢
-      if (c.groups.length) {
+      if (c.groups.some(function (g) { return g.ref; })) {
         var gl = h('ul', { class: 'plain' });
         c.groups.forEach(function (g) {
+          if (!g.ref) return;
           gl.appendChild(h('li', { text: g.sum != null
             ? t('groupSum', { ref: g.ref, ages: g.ages.join(' + '), sum: g.sum })
             : t('groupSumMissing', { ref: g.ref }) }));
         });
         sec.appendChild(h('p', { class: 'sub-title', text: t('groupTitle') }));
         sec.appendChild(gl);
+      }
+
+      // ★ ダブルスの種目（組ごと）。性別から決めたものを見せ、選び直せる
+      var eventGroups = c.groups.filter(function (g) { return g.eventRef; });
+      if (eventGroups.length) {
+        sec.appendChild(h('p', { class: 'sub-title', text: t('eventTitle') }));
+        sec.appendChild(h('p', { class: 'hint', text: t('eventNote') }));
+        var el2 = h('ul', { class: 'plain' });
+        eventGroups.forEach(function (g) {
+          var li = h('li', { class: 'event-row' });
+          if (g.members.length < g.size || !g.event) {
+            li.appendChild(h('span', { text: t('eventRowNone', { ref: g.eventRef }) }));
+          } else {
+            li.appendChild(h('span', { text: t('eventRow', { ref: g.eventRef,
+              names: g.members.map(function (m) { return m.name; }).join('・'),
+              event: t('event.' + g.event + '.' + (sh.eventFmt || 'short')) }) }));
+            var sel = h('select', { onchange: function (ev) {
+              sh.events = sh.events || {};
+              sh.events[g.key] = ev.target.value;
+              renderReview();
+            } });
+            ['men', 'women', 'mixed'].forEach(function (k) {
+              sel.appendChild(h('option', { value: k, text: t('event.' + k + '.long') }));
+            });
+            sel.value = g.event;
+            li.appendChild(sel);
+            if (g.warn) li.appendChild(h('span', { class: 'event-warn', text: t('eventWarn.' + g.warn) }));
+          }
+          el2.appendChild(li);
+        });
+        sec.appendChild(el2);
+        // 書き方（男子／男子ダブルス）
+        var fmtSel = h('select', { onchange: function (ev) { sh.eventFmt = ev.target.value; renderReview(); } });
+        ['short', 'long'].forEach(function (k) {
+          fmtSel.appendChild(h('option', { value: k, text: t('eventFmt.' + k) }));
+        });
+        fmtSel.value = sh.eventFmt || 'short';
+        sec.appendChild(h('p', { class: 'small' }, [h('span', { text: t('eventFmtTitle') + '：' }), fmtSel]));
       }
 
       // 知らせること
