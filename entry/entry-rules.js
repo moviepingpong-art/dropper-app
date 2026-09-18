@@ -252,6 +252,18 @@
       if (marks.length >= 2) ageClassesRaw = t.trim();
     });
 
+    // 6c. 参加料の単価（「5,000×　　＝」「参加料：団体3,000円×（　）チーム＝合計（　）円」）
+    // ★ 計算して見せるだけ。申込書には書かない（書く場所は様式ごとに違い、文の途中の空欄のこともある）
+    // ★ 「参加料」の語と単価が別のセルに分かれている様式がある（百万石は B「参加料は…」・H「3,000×　＝」）。
+    //   シートのどこかに「参加料」の語があれば、「数×」の形のセルを単価とみなす（2026-09-19）
+    var feeRaw = '';
+    var feeWord = cells.some(function (c) { return /(参加料|参加費|申込料)/.test(String(c.text || '')); });
+    cells.forEach(function (c) {
+      var t = String(c.text == null ? '' : c.text);
+      if (feeRaw || !/[×✕xX]/.test(t) || !/\d[\d,]{2,}/.test(t)) return;
+      if (feeWord || /円/.test(t)) feeRaw = t.trim();
+    });
+
     // 6. 基準日
     var baseDateRaw = '';
     var dateLike = /(明治|大正|昭和|平成|令和|[MTSHR])?\s*\d{1,4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日|\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/;
@@ -261,7 +273,7 @@
       if (!baseDateRaw && /(現在|時点|基準)/.test(t) && dateLike.test(t)) baseDateRaw = t.trim();
     });
 
-    return { baseDateRaw: baseDateRaw, ageClassesRaw: ageClassesRaw, tables: tables, extras: extras };
+    return { baseDateRaw: baseDateRaw, ageClassesRaw: ageClassesRaw, feeRaw: feeRaw, tables: tables, extras: extras };
   }
 
   global.EntryRules = { map: map };

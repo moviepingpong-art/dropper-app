@@ -954,6 +954,12 @@
         var saved = M.prefs.get(k);
         sh.fmt = (saved && saved.fmt) || {};
         sh.overrides = (saved && saved.fields) || {};
+        // 大会の決まり（前にこの申込書で入れたもの）
+        sh.ageClassesRaw = (saved && saved.ageClasses) || '';
+        sh.eventWrite = (saved && saved.eventWrite) || '';
+        sh.eventFmt = (saved && saved.eventFmt) || '';
+        sh.feeCount = (saved && saved.feeCount) || '';
+        sh.feeManual = (saved && saved.feeManual) || '';
         sh.colsOpen = null;   // null = 決められなかった列があるときだけ開く。本人が開け閉めしたらそれに従う
       });
     })).then(function () {
@@ -970,7 +976,12 @@
     sh.duplicates = r.duplicates;
     return r.mapping;
   }
-  function savePrefs(sh) { M.prefs.put(sh.key, { fmt: sh.fmt, fields: sh.overrides }); }
+  // 様式ごとに覚えるもの。★ 個人情報は入れない（書き方と欄の対応、大会の決まりだけ）
+  function savePrefs(sh) {
+    M.prefs.put(sh.key, { fmt: sh.fmt, fields: sh.overrides,
+      ageClasses: sh.ageClassesRaw || '', eventWrite: sh.eventWrite || '', eventFmt: sh.eventFmt || '',
+      feeCount: sh.feeCount || '', feeManual: sh.feeManual || '' });
+  }
 
   // ★ 生年月日を西暦で書くか和暦で書くか（2026-09-15、本人の要望）。
   //   申込書に指示が無いときは、名簿の書き方に関係なく本人に選んでもらい、選ぶまで保存させない。
@@ -1130,6 +1141,11 @@
 
   function computeSheet(sh) {
     var mapping = withFmt(sh);
+    // ★ 年齢区分は、申込書に書かれていなければ本人が④で貼り付けたものを使う（要項の文）
+    if (sh.ageClassesRaw) {
+      mapping.ageClasses = M.ageClassesIn(sh.ageClassesRaw);
+      mapping.ageClassesRaw = sh.ageClassesRaw;
+    }
     var entries = entriesOf(sh).filter(function (e) { return memberOf(sh, e); });
     var anchorOf = function (r) { return X.anchorOf(state.form.book, sh.index, r); };
     var res = M.slotsFor(mapping, entries.map(function (e) { return e.n; }), { cells: sh.cells, anchorOf: anchorOf });
@@ -1350,6 +1366,27 @@
         sec.appendChild(gl);
       }
 
+      // ★ 年齢区分（2026-09-19）。申込書に書かれていないこともある（要項にはある）ので、
+      //   要項の文を貼り付けて読ませる。読んだ区分はその申込書について覚える
+      if (c.groups.length) {
+        sec.appendChild(h('p', { class: 'sub-title', text: t('ageClassTitle') }));
+        var fromForm = (sh.mapping && sh.mapping.ageClassesRaw) || '';
+        if (fromForm) sec.appendChild(h('p', { class: 'hint', text: t('ageClassFrom', { raw: fromForm }) }));
+        var classInput = h('input', { type: 'text', value: sh.ageClassesRaw || '', placeholder: t('ageClassPlaceholder') });
+        var applyClasses = function () {
+          sh.ageClassesRaw = classInput.value.trim();
+          savePrefs(sh);
+          renderReview();
+        };
+        classInput.addEventListener('change', applyClasses);
+        sec.appendChild(h('div', { class: 'field' }, [
+          h('label', { text: t('ageClassInput') }), classInput,
+          h('p', { class: 'hint', text: c.mapping.ageClasses.length
+            ? t('ageClassRead', { n: c.mapping.ageClasses.length, list: c.mapping.ageClasses.map(function (x) { return x.text; }).join(' / ') })
+            : t('ageClassNotRead') })
+        ]));
+      }
+
       // ★ ダブルスの種目（組ごと）。性別から決めたものを見せ、選び直せる
       var eventGroups = c.groups.filter(function (g) { return g.eventRef; });
       if (eventGroups.length) {
@@ -1395,6 +1432,48 @@
         });
         fmtSel.value = sh.eventFmt || 'short';
         sec.appendChild(h('p', { class: 'small' }, [h('span', { text: t('eventFmtTitle') + '：' }), fmtSel]));
+      }
+
+      // ★ 参加料（2026-09-19、本人の要望）。計算して見せるだけで、申込書には書かない
+      //   （書く場所は様式ごとに違い、文の途中の空欄のこともあるため）
+      var fee = c.mapping.fee;
+      var fullGroups = c.groups.filter(function (g) { return g.members.length === g.size; }).length;
+      var counts = { people: c.people.length, groups: fullGroups, sheet: 1 };
+      if (fee || sh.feeManual) {
+        sec.appendChild(h('p', { class: 'sub-title', text: t('feeTitle') }));
+        if (fee) sec.appendChild(h('p', { class: 'hint', text: t('feeFrom', { raw: fee.text }) }));
+        var priceInput = h('input', { type: 'number', class: 'row-num', value: String(sh.feePrice || (fee && fee.price) || ''), min: '0' });
+        var countSel = h('select');
+        // ★ 数え方は大会ごとに違う（1人いくら／1組いくら／1チームいくら）。選ぶまで計算しない
+        countSel.appendChild(h('option', { value: '', text: t('feeCount.choose') }));
+        [['people', t('feeCount.people', { n: counts.people })],
+         ['groups', t('feeCount.groups', { n: counts.groups })],
+         ['sheet', t('feeCount.sheet')],
+         ['manual', t('feeCount.manual')]].forEach(function (o) {
+          if (o[0] === 'groups' && !c.groups.length) return;
+          countSel.appendChild(h('option', { value: o[0], text: o[1] }));
+        });
+        countSel.value = sh.feeCount || '';
+        var manualInput = h('input', { type: 'number', class: 'row-num', value: String(sh.feeManual || ''), min: '0' });
+        manualInput.hidden = countSel.value !== 'manual';
+        var n = countSel.value === 'manual' ? Number(sh.feeManual || 0) : counts[countSel.value];
+        var price = Number(priceInput.value || 0);
+        var apply = function () {
+          sh.feePrice = Number(priceInput.value || 0);
+          sh.feeCount = countSel.value;
+          sh.feeManual = manualInput.value;
+          savePrefs(sh);
+          renderReview();
+        };
+        [priceInput, countSel, manualInput].forEach(function (x) { x.addEventListener('change', apply); });
+        var line = h('p', { class: 'small fee-line' }, [
+          priceInput, h('span', { text: t('feeYenTimes') }), countSel, manualInput,
+          h('span', { class: 'fee-total', text: (countSel.value && price && n)
+            ? t('feeTotal', { total: (price * n).toLocaleString('ja-JP'), n: n })
+            : t('feeTotalWait') })
+        ]);
+        sec.appendChild(line);
+        sec.appendChild(h('p', { class: 'hint', text: t('feeNote') }));
       }
 
       // 知らせること

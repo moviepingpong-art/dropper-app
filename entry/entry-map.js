@@ -94,6 +94,22 @@
   // 前後のかっこ・中黒・空白を落とす（「④ 150歳以上 ））」→「④ 150歳以上」）
   function tidy(s) { return String(s).replace(/^[\s（(・]+/, '').replace(/[\s）)・]+$/, ''); }
 
+  // 参加料の文から単価を読む。「5,000×　＝」「参加料：団体3,000円×（　）チーム＝合計（　）円」
+  // → { price: 3000, per: 'チーム' }。読めなければ null
+  // ★ 計算して見せるだけ。申込書には書かない（書く場所が様式ごとに違う）
+  function feeIn(raw) {
+    var t = str(raw);
+    if (!t) return null;
+    t = t.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); }).replace(/[　\t]/g, ' ');
+    var m = /(\d[\d,]{2,})\s*円?\s*[×✕xX]/.exec(t);
+    if (!m) return null;
+    var price = Number(m[1].replace(/,/g, ''));
+    if (!isFinite(price) || price <= 0) return null;
+    var after = t.slice(m.index + m[0].length);
+    var per = (/(チーム|団体|組|ペア|名|人)/.exec(after) || /(チーム|団体|組|ペア|名|人)/.exec(t.slice(0, m.index)) || [])[1] || '';
+    return { price: price, per: per, text: t.trim() };
+  }
+
   // 合計年齢から区分を選ぶ。どれにも当てはまらなければ null
   function ageClassOf(classes, sum) {
     if (!classes || !classes.length || sum == null) return null;
@@ -108,6 +124,7 @@
     var o = raw && typeof raw === 'object' ? raw : {};
     var out = { baseDate: dateIn(str(o.baseDateRaw)), baseDateRaw: str(o.baseDateRaw),
       ageClasses: ageClassesIn(o.ageClassesRaw), ageClassesRaw: str(o.ageClassesRaw),
+      fee: feeIn(o.feeRaw), feeRaw: str(o.feeRaw),
       tables: [], extras: [], problems: [] };
 
     (Array.isArray(o.tables) ? o.tables : []).forEach(function (t, ti) {
@@ -365,6 +382,6 @@
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, prefs: prefs, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf
+    formKey: formKey, prefs: prefs, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
   };
 })(typeof window !== 'undefined' ? window : this);

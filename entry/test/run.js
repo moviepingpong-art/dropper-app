@@ -1104,6 +1104,22 @@ function eventSection() {
   eq(M.ageClassOf([], 150), null, '区分が書かれていなければ決めない');
   eq(M.ageClassesIn(HYAKU)[3].text, '④ 150歳以上', '区分の文字は、前後のかっこを落として見せる');
 
+  // ===== 参加料の単価（計算して見せるだけ。申込書には書かない） =====
+  eq([M.feeIn('5,000×　　　　　＝'), M.feeIn('3,000×　　＝')].map(function (f) { return f && f.price; }), [5000, 3000],
+    '「5,000×　＝」から単価を読む（百万石）');
+  var kahoku = M.feeIn('参加料：団体3,000円×（　　）チーム＝合計（　　　　）円を添えて上記のとおり、申し込みます。');
+  eq([kahoku.price, kahoku.per], [3000, 'チーム'], '「団体3,000円×（ ）チーム」から単価と数え方の言葉を読む');
+  eq(M.feeIn('参加費 1人 800円'), null, '「×」が無い文からは読まない（数え方が分からないため）');
+  eq(M.feeIn(''), null, '何も書かれていなければ読まない');
+  var feeCells = [
+    { ref: 'B25', row: 25, col: 2, text: '参加料は、大会受付時に支払います' },
+    { ref: 'H25', row: 25, col: 8, text: '3,000×　　　　　＝' }
+  ];
+  eq(M.normalize(RU.map(feeCells, [], { names: [], suspects: [] })).fee.price, 3000,
+    '★ 「参加料」の語と単価が別のセルでも拾う（百万石はこの形）');
+  eq(M.normalize(RU.map([{ ref: 'A1', row: 1, col: 1, text: '3人×4組' }], [], { names: [], suspects: [] })).fee, null,
+    '参加料と関係ない「×」の文は拾わない');
+
   // 申込書から区分の文を拾う（規則）
   var classCells = [
     { ref: 'C5', row: 5, col: 3, text: HYAKU },
