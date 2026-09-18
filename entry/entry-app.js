@@ -1148,9 +1148,12 @@
       var key = sh.index + '#' + (g.event || g.ageSum || gi);
       var auto = eventOf(members);
       var chosen = sh.events && sh.events[key];
-      return { ref: g.ageSum, ages: ages, sum: ok ? ages.reduce(function (s, a) { return s + a; }, 0) : null,
+      var sum = ok ? ages.reduce(function (s, a) { return s + a; }, 0) : null;
+      return { ref: g.ageSum, ages: ages, sum: sum,
         eventRef: g.event, members: members, size: g.size || g.slots.length, key: key,
-        event: chosen || auto, autoEvent: auto, warn: eventWarning(chosen || auto, members) };
+        event: chosen || auto, autoEvent: auto, warn: eventWarning(chosen || auto, members),
+        // ★ 年齢区分（申込書に書かれている区分から、合計年齢で決める。2026-09-19）
+        ageClass: M.ageClassOf(mapping.ageClasses, sum) };
     });
     var writes = [];
     // ★ 空の申込書では、名前もこちらが書く（名前が書いてある申込書では、名前はもう入っている）
@@ -1168,9 +1171,15 @@
     people.forEach(function (p) { p.fill.writes.forEach(function (w) { writes.push(w); }); });
     groups.forEach(function (g) {
       if (g.sum != null && g.ref) writes.push({ ref: g.ref, value: g.sum });
-      // 組がそろっている（2人とも入っている）ときだけ種目を書く
-      if (g.eventRef && g.event && g.members.length === g.size) {
-        writes.push({ ref: g.eventRef, value: t('event.' + g.event + '.' + (sh.eventFmt || 'short')) });
+      // 組がそろっている（2人とも入っている）ときだけ、種目の欄に書く。
+      // ★ その欄に「種目」を書くか「年齢区分」を書くかは本人が選ぶ（百万石は年齢区分を書く欄だった）
+      if (g.eventRef && g.members.length === g.size) {
+        var what = sh.eventWrite || 'event';
+        if (what === 'event' && g.event) {
+          writes.push({ ref: g.eventRef, value: t('event.' + g.event + '.' + (sh.eventFmt || 'short')) });
+        } else if (what === 'ageClass' && g.ageClass) {
+          writes.push({ ref: g.eventRef, value: g.ageClass.mark });
+        }
       }
     });
     return { mapping: mapping, res: res, base: base, people: people, groups: groups, writes: writes };
@@ -1330,9 +1339,12 @@
         var gl = h('ul', { class: 'plain' });
         c.groups.forEach(function (g) {
           if (!g.ref) return;
-          gl.appendChild(h('li', { text: g.sum != null
+          var line = g.sum != null
             ? t('groupSum', { ref: g.ref, ages: g.ages.join(' + '), sum: g.sum })
-            : t('groupSumMissing', { ref: g.ref }) }));
+            : t('groupSumMissing', { ref: g.ref });
+          // ★ 申込書に年齢区分が書かれていれば、合計年齢から区分も見せる
+          if (g.sum != null && g.ageClass) line += t('ageClassSuffix', { mark: g.ageClass.mark, text: g.ageClass.text });
+          gl.appendChild(h('li', { text: line }));
         });
         sec.appendChild(h('p', { class: 'sub-title', text: t('groupTitle') }));
         sec.appendChild(gl);
@@ -1342,6 +1354,15 @@
       var eventGroups = c.groups.filter(function (g) { return g.eventRef; });
       if (eventGroups.length) {
         sec.appendChild(h('p', { class: 'sub-title', text: t('eventTitle') }));
+        // ★ その欄に何を書くか（種目／年齢区分／書かない）。百万石は年齢区分を書く欄だった
+        var whatSel = h('select', { onchange: function (ev) { sh.eventWrite = ev.target.value; renderReview(); } });
+        [['event', t('eventWrite.event')], ['ageClass', t('eventWrite.ageClass')], ['none', t('eventWrite.none')]]
+          .forEach(function (o) {
+            if (o[0] === 'ageClass' && !c.mapping.ageClasses.length) return;   // 区分が書かれていない申込書では出さない
+            whatSel.appendChild(h('option', { value: o[0], text: o[1] }));
+          });
+        whatSel.value = sh.eventWrite || 'event';
+        sec.appendChild(h('p', { class: 'small' }, [h('span', { text: t('eventWriteTitle') + '：' }), whatSel]));
         sec.appendChild(h('p', { class: 'hint', text: t('eventNote') }));
         var el2 = h('ul', { class: 'plain' });
         eventGroups.forEach(function (g) {

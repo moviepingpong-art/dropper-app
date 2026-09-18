@@ -1087,6 +1087,31 @@ function eventSection() {
   eq(res2.groups.map(function (g) { return (g.ageSum || '-') + '/' + g.event; }), ['-/M2', '-/M4'],
     '合計年齢が無い組でも、種目の欄は決まる');
 
+  // ===== 年齢区分（申込書に書かれている区分を読む） =====
+  var HYAKU = '合計年齢　（　① 119歳以下　・　② 120～134歳　・　③ 135～149歳　・　④　150歳以上　）';
+  var DANTAI = '４名合計年齢　（　① 249歳以下　・　② 250～289歳　・　③ 290歳以上　）';
+  eq(M.ageClassesIn(HYAKU).map(function (c) { return c.mark + ':' + (c.min == null ? '' : c.min) + '-' + (c.max == null ? '' : c.max); }),
+    ['①:-119', '②:120-134', '③:135-149', '④:150-'], '★ 申込書に書かれた年齢区分を読む（①〜④）');
+  eq(M.ageClassesIn(DANTAI).map(function (c) { return c.mark; }), ['①', '②', '③'], '4名合計の区分も読む');
+  eq(M.ageClassesIn('年齢区分（1. 100歳未満 2. 100歳以上）').map(function (c) { return c.mark + ':' + (c.max == null ? '' : c.max); }),
+    ['1.:99', '2.:'], '「1. 100歳未満」の形も読む（未満は1つ下まで）');
+  eq(M.ageClassesIn('合計年齢は150歳以上とする').length, 0, '区分が1つしか書かれていない文は、区分と見なさない');
+  eq(M.ageClassesIn('').length, 0, '何も書かれていなければ区分なし');
+  var cls = M.ageClassesIn(HYAKU);
+  eq([118, 119, 120, 134, 150, 200].map(function (n) { var c = M.ageClassOf(cls, n); return c ? c.mark : '-'; }),
+    ['①', '①', '②', '②', '④', '④'], '合計年齢から区分を決める（境目も正しい）');
+  eq(M.ageClassOf(cls, null), null, '合計年齢が分からなければ区分も決めない');
+  eq(M.ageClassOf([], 150), null, '区分が書かれていなければ決めない');
+  eq(M.ageClassesIn(HYAKU)[3].text, '④ 150歳以上', '区分の文字は、前後のかっこを落として見せる');
+
+  // 申込書から区分の文を拾う（規則）
+  var classCells = [
+    { ref: 'C5', row: 5, col: 3, text: HYAKU },
+    { ref: 'A2', row: 2, col: 1, text: '年齢は令和9年4月1日現在' }
+  ];
+  eq(M.normalize(RU.map(classCells, [], { names: [], suspects: [] })).ageClasses.length, 4,
+    '★ 申込書の文から年齢区分を拾う（「①」を数字にそろえない）');
+
   // ★ 種目の欄に文字が印刷されていたら書かない（ほかの欄と同じ守り）
   var cells3 = cells.concat([{ ref: 'M2', row: 2, col: 13, text: '男子' }]);
   var res3 = M.slotsFor(M.normalize(RU.map(cells3, merges, { names: names, suspects: [] })), names,

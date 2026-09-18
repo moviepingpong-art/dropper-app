@@ -61,9 +61,54 @@
     return m ? global.EntryRoster.parseBirth(m[0].replace(/\s+/g, '')) : null;
   }
 
+  // 申込書に書かれた年齢区分の文を読む。
+  //   「合計年齢（① 119歳以下 ・ ② 120〜134歳 ・ ③ 135〜149歳 ・ ④ 150歳以上）」
+  //   → [{ mark: '①', min: null, max: 119 }, { mark: '②', min: 120, max: 134 }, …]
+  // ★ 区分は大会ごとに違う。こちらで決め打ちせず、書いてあるものだけを読む。
+  //   読めない書き方は、その区分を捨てる（間違った区分を書くより、書かないほうがよい）
+  function ageClassesIn(raw) {
+    var t = str(raw);
+    if (!t) return [];
+    // ★ NFKC は使わない。「①」が「1」になって、区分の目印と数字の区別が付かなくなる（2026-09-19）。
+    //   そろえるのは数字・空白・波ダッシュだけ
+    t = t.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/[　\t]/g, ' ').replace(/[〜～~]/g, '~');
+    var out = [];
+    // 区切りは「・」「、」。先頭の「合計年齢（」などは捨てる
+    // 区切りは「・」「、」のほか、目印（①・1.）の直前の空白でも切る
+    t.split(/[・、]|\s+(?=[①-⑳]|\(?\d+\s*[.．)])/).forEach(function (part) {
+      var mark = (/[①-⑳]|\(\s*\d+\s*\)|\d+\s*[.．)]/.exec(part) || [])[0];
+      if (!mark) return;
+      mark = mark.replace(/\s+/g, '');
+      var body = part.slice(part.indexOf(mark) + mark.length);
+      var range = /(\d+)\s*(?:歳)?\s*[~\-–]\s*(\d+)\s*歳/.exec(body);
+      var below = /(\d+)\s*歳(以下|未満)/.exec(body);
+      var above = /(\d+)\s*歳以上/.exec(body);
+      if (range) out.push({ mark: mark, min: Number(range[1]), max: Number(range[2]), text: tidy(part) });
+      else if (below) out.push({ mark: mark, min: null, max: below[2] === '未満' ? Number(below[1]) - 1 : Number(below[1]), text: tidy(part) });
+      else if (above) out.push({ mark: mark, min: Number(above[1]), max: null, text: tidy(part) });
+    });
+    return out;
+  }
+
+  // 前後のかっこ・中黒・空白を落とす（「④ 150歳以上 ））」→「④ 150歳以上」）
+  function tidy(s) { return String(s).replace(/^[\s（(・]+/, '').replace(/[\s）)・]+$/, ''); }
+
+  // 合計年齢から区分を選ぶ。どれにも当てはまらなければ null
+  function ageClassOf(classes, sum) {
+    if (!classes || !classes.length || sum == null) return null;
+    for (var i = 0; i < classes.length; i++) {
+      var c = classes[i];
+      if ((c.min == null || sum >= c.min) && (c.max == null || sum <= c.max)) return c;
+    }
+    return null;
+  }
+
   function normalize(raw) {
     var o = raw && typeof raw === 'object' ? raw : {};
-    var out = { baseDate: dateIn(str(o.baseDateRaw)), baseDateRaw: str(o.baseDateRaw), tables: [], extras: [], problems: [] };
+    var out = { baseDate: dateIn(str(o.baseDateRaw)), baseDateRaw: str(o.baseDateRaw),
+      ageClasses: ageClassesIn(o.ageClassesRaw), ageClassesRaw: str(o.ageClassesRaw),
+      tables: [], extras: [], problems: [] };
 
     (Array.isArray(o.tables) ? o.tables : []).forEach(function (t, ti) {
       if (!t || typeof t !== 'object') return;
@@ -320,6 +365,6 @@
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, prefs: prefs
+    formKey: formKey, prefs: prefs, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -241,6 +241,17 @@
       tables.push(tb);
     });
 
+    // 6b. 年齢区分の説明（「合計年齢（① 119歳以下・② 120〜134歳・③ 135〜149歳・④ 150歳以上）」）
+    // ★ 申込書に書かれている区分をそのまま読む。こちらで区分を決め打ちしない（大会ごとに違う）
+    var ageClassesRaw = '';
+    cells.forEach(function (c) {
+      // ★ ここは nfkc を通さない。「①」が「1」になって、区分の目印が消える（2026-09-19）
+      var t = String(c.text == null ? '' : c.text);
+      if (ageClassesRaw || !/歳(以下|以上|未満)/.test(t)) return;
+      var marks = t.match(/[①-⑳]|\(\s*\d+\s*\)|\d+\s*[.．)]/g) || [];
+      if (marks.length >= 2) ageClassesRaw = t.trim();
+    });
+
     // 6. 基準日
     var baseDateRaw = '';
     var dateLike = /(明治|大正|昭和|平成|令和|[MTSHR])?\s*\d{1,4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日|\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/;
@@ -250,7 +261,7 @@
       if (!baseDateRaw && /(現在|時点|基準)/.test(t) && dateLike.test(t)) baseDateRaw = t.trim();
     });
 
-    return { baseDateRaw: baseDateRaw, tables: tables, extras: extras };
+    return { baseDateRaw: baseDateRaw, ageClassesRaw: ageClassesRaw, tables: tables, extras: extras };
   }
 
   global.EntryRules = { map: map };
