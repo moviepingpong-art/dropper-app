@@ -12,7 +12,7 @@
   'use strict';
 
   var X = window.EntryXlsx, R = window.EntryRoster, M = window.EntryMap,
-      B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend;
+      B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend, BL = window.EntryBlank;
 
   function t(k, v) { return window.I18N.t(k, v); }
   function has(k) { return Object.prototype.hasOwnProperty.call(window.I18N.dict(), k); }
@@ -675,9 +675,18 @@
       if (s.state && s.state !== 'visible') return;   // 隠しシートは見ない
       var cells = X.cells(book, i);
       var found = R.findNames(cells, state.roster);
-      if (!found.names.length && !found.suspects.length) return;
       var sh = { index: i, name: s.name, cells: cells, merges: X.merges(book, i), found: found,
         pick: {}, key: null, mapping: null, fmt: {}, baseDate: null };
+      if (!found.names.length && !found.suspects.length) {
+        // ★ 名前が1つも書かれていない申込書。見出しと空の記入欄から表を見つけ、名簿から選んでもらう
+        var tables = BL.tables(X.grid(book, i));
+        if (!tables.length) return;
+        sh.blank = true;
+        sh.tables = tables;
+        sh.picks = tables.map(function () { return []; });   // 表ごとに「入れる人」の並び
+        state.sheets.push(sh);
+        return;
+      }
       // ③で「同じ人が2回」を表ごとに見るために、欄の対応をここで作っておく（規則なので一瞬）
       sh.rules = M.normalize(window.EntryRules.map(cells, sh.merges, found));
       state.sheets.push(sh);
@@ -727,10 +736,120 @@
     return 'R' + n.row + 'C' + n.col;
   }
 
+  /* ===== ③ 空の申込書：名簿から誰を入れるか選ぶ ===== */
+  // ★ 2026-09-18。名前が1つも書かれていない申込書では、表（名前の列と書ける行）を見つけて、
+  //   名簿から人を選んでもらう。選んだ人は、名前ごとこちらが書き込む。
+  function tableLabel(tb) {
+    var col = tb.nameCol || (tb.familyCol + '・' + tb.givenCol);
+    return t('pickTable', { col: col, from: tb.firstRow, to: tb.lastRow, n: tb.rows.length });
+  }
+
+  function renderPickSheet(sh, sec) {
+    sh.tables.forEach(function (tb, ti) {
+      var picks = sh.picks[ti];
+      var box = h('div', { class: 'pick-table' });
+      box.appendChild(h('p', { class: 'sub-title', text: tableLabel(tb) }));
+
+      // 選んだ人（上の行から順に入る）
+      if (!picks.length) {
+        box.appendChild(h('p', { class: 'hint', text: t('pickNobody') }));
+      } else {
+        var ul = h('ol', { class: 'picked' });
+        picks.forEach(function (m, i) {
+          var row = tb.rows[i];
+          ul.appendChild(h('li', {}, [
+            h('span', { class: 'ref', text: (tb.nameCol || tb.familyCol) + row }),
+            h('span', { class: 'typed', text: m.name }),
+            h('span', { class: 'hint', text: ymdText(m.birth) }),
+            h('button', { type: 'button', class: 'link-btn', text: t('pickUp'), disabled: i === 0,
+              onclick: function () { picks.splice(i - 1, 0, picks.splice(i, 1)[0]); renderNames(); } }),
+            h('button', { type: 'button', class: 'link-btn', text: t('pickDown'), disabled: i === picks.length - 1,
+              onclick: function () { picks.splice(i + 1, 0, picks.splice(i, 1)[0]); renderNames(); } }),
+            h('button', { type: 'button', class: 'link-btn', text: t('pickRemove'),
+              onclick: function () { picks.splice(i, 1); renderNames(); } })
+          ]));
+        });
+        box.appendChild(ul);
+      }
+
+      // 名簿から選ぶ（男子・女子）
+      var full = picks.length >= tb.rows.length;
+      var details = h('details', { class: 'cols-box', open: !picks.length || sh.pickOpen === ti });
+      details.addEventListener('toggle', function () { sh.pickOpen = details.open ? ti : null; });
+      details.appendChild(h('summary', { text: full ? t('pickFull', { n: tb.rows.length }) : t('pickFrom') }));
+      if (!full) {
+        B.SHEETS.forEach(function (g) {
+          var list = (state.book && state.book.people[g]) || [];
+          if (!list.length) return;
+          details.appendChild(h('p', { class: 'sub-title', text: g }));
+          var wrap = h('div', { class: 'pick-people' });
+          list.forEach(function (p) {
+            var m = state.roster.members.filter(function (x) { return x.sheet === g && x.row === p.row; })[0];
+            if (!m) return;
+            var already = picks.indexOf(m) >= 0;
+            wrap.appendChild(h('button', { type: 'button', class: 'btn-sub pick-one', disabled: already,
+              text: m.name, title: ymdText(m.birth),
+              onclick: function () {
+                if (picks.length >= tb.rows.length) return;
+                picks.push(m);
+                sh.pickOpen = ti;
+                renderNames();
+              } }));
+          });
+          details.appendChild(wrap);
+        });
+      }
+      box.appendChild(details);
+
+      // ★ 表の見つけ方が外れたときの逃げ道。書く行を本人が直せる
+      var from = h('input', { type: 'number', class: 'row-num', value: String(tb.firstRow), min: '1', max: '2000' });
+      var to = h('input', { type: 'number', class: 'row-num', value: String(tb.lastRow), min: '1', max: '2000' });
+      var apply = function () {
+        var f = Number(from.value), t2 = Number(to.value);
+        if (!(f >= 1 && t2 >= f && t2 - f < 200)) { setMsg('namesMsg', t('pickRowsBad'), 'ng'); return; }
+        tb.firstRow = f; tb.lastRow = t2;
+        tb.rows = [];
+        for (var r = f; r <= t2; r++) tb.rows.push(r);
+        sh.picks[ti] = picks.slice(0, tb.rows.length);
+        renderNames();
+      };
+      from.addEventListener('change', apply);
+      to.addEventListener('change', apply);
+      box.appendChild(h('p', { class: 'small pick-rows' }, [
+        h('span', { text: t('pickRowsLabel') }), from, h('span', { text: '〜' }), to, h('span', { text: t('pickRowsUnit') })
+      ]));
+      sec.appendChild(box);
+    });
+  }
+
+  // 選んだ人から、いままでの道（見出しの規則・④・⑤）が使う形を作る
+  function foundFromPicks(sh) {
+    var names = [];
+    sh.tables.forEach(function (tb, ti) {
+      sh.picks[ti].forEach(function (m, i) {
+        var row = tb.rows[i];
+        if (!row) return;
+        var refs = tb.nameCol ? [tb.nameCol + row] : [tb.familyCol + row, tb.givenCol + row];
+        var col = X.parseRef(refs[0]).col;
+        names.push({ refs: refs, row: row, col: col, text: m.name, match: { status: 'exact', member: m } });
+      });
+    });
+    return { names: names, suspects: [], duplicates: [] };
+  }
+
   function renderNames() {
     var body = clear(el('namesBody'));
+    var anyBlank = state.sheets.some(function (sh) { return sh.blank; });
+    el('stepNamesTitle').textContent = anyBlank && state.sheets.every(function (sh) { return sh.blank; })
+      ? t('step3TitlePick') : t('step3Title');
+    el('stepNamesHint').textContent = anyBlank ? t('step3HintPick') : t('step3Hint');
     state.sheets.forEach(function (sh) {
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
+      if (sh.blank) {
+        renderPickSheet(sh, sec);
+        body.appendChild(sec);
+        return;
+      }
       var ul = h('ul', { class: 'names' });
       var chosen = {};
       entriesOf(sh).forEach(function (e) {
@@ -798,9 +917,17 @@
       sec.appendChild(ul);
       body.appendChild(sec);
     });
+    var picked = state.sheets.reduce(function (sum, sh) {
+      return sum + (sh.blank ? sh.picks.reduce(function (s, p) { return s + p.length; }, 0) : 0);
+    }, 0);
     var left = unresolvedCount();
-    el('namesNext').disabled = left > 0;
-    setMsg('namesMsg', left ? t('namesLeft', { n: left }) : t('namesReady'), left ? 'wait' : 'ok');
+    if (anyBlank) {
+      el('namesNext').disabled = left > 0 || picked === 0;
+      setMsg('namesMsg', picked ? t('pickReady', { n: picked }) : t('pickNone'), picked ? 'ok' : 'wait');
+    } else {
+      el('namesNext').disabled = left > 0;
+      setMsg('namesMsg', left ? t('namesLeft', { n: left }) : t('namesReady'), left ? 'wait' : 'ok');
+    }
     hideFrom('stepReview');
   }
 
@@ -809,6 +936,11 @@
   // 様式ごとに覚えるのは、本人が④で選び直した書き方（fmt）と書く欄（fields）だけ（EntryMap.prefs。個人情報は入らない）
   function onNamesNext() {
     Promise.all(state.sheets.map(function (sh) {
+      // 空の申込書は、選んでもらった人から「名前がそこに書かれている」形を作って、いままでの道に合流する
+      if (sh.blank) {
+        sh.found = foundFromPicks(sh);
+        sh.rules = null;
+      }
       sh.mapping = sh.rules || M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
       return M.formKey(sh.name, sh.cells, sh.merges, sh.found).then(function (k) {
         sh.key = k;
@@ -1007,6 +1139,18 @@
       return { ref: g.ageSum, ages: ages, sum: ok ? ages.reduce(function (s, a) { return s + a; }, 0) : null };
     });
     var writes = [];
+    // ★ 空の申込書では、名前もこちらが書く（名前が書いてある申込書では、名前はもう入っている）
+    if (sh.blank) {
+      people.forEach(function (p) {
+        var refs = p.entry.n.refs, m = p.member;
+        if (refs.length >= 2) {
+          writes.push({ ref: refs[0], value: m.family || m.name });
+          writes.push({ ref: refs[1], value: m.given || '' });
+        } else {
+          writes.push({ ref: refs[0], value: m.name });
+        }
+      });
+    }
     people.forEach(function (p) { p.fill.writes.forEach(function (w) { writes.push(w); }); });
     groups.forEach(function (g) { if (g.sum != null) writes.push({ ref: g.ref, value: g.sum }); });
     return { mapping: mapping, res: res, base: base, people: people, groups: groups, writes: writes };
