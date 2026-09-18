@@ -68,6 +68,16 @@ function assertPreserved(before, after, writtenBySheet, label) {
       if (stripCells(before.parts[e.name], refs) !== stripCells(after.parts[e.name], refs)) changed.push(e.name + '（書いたセル以外）');
       return;
     }
+    // ★ styles.xml は「書式の写しを末尾に足す」だけ変わってよい（縮小して全体を表示／日付の書式を外す）。
+    //   足しただけであることをここで確かめる。元の <xf> を1つでも書き換えたら落ちる
+    if (e.name === 'xl/styles.xml') {
+      var sb = cellXfsOf(before.parts[e.name]), sa = cellXfsOf(after.parts[e.name]);
+      var outside = function (x) { var c = cellXfsOf(x); return x.slice(0, c.index) + x.slice(c.index + c.whole.length); };
+      var appendOnly = sa.xfs.slice(0, sb.xfs.length).join('') === sb.xfs.join('') &&
+        sa.count === sa.xfs.length && outside(before.parts[e.name]) === outside(after.parts[e.name]);
+      if (!appendOnly) changed.push(e.name + '（書式の一覧が、末尾に足す以外の形で変わった）');
+      return;
+    }
     if (e.name === 'xl/workbook.xml') {
       var norm = function (x) { return x.replace(/<calcPr fullCalcOnLoad="1"\/>/, '').replace(/<calcPr fullCalcOnLoad="1"/, '<calcPr'); };
       if (norm(before.parts[e.name]) !== norm(after.parts[e.name])) changed.push(e.name);
@@ -334,6 +344,20 @@ function formC(roster) {
       problems: []
     }).then(function (after) {
       check(/fullCalcOnLoad="1"/.test(after.parts['xl/workbook.xml']), '式のあるブックは、開いたときに計算し直させる');
+      // ★ G7 は日付の書式（yyyy/m/d）の年齢の欄。数をそのまま書くと Excel が日付として見せてしまう
+      //   （本物のスポレク参加申込書で「1900-02-29」と出た）。書式の写しを作って日付の書式を外す
+      var byRef = {};
+      X.cells(after, '申込書').forEach(function (c) { byRef[c.ref] = c; });
+      var fmtOf = function (style) {
+        var xfs = cellXfsOf(after.parts['xl/styles.xml']).xfs;
+        return (/numFmtId="(\d+)"/.exec(xfs[Number(style || 0)] || '') || [])[1] || '0';
+      };
+      check(!byRef['G7'].isDate && byRef['G7'].value === 74, '★ 日付の書式の欄に年齢を書いても、日付にならない（1900-02-29 にならない）');
+      eq(fmtOf(byRef['G7'].style), '0', '★ そのセルだけ、日付の書式を外した写しを指す');
+      // 元の書式を書き換えていないことは、上の「書き換えたセル以外は変わっていない」が見ている
+      // （styles.xml は末尾に足す形でしか変わってはいけない）
+      eq(fmtOf(byRef['G6'].style), '0', '元から日付でない年齢の欄は、そのままの書式');
+      eq(byRef['F6'].text, '1960年3月3日', '生年月日は文字で書くので、書式の影響を受けない');
     });
   });
 }

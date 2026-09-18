@@ -336,6 +336,12 @@
       style = a.s || '';
     }
     var build = function (st) {
+      // ★ 数を、日付の書式が付いたセルに書かない（2026-09-18、本人が本物の申込書で発見）。
+      //   年齢の欄のうち1つだけ日付の書式（yyyy-mm-dd）が付いていて、60 と書いたら Excel が
+      //   「1900-02-29」と表示した。そのセルだけ、書式の写しを作って日付の書式を外す
+      if (typeof value === 'number' && isFinite(value) && book.dateStyles && book.dateStyles[Number(st || 0)]) {
+        st = plainNumberStyle(book, st);
+      }
       if (shrink) st = shrinkStyle(book, st);
       var head = '<c r="' + ref + '"' + (st ? ' s="' + st + '"' : '');
       if (value === null || value === undefined || value === '') return head + '/>';
@@ -353,6 +359,17 @@
     return { ok: true, ref: ref };
   }
 
+  // 日付の書式を外した書式の写しを作る（罫線・フォント・揃えはそのまま）。
+  // 作り方は shrinkStyle と同じ決まり: 元の <xf> は書き換えず、cellXfs の末尾に足すだけ。
+  function plainNumberStyle(book, st) {
+    var made = cloneXf(book, st, 'numberMap', function (attrsPart) {
+      return attrsPart.replace(/\s+numFmtId="[^"]*"/, '').replace(/\s+applyNumberFormat="[^"]*"/, '') +
+        ' numFmtId="0" applyNumberFormat="1"';
+    });
+    if (made != null) book.dateStyles[Number(made)] = false;
+    return made == null ? st : made;
+  }
+
   // ===== 縮小して全体を表示 =====
   // Excel の書式は styles.xml の cellXfs に並んだ <xf> の番号でセルから指される。
   // 元の書式（罫線・フォント・揃え）を写した <xf> を末尾に足し、alignment に shrinkToFit="1" を付ける。
@@ -361,43 +378,48 @@
   //   （run.js が確かめる）。同じ元の書式からの写しは1つだけ作る（book.shrinkMap）。
   // ★ wrapText（折り返して全体を表示）があると Excel は縮小しないので、写しからは外す。
   function shrinkStyle(book, st) {
+    var made = cloneXf(book, st, 'shrinkMap',
+      function (attrsPart) { return attrsPart.replace(/\s+applyAlignment="[^"]*"/, '') + ' applyAlignment="1"'; },
+      function (inner) {
+        if (/<alignment\b/.test(inner)) {
+          return inner.replace(/<alignment\b([^>]*?)(\/?)>/, function (_, a, slash) {
+            a = a.replace(/\s+shrinkToFit="[^"]*"/, '').replace(/\s+wrapText="[^"]*"/, '');
+            return '<alignment' + a + ' shrinkToFit="1"' + slash + '>';
+          });
+        }
+        return '<alignment shrinkToFit="1"/>' + inner;   // alignment は protection より前に置く決まり
+      });
+    return made == null ? st : made;
+  }
+
+  // 書式（<xf>）の写しを cellXfs の末尾に足して、その番号を返す。同じ元からの写しは1つだけ（book[mapName]）。
+  // 書式の一覧が無いブック（まず無い）や、元の書式が見つからないときは null を返す（呼び元は元の書式のまま書く）。
+  function cloneXf(book, st, mapName, fixAttrs, fixInner) {
     var path = 'xl/styles.xml';
     var xml = book.parts[path];
-    if (!xml) return st;   // 書式の一覧が無いブック（まず無い）は、縮小を付けずに書く
-    book.shrinkMap = book.shrinkMap || {};
+    if (!xml) return null;
+    book[mapName] = book[mapName] || {};
     var key = st || '0';
-    if (book.shrinkMap[key] != null) return book.shrinkMap[key];
+    if (book[mapName][key] != null) return book[mapName][key];
 
     var block = /<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/.exec(xml);
-    if (!block) return st;
+    if (!block) return null;
     var xfs = block[2].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
     var base = xfs[Number(key)] || xfs[0];
-    if (!base) return st;
+    if (!base) return null;
 
-    var clone;
     var open = /^<xf\b([^>]*?)(\/?)>/.exec(base);
-    var attrsPart = open[1].replace(/\s+applyAlignment="[^"]*"/, '') + ' applyAlignment="1"';
-    if (open[2] === '/') {
-      clone = '<xf' + attrsPart + '><alignment shrinkToFit="1"/></xf>';
-    } else {
-      var inner = base.slice(open[0].length, base.length - '</xf>'.length);
-      if (/<alignment\b/.test(inner)) {
-        inner = inner.replace(/<alignment\b([^>]*?)(\/?)>/, function (_, a, slash) {
-          a = a.replace(/\s+shrinkToFit="[^"]*"/, '').replace(/\s+wrapText="[^"]*"/, '');
-          return '<alignment' + a + ' shrinkToFit="1"' + slash + '>';
-        });
-      } else {
-        inner = '<alignment shrinkToFit="1"/>' + inner;   // alignment は protection より前に置く決まり
-      }
-      clone = '<xf' + attrsPart + '>' + inner + '</xf>';
-    }
+    var attrsPart = fixAttrs ? fixAttrs(open[1]) : open[1];
+    var inner = open[2] === '/' ? '' : base.slice(open[0].length, base.length - '</xf>'.length);
+    if (fixInner) inner = fixInner(inner);
+    var clone = inner ? '<xf' + attrsPart + '>' + inner + '</xf>' : '<xf' + attrsPart + '/>';
 
     var index = xfs.length;
     var head = block[1].replace(/\s+count="\d+"/, '') + ' count="' + (index + 1) + '"';
     var newBlock = '<cellXfs' + head + '>' + block[2] + clone + '</cellXfs>';
     book.parts[path] = xml.slice(0, block.index) + newBlock + xml.slice(block.index + block[0].length);
     book.dirty[path] = true;
-    book.shrinkMap[key] = String(index);
+    book[mapName][key] = String(index);
     return String(index);
   }
 
