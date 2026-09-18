@@ -81,20 +81,28 @@
             x.firstRow === f.firstRow && x.lastRow === f.lastRow;
         })[0];
         if (!given) return;   // 「姓」だけの表は扱わない（「名」が見つからないと書けない）
-        out.push(make(f, { familyCol: colName(f.col), givenCol: colName(given.col) }));
+        out.push(make(f, { familyCol: colName(f.col), givenCol: colName(given.col) }, g));
         return;
       }
-      out.push(make(f, { nameCol: colName(f.col) }));
+      out.push(make(f, { nameCol: colName(f.col) }, g));
     });
     return out.sort(function (a, b) { return a.firstRow - b.firstRow || a.headerRow - b.headerRow; });
   }
 
-  function make(f, cols) {
+  function make(f, cols, g) {
     var rows = [];
     for (var r = f.firstRow; r <= f.lastRow; r++) rows.push(r);
-    var t = { headerRow: f.headerRow, firstRow: f.firstRow, lastRow: f.lastRow, rows: rows };
+    var t = { headerRow: f.headerRow, firstRow: f.firstRow, lastRow: f.lastRow, rows: rows, label: labelOf(g, f) };
     Object.keys(cols).forEach(function (k) { t[k] = cols[k]; });
     return t;
+  }
+
+  // 表の名前。見出しのすぐ上の、同じ列にある短い文字を使う（スポレクの「連絡責任者」）。
+  // ★ 遠くの文字は拾わない。見当違いの名前を付けるより、名前が無いほうがよい
+  function labelOf(g, f) {
+    if (!g) return '';
+    var t = g.text(f.headerRow - 1, f.col);
+    return (t && t.length <= 10 && !/^\d+$/.test(t)) ? t : '';
   }
 
   // 見出しの下に続く「書ける行」を数える

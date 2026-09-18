@@ -1074,6 +1074,10 @@ function blankSection(roster) {
     ['A+B:2-3'], '「姓」と「名」が並んでいれば1つの表にする');
   eq(shownOf(B_.tables([cell(2, 1, '氏　名'), cell(1, 2, '監督'), cell(2, 2, ''), cell(1, 3, '1'), cell(2, 3, '')])),
     ['B:2-3'], '見出しの空白と、左の行の名札（監督）を越えて数える');
+  // 表の名前は、見出しのすぐ上の同じ列の短い文字だけ（遠くの文字は拾わない）
+  eq(B_.tables([cell(2, 1, '連絡責任者'), cell(2, 2, '氏名'), cell(2, 3, ''), cell(3, 3, '')])[0].label, '連絡責任者',
+    '表の名前を、見出しのすぐ上から拾う');
+  eq(B_.tables([cell(2, 2, '氏名'), cell(2, 3, ''), cell(3, 3, '')])[0].label, '', '拾えなければ名前なし');
 
   var cases = [
     { label: '様式A（1人1行）', file: path.join(FIX, 'form-a-all-fields.xlsx'), sheet: 0,

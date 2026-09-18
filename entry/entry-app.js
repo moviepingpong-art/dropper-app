@@ -741,7 +741,11 @@
   //   名簿から人を選んでもらう。選んだ人は、名前ごとこちらが書き込む。
   function tableLabel(tb) {
     var col = tb.nameCol || (tb.familyCol + '・' + tb.givenCol);
-    return t('pickTable', { col: col, from: tb.firstRow, to: tb.lastRow, n: tb.rows.length });
+    var n = tb.rows.length;
+    var where = (tb.firstRow === tb.lastRow ? t('pickRowsOne', { col: col, from: tb.firstRow })
+      : t('pickRowsMany', { col: col, from: tb.firstRow, to: tb.lastRow })) +
+      (n === 1 ? t('pickCapOne') : t('pickCap', { n: n }));
+    return tb.label ? t('pickTableNamed', { label: tb.label, where: where }) : where;
   }
 
   function renderPickSheet(sh, sec) {
@@ -787,8 +791,11 @@
             var m = state.roster.members.filter(function (x) { return x.sheet === g && x.row === p.row; })[0];
             if (!m) return;
             var already = picks.indexOf(m) >= 0;
+            // ★ 同姓同名は、そのままでは見分けられない。生まれ年を添える
+            var sameName = state.roster.members.filter(function (x) { return x.key === m.key; }).length > 1;
+            var label = sameName ? t('pickSameName', { name: m.name, year: m.birth ? m.birth.y : '?' }) : m.name;
             wrap.appendChild(h('button', { type: 'button', class: 'btn-sub pick-one', disabled: already,
-              text: m.name, title: ymdText(m.birth),
+              text: label, title: ymdText(m.birth),
               onclick: function () {
                 if (picks.length >= tb.rows.length) return;
                 picks.push(m);
