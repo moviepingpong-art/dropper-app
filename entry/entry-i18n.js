@@ -118,7 +118,7 @@
       pickTableNamed: '{label}：{where}',
       pickNobody: 'まだ誰も入れていません。下の「名簿から選ぶ」から選んでください。',
       pickFrom: '名簿から選ぶ',
-      pickFull: 'この表はいっぱいです（{n}人）。入れ替えるには、上の一覧から外してください',
+      pickComplete: '✓ ちょうど{n}人そろいました（この表は{n}人まで）。入れ替えるときは、上の一覧の「外す」から',
       pickUp: '↑',
       pickDown: '↓',
       pickRemove: '外す',

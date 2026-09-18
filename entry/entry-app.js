@@ -777,10 +777,13 @@
       }
 
       // 名簿から選ぶ（男子・女子）
+      // ★ ちょうど入りきったときは「いっぱいです」と出さない（入れすぎたと勘違いする。2026-09-19、本人の指摘）。
+      //   「ちょうどそろいました」と伝え、入れ替えは上の一覧の「外す」でできることを添える
       var full = picks.length >= tb.rows.length;
-      var details = h('details', { class: 'cols-box', open: !picks.length || sh.pickOpen === ti });
+      var details = h('details', { class: 'cols-box' + (full ? ' done' : ''), open: !picks.length || sh.pickOpen === ti });
       details.addEventListener('toggle', function () { sh.pickOpen = details.open ? ti : null; });
-      details.appendChild(h('summary', { text: full ? t('pickFull', { n: tb.rows.length }) : t('pickFrom') }));
+      details.appendChild(h('summary', { class: full ? 'done' : null,
+        text: full ? t('pickComplete', { n: tb.rows.length }) : t('pickFrom') }));
       if (!full) {
         B.SHEETS.forEach(function (g) {
           var list = (state.book && state.book.people[g]) || [];
