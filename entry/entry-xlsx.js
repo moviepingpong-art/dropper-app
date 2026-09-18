@@ -294,6 +294,25 @@
     return out;
   }
 
+  // 空のセルも含めて、シートに置かれているセルを並べる。{ ref, row, col, text, styled }
+  // ★ cells() は値の入ったセルだけを返す。空の様式（罫線だけ引いてある記入欄）を読むには、
+  //   空のセルの位置も要る（entry-blank.js が「書ける行」を数えるのに使う）。
+  function grid(book, sheet) {
+    var s = sheetOf(book, sheet);
+    var texts = {};
+    cells(book, sheet).forEach(function (c) { texts[c.ref] = c.text; });
+    var out = [];
+    var re = new RegExp(CELL_RE.source, 'g'), m;
+    var data = sheetData(book.parts[s.path]);
+    while ((m = re.exec(data))) {
+      var a = attrs('<c ' + m[1] + '>');
+      if (!a.r) continue;
+      var pr = parseRef(a.r);
+      out.push({ ref: a.r, row: pr.row, col: pr.col, text: texts[a.r] || '', styled: a.s !== undefined });
+    }
+    return out;
+  }
+
   function merges(book, sheet) {
     var s = sheetOf(book, sheet);
     var out = [];
@@ -501,7 +520,7 @@
   }
 
   global.EntryXlsx = {
-    open: open, sheetNames: sheetNames, cells: cells, merges: merges, anchorOf: anchorOf,
+    open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
     setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }

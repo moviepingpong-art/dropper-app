@@ -24,8 +24,9 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-map.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-postal.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8'));
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-blank.js'), 'utf8'));
 var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap,
-    P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend;
+    P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend, B_ = window.EntryBlank;
 var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
 
 // 手で書いた欄の対応を、見出しの規則の答えと比べるために取っておく
@@ -229,6 +230,7 @@ function main() {
     .then(function () { return revSection(); })
     .then(function () { return attendSection(); })
     .then(function () { return bookSection(); })
+    .then(function () { return blankSection(roster); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -1043,6 +1045,79 @@ function attendSection() {
     var src = fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8');
     check(src.indexOf("'?action=members&s='") >= 0 && src.indexOf("'?a=members&s='") < 0,
       '★ 出欠システムを呼ぶ合図は action=members');
+  });
+}
+
+// ===== 空の様式から「名前を書く表」を見つける =====
+function shownOf(tables) {
+  return tables.map(function (t) {
+    return (t.nameCol || (t.familyCol + '+' + t.givenCol)) + ':' + t.firstRow + '-' + t.lastRow;
+  });
+}
+function blankSection(roster) {
+  section('11. 空の様式から表を見つける（entry-blank.js）');
+
+  // 名前を消して「空の様式」にしてから測る
+  function blankOf(file, sheet, nameRefs) {
+    return read(file).then(function (book) {
+      nameRefs.forEach(function (ref) { X.setCell(book, sheet, ref, ''); });
+      return X.save(book).then(function (bytes) { return X.open(bytes); });
+    });
+  }
+  function shown(tables) { return shownOf(tables); }
+
+  // 手で作った小さな表で、細かい決まりを確かめる（grid は { ref, row, col, text, styled } の並び）
+  var cell = function (col, row, text) { return { ref: X.toRef(col, row), row: row, col: col, text: text || '', styled: true }; };
+  eq(B_.tables([cell(1, 1, '姓'), cell(1, 2, ''), cell(1, 3, '')]), [],
+    '★ 「姓」だけで「名」の見出しが無い表は作らない（名前を書き分けられないため）');
+  eq(shownOf(B_.tables([cell(1, 1, '姓'), cell(2, 1, '名'), cell(1, 2, ''), cell(2, 2, ''), cell(1, 3, ''), cell(2, 3, '')])),
+    ['A+B:2-3'], '「姓」と「名」が並んでいれば1つの表にする');
+  eq(shownOf(B_.tables([cell(2, 1, '氏　名'), cell(1, 2, '監督'), cell(2, 2, ''), cell(1, 3, '1'), cell(2, 3, '')])),
+    ['B:2-3'], '見出しの空白と、左の行の名札（監督）を越えて数える');
+
+  var cases = [
+    { label: '様式A（1人1行）', file: path.join(FIX, 'form-a-all-fields.xlsx'), sheet: 0,
+      names: ['B7', 'B8', 'B9', 'B10', 'B11', 'B12'], want: ['B:7-12'] },
+    { label: '様式B（2人1組・結合）', file: path.join(FIX, 'form-b-pairs.xlsx'), sheet: 0,
+      names: ['C14', 'C15', 'C16', 'C17', 'C18', 'C19'], want: ['C:14-21'] },
+    { label: '様式C（姓と名が別の欄）', file: path.join(FIX, 'form-c-split.xlsx'), sheet: 0,
+      names: ['B6', 'B7', 'B8', 'B9', 'C6', 'C7', 'C8', 'C9'], want: ['B+C:6-9'] },
+    { label: '様式D（もともと空・監督の行つきの表が2つ）', file: path.join(FIX, 'form-d-blank.xlsx'), sheet: 0,
+      names: [], want: ['B:5-11', 'B:15-21'] }
+  ];
+
+  return cases.reduce(function (p, c) {
+    return p.then(function () {
+      return blankOf(c.file, c.sheet, c.names).then(function (book) {
+        eq(shown(B_.tables(X.grid(book, c.sheet))), c.want, c.label + ': 名前の列と書ける行');
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    // ★ 本物の様式（local/）。無ければ飛ばす
+    if (!fs.existsSync(LOCAL)) return;
+    var files = fs.readdirSync(LOCAL);
+    var hyaku = files.filter(function (f) { return /百万石.*\.xlsx$/.test(f); })[0];
+    var sporec = files.filter(function (f) { return /スポレク.*\.xlsx$/.test(f); })[0];
+    var jobs = [];
+    if (hyaku) {
+      jobs.push({ label: '本物の百万石 団体戦', file: path.join(LOCAL, hyaku), sheet: 0,
+        names: ['C14', 'C15', 'C16', 'C17', 'C18', 'C19'], want: ['C:14-19'] });
+      jobs.push({ label: '本物の百万石 個人戦', file: path.join(LOCAL, hyaku), sheet: 1,
+        names: ['C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21'], want: ['C:14-21'] });
+    }
+    if (sporec) {
+      // ★ スポレクには本物の名前が書き込まれている。消してから測る（表示も期待値にも出さない）
+      jobs.push({ label: '本物のスポレク シート1', file: path.join(LOCAL, sporec), sheet: 0,
+        names: ['B10', 'B13', 'B14', 'B15', 'B16', 'B17', 'B18'], want: ['B:10-10', 'B:13-18'] });
+    }
+    if (!jobs.length) { console.log('  --   本物の様式が entry/test/local/ に無いので飛ばします'); return; }
+    return jobs.reduce(function (p, j) {
+      return p.then(function () {
+        return blankOf(j.file, j.sheet, j.names).then(function (book) {
+          eq(shown(B_.tables(X.grid(book, j.sheet))), j.want, j.label + ': 名前の列と書ける行');
+        });
+      });
+    }, Promise.resolve());
   });
 }
 

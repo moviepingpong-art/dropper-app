@@ -11,6 +11,8 @@
 //   form-a-all-fields.xlsx   … 全項目型。1人1行。セルが無いところへ書き込む道を通す
 //   form-b-pairs.xlsx        … 百万石型。2人1組・結合セル・年月日の3欄。罫線つきの空セルを置き換える道を通す
 //   form-c-split.xlsx        … 分割型。姓と名が別欄・男女の列に○・都道府県が別欄・式のセル
+//   form-d-blank.xlsx        … ★ 空の様式（名前が1つも書かれていない）。監督の行つきの表が2つ。
+//                              空の申込書から表を見つける道（entry-blank.js）を試す
 // 様式にはすでに「幹事が名前だけ書いた」状態で名前が入っている。
 var fs = require('fs');
 var path = require('path');
@@ -243,12 +245,41 @@ function formC() {
   return { name: '申込書', cols: [5, 8, 8, 4, 4, 16, 6, 10, 30, 15], cells: cells, merges: [] };
 }
 
+// ===== 様式D 空の様式（名前が1つも書かれていない） =====
+// ★ 空の申込書から「名前を書く表」を見つける道（entry-blank.js）を試すためのもの。
+//   かほく市長杯の様式と同じ形（監督の行つきの表が2つ、見出しに空白入りの「氏　名」）。
+//   人・団体・大会名は架空。
+function formD() {
+  var cells = { A1: { v: '第1回 テスト市長杯ラージボール大会参加申込書（試験用の架空の様式）', s: 4 } };
+  [3, 13].forEach(function (top) {
+    cells['A' + top] = { v: 'チーム名', s: 2 };
+    cells['B' + top] = { s: 1 };
+    cells['D' + top] = { v: '部門', s: 2 };
+    cells['E' + top] = { v: '男 子', s: 1 };
+    cells['F' + top] = { v: '女 子', s: 1 };
+    var head = top + 1;
+    cells['A' + head] = { v: 'No', s: 2 };
+    cells['B' + head] = { v: '氏　名', s: 2 };      // ★ 見出しに空白が入っている
+    cells['C' + head] = { v: '性別', s: 2 };
+    cells['D' + head] = { v: '生年月日', s: 2 };
+    cells['E' + head] = { v: '年齢', s: 2 };
+    cells['F' + head] = { v: '現　住　所', s: 2 };
+    cells['A' + (head + 1)] = { v: '監督', s: 1 };   // ★ 行の名札（名前の列より左）
+    for (var i = 1; i <= 6; i++) cells['A' + (head + 1 + i)] = { v: i, s: 1 };
+    box(cells, 'B' + (head + 1), 'F' + (head + 7), 1);
+  });
+  cells['A23'] = { v: '※年齢の基準は、令和9年4月1日とする。監督と選手を兼ねる場合は、両方に記入してください。' };
+  cells['A24'] = { v: '大会長　架空　太郎　殿' };
+  return { name: '参加申込書', cols: [6, 18, 6, 14, 6, 34], cells: cells, merges: [] };
+}
+
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 Promise.all([
   rosterBook().then(function (b) { fs.writeFileSync(path.join(OUT, 'roster.xlsx'), Buffer.from(b)); }),
   buildXlsx([formA()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-a-all-fields.xlsx'), b); }),
   buildXlsx([formB()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-b-pairs.xlsx'), b); }),
-  buildXlsx([formC()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-c-split.xlsx'), b); })
+  buildXlsx([formC()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-c-split.xlsx'), b); }),
+  buildXlsx([formD()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-d-blank.xlsx'), b); })
 ]).then(function () {
   console.log('fixtures を作りました: ' + fs.readdirSync(OUT).join(', '));
 }).catch(function (e) { console.error(e); process.exit(1); });
