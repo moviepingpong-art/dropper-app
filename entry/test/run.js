@@ -194,6 +194,17 @@ function main() {
     eq(addrOf(yamada, 'plain', {}), '石川県金沢市テスト町1-1', '住所: 省く県が決まっていなければ、そのまま書く');
     eq(addrOf(yamada, 'with-postal', { dropPref: '石川県' }), '〒920-0001 金沢市テスト町1-1', '住所: 〒から書くときも県名を省く');
 
+    // ★ 見出しに空白が入っていても、見出しは名前として拾わない（2026-09-18、かほく市長杯の様式で発覚）
+    var headerCells = [
+      { ref: 'B4', row: 4, col: 2, text: '氏　名' },
+      { ref: 'B5', row: 5, col: 2, text: '山田 太郎' },
+      { ref: 'B6', row: 6, col: 2, text: '鈴木 和子' },
+      { ref: 'C4', row: 4, col: 3, text: '生年月日' }
+    ];
+    var hFound = R.findNames(headerCells, roster);
+    eq([hFound.names.length, hFound.suspects.length], [2, 0],
+      '★ 名前の並びのすぐ上にある見出し「氏　名」を、名前として拾わない（空白を取ってから見出しの語を見る）');
+
     section('2. 日付と年齢');
     // 名簿は決まった形になったが、人が Excel で直すことがあるので、いろいろな書き方を読めるままにしておく
     eq([R.parseBirth('S27.5.10'), R.parseBirth('昭和30年2月28日'), R.parseBirth('1958-08-15'), R.parseBirth('19600303')],
@@ -593,6 +604,13 @@ function mapSection(roster) {
     return t ? t.nameCol : '-';
   }), ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'AB', 'AB', '-', '-', '-'], '列は「C14」「C:E」「$C」「C列」「Ｃ」でも C と読む');
   eq(M.normalize({ baseDateRaw: '（年齢は、令和９年４月１日現在をご記入下さい）', tables: [] }).baseDate, { y: 2027, m: 4, d: 1 }, '基準日は文の中から日付だけを読む');
+  // ★ 基準日の言い回しは「現在」「時点」だけではない（2026-09-18、かほく市長杯の様式）
+  var baseCells = [
+    { ref: 'A1', row: 1, col: 1, text: '※年齢の基準は、令和9年4月1日とする。監督と選手を兼ねる場合は、両方に記入してください。' },
+    { ref: 'A2', row: 2, col: 1, text: '令和8年4月6日' }   // 申込日。こちらは拾わない
+  ];
+  eq(M.normalize(RU.map(baseCells, [], { names: [], suspects: [] })).baseDate, { y: 2027, m: 4, d: 1 },
+    '★ 「年齢の基準は、令和9年4月1日とする」からも基準日を読む（申込日は拾わない）');
 
   var hA = HAND.A;
   var wrongA = M.normalize({ tables: [{ nameCol: 'B', firstRow: 7, lastRow: 12, fields: [

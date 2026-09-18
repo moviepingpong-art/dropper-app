@@ -171,11 +171,13 @@
         if (String(c.col) !== col || used[c.ref] || c.formula) return;
         if (c.row < top || c.row > bottom || (c.row - rowsHit[0]) % step !== 0) return;
         var t = nfkc(c.text);
-        if (!NAMEISH_RE.test(t) || LABEL_RE.test(t)) return;
+        // ★ 見出しの語は、空白を取ってから見る（2026-09-18）。「氏　名」「氏　　　名」のように
+        //   空白を入れた見出しが、名前の並びのすぐ上にあると、見出しを名前として拾っていた
+        if (!NAMEISH_RE.test(t) || LABEL_RE.test(nameKey(t))) return;
         var nb = byPos[c.row + ':' + (Number(col) + 1)];
         var text = t, refs = [c.ref];
         var m = matchName(roster, t);
-        if (nb && !used[nb.ref] && NAMEISH_RE.test(nfkc(nb.text)) && !LABEL_RE.test(nb.text)) {
+        if (nb && !used[nb.ref] && NAMEISH_RE.test(nfkc(nb.text)) && !LABEL_RE.test(nameKey(nb.text))) {
           var m2 = matchName(roster, t + ' ' + nb.text);
           if (m2 && m2.candidates && m2.candidates.length) { m = m2; text = t + ' ' + nfkc(nb.text); refs.push(nb.ref); }
         }
