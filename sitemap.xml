@@ -91,4 +91,12 @@
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+  <!-- 申込書ドロッパー。★ このツールだけ日本語のみなので、xhtml:link（他言語版の案内）は
+       書かない。無い版を指すと嘘になる（ページ側の hreflang も同じ理由で書いていない）。 -->
+  <url>
+    <loc>https://app.dropper-tools.com/entry/</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
 </urlset>

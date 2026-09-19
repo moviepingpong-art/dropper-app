@@ -492,6 +492,9 @@ function mapSection(roster) {
   check(!/<link\b[^>]*\bhreflang=/.test(html), 'index.html に hreflang の link が無い（日本語のみなので、他言語版への指示は嘘になる）');
   // コメント（<!-- --> の中）を取り除いてから見る。説明の文に反応させない
   check(!/試作/.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'index.html に「試作」の表示が残っていない');
+  // ★ noindex を外しても、sitemap に無いと検索に見つけてもらいにくい（2026-09-20 に入れ忘れた）
+  var sm = fs.readFileSync(path.join(__dirname, '..', '..', 'sitemap.xml'), 'utf8');
+  check(sm.indexOf('<loc>https://app.dropper-tools.com/entry/</loc>') >= 0, 'sitemap.xml に /entry/ がある');
 
   // --- 自作の様式3つ: 規則の答えが、手で書いた正解と一致する ---
   ['A', 'B', 'C'].forEach(function (k) {
