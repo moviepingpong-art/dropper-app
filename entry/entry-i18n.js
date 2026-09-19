@@ -270,6 +270,7 @@
 
       'skip.target-is-formula': '式の入ったセル',
       'skipGroup.name-outside-table': '欄の並びの外にある名前には、何も書きません：{refs}',
+      'skipGroup.target-crossed-out': '{fields}：申込書に斜線が引いてある欄なので書きません（{refs}）。「書かなくてよい」の意味です',
       'skipGroup.target-has-text': 'すでに文字が入っている欄には書きません（{fields}）：{refs}',
       'skipGroup.target-is-formula': '式の入ったセルには書きません（{fields}）：{refs}',
       'skipGroup.target-is-name': '名前の欄には書きません（{fields}）：{refs}',

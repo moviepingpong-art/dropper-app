@@ -313,6 +313,40 @@
     return out;
   }
 
+  // ★ 斜線（×印）が引かれた欄かどうか（2026-09-19、本物の百万石で分かった）。
+  //   事務局の様式は「ここは書かなくてよい」を斜線で示すことがある（監督の行の生年月日・年齢）。
+  //   セルの書式 →（セルが無ければ）行や列の書式をたどり、その罫線に斜線があるかを見る。
+  function crossedOut(book, sheet, ref) {
+    var s = sheetOf(book, sheet);
+    var xml = book.parts[s.path];
+    var styles = book.parts['xl/styles.xml'];
+    if (!xml || !styles) return false;
+    var pos = parseRef(ref);
+    var st = null;
+    var cm = new RegExp('<c\\b(?=[^>]*\\sr="' + ref + '")([^>]*?)(?:\\/>|>[\\s\\S]*?<\\/c>)').exec(sheetData(xml));
+    if (cm) {
+      var ca = attrs('<c ' + cm[1] + '>');
+      if (ca.s !== undefined) st = ca.s;
+    }
+    if (st === null) {
+      var rm = new RegExp('<row\\b(?=[^>]*\\sr="' + pos.row + '")([^>]*?)(?:\\/>|>)').exec(xml);
+      var ra = rm ? attrs('<row ' + rm[1] + '>') : {};
+      st = ((ra.customFormat === '1' || ra.customFormat === 'true') && ra.s !== undefined) ? ra.s : colStyle(xml, pos.col);
+    }
+    if (st === '' || st === null || st === undefined) return false;
+    var xfs = (/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles) || ['', ''])[1]
+      .match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var xf = xfs[Number(st)];
+    if (!xf) return false;
+    var borderId = (/borderId="(\d+)"/.exec(xf) || [])[1];
+    if (borderId === undefined) return false;
+    var borders = (/<borders\b[^>]*>([\s\S]*?)<\/borders>/.exec(styles) || ['', ''])[1]
+      .match(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g) || [];
+    var b = borders[Number(borderId)];
+    // <diagonal/>（空）は斜線なし。<diagonal style="thin">…</diagonal> なら斜線あり
+    return !!b && /<diagonal\b[^>]*style=/.test(b);
+  }
+
   function merges(book, sheet) {
     var s = sheetOf(book, sheet);
     var out = [];
@@ -521,6 +555,7 @@
 
   global.EntryXlsx = {
     open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
+    crossedOut: crossedOut,
     setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }

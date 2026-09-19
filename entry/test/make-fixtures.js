@@ -65,6 +65,7 @@ function serial(y, m, d) { return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(1
 
 // ===== 最小の xlsx を組み立てる =====
 // s: 0 標準 / 1 罫線 / 2 見出し（色・中央・罫線）/ 3 日付＋罫線 / 4 表題（太字14pt）
+//    5 罫線＋斜線（★「ここは書かなくてよい」を斜線で示す欄。百万石の監督の行がこれだった）
 var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
   '<numFmts count="1"><numFmt numFmtId="176" formatCode="yyyy/m/d"/></numFmts>' +
@@ -72,15 +73,20 @@ var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
   '<font><b/><sz val="14"/><name val="游ゴシック"/><family val="3"/><charset val="128"/></font></fonts>' +
   '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
   '<fill><patternFill patternType="solid"><fgColor rgb="FFDDEBF7"/><bgColor indexed="64"/></patternFill></fill></fills>' +
-  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+  '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
   '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right>' +
-  '<top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>' +
+  '<top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>' +
+  '<border diagonalUp="1" diagonalDown="1"><left style="thin"><color auto="1"/></left>' +
+  '<right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top>' +
+  '<bottom style="thin"><color auto="1"/></bottom>' +
+  '<diagonal style="thin"><color auto="1"/></diagonal></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+  '<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
   '<xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' +
   '<xf numFmtId="176" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
-  '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>' +
+  '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/></cellXfs>' +
   '<cellStyles count="1"><cellStyle name="標準" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -267,6 +273,9 @@ function formD() {
     cells['A' + (head + 1)] = { v: '監督', s: 1 };   // ★ 行の名札（名前の列より左）
     for (var i = 1; i <= 6; i++) cells['A' + (head + 1 + i)] = { v: i, s: 1 };
     box(cells, 'B' + (head + 1), 'F' + (head + 7), 1);
+    // ★ 監督の行の生年月日・年齢には斜線が引いてある（書かなくてよい、の意味。本物の百万石と同じ）
+    cells['D' + (head + 1)] = { s: 5 };
+    cells['E' + (head + 1)] = { s: 5 };
   });
   cells['A23'] = { v: '※年齢の基準は、令和9年4月1日とする。監督と選手を兼ねる場合は、両方に記入してください。' };
   cells['A24'] = { v: '大会長　架空　太郎　殿' };

@@ -200,6 +200,13 @@
     });
     var nameAt = {};
     names.forEach(function (n) { n.refs.forEach(function (r) { nameAt[anchor(r)] = true; }); });
+    // 斜線（×印）が引いてある欄かどうか。画面が EntryXlsx.crossedOut を包んで渡す（試験では渡さない）
+    var crossedCache = {};
+    var crossed = function (ref) {
+      if (!opts.crossedOut) return false;
+      if (!crossedCache.hasOwnProperty(ref)) crossedCache[ref] = !!opts.crossedOut(ref);
+      return crossedCache[ref];
+    };
 
     function tableOf(n) {
       var row = X.parseRef(n.refs[0]).row;
@@ -256,6 +263,12 @@
           problems.push({ code: 'target-has-text', ref: ref, field: f.field, name: n.refs[0] });
           return;
         }
+        // ★ 斜線（×印）が引いてある欄は「書かなくてよい」の意味（百万石の監督の行の生年月日・年齢）。
+        //   2026-09-19、本人の指摘で分かった
+        if (crossed(ref)) {
+          problems.push({ code: 'target-crossed-out', ref: ref, field: f.field, name: n.refs[0] });
+          return;
+        }
         var nf = { field: f.field, ref: ref };
         if (f.fmt) nf.fmt = f.fmt;
         if (f.mark) nf.mark = f.mark;
@@ -276,7 +289,8 @@
           if (!colLetter) return '';
           var ref = anchor(colLetter + (start + offset));
           var why = nameAt[ref] ? 'target-is-name' : formulaAt[ref] ? 'target-is-formula'
-            : (textAt[ref] != null && textAt[ref] !== '') ? 'target-has-text' : '';
+            : (textAt[ref] != null && textAt[ref] !== '') ? 'target-has-text'
+            : crossed(ref) ? 'target-crossed-out' : '';
           if (!why) return ref;
           if (!problemSeen[ref]) { problemSeen[ref] = true; problems.push({ code: why, ref: ref, field: field }); }
           return '';

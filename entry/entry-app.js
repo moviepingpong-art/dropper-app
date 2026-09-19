@@ -1151,7 +1151,9 @@
     }
     var entries = entriesOf(sh).filter(function (e) { return memberOf(sh, e); });
     var anchorOf = function (r) { return X.anchorOf(state.form.book, sh.index, r); };
-    var res = M.slotsFor(mapping, entries.map(function (e) { return e.n; }), { cells: sh.cells, anchorOf: anchorOf });
+    var res = M.slotsFor(mapping, entries.map(function (e) { return e.n; }), { cells: sh.cells, anchorOf: anchorOf,
+      // ★ 斜線が引いてある欄には書かない（「書かなくてよい」の意味。百万石の監督の行）
+      crossedOut: function (ref) { return X.crossedOut(state.form.book, sh.index, ref); } });
     var base = sh.baseDate || mapping.baseDate;
     var people = res.slots.map(function (slot) {
       var e = entries.filter(function (x) { return x.n === slot.name; })[0];

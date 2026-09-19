@@ -1128,6 +1128,33 @@ function eventSection() {
   eq(M.normalize(RU.map(classCells, [], { names: [], suspects: [] })).ageClasses.length, 4,
     '★ 申込書の文から年齢区分を拾う（「①」を数字にそろえない）');
 
+  // ===== 斜線（×印）が引いてある欄には書かない =====
+  // ★ 事務局の様式は「ここは書かなくてよい」を斜線で示すことがある（百万石の監督の行の生年月日・年齢。
+  //   2026-09-19、本人が本物で気づいた）
+  var crossCells = [
+    { ref: 'C1', row: 1, col: 3, text: '氏名' }, { ref: 'D1', row: 1, col: 4, text: '生年月日' },
+    { ref: 'C2', row: 2, col: 3, text: '山田 太郎' }, { ref: 'C3', row: 3, col: 3, text: '山田 花子' }
+  ];
+  var crossNames = [2, 3].map(function (row) {
+    return { refs: ['C' + row], row: row, col: 3, text: 'x', match: { status: 'exact', member: null } };
+  });
+  var crossMapping = M.normalize(RU.map(crossCells, [], { names: crossNames, suspects: [] }));
+  var crossRes = M.slotsFor(crossMapping, crossNames, { cells: crossCells, anchorOf: function (r) { return r; },
+    crossedOut: function (ref) { return ref === 'D2'; } });   // 1人目の生年月日だけ斜線
+  eq(crossRes.problems.map(function (p) { return p.code + ' ' + p.ref; }), ['target-crossed-out D2'],
+    '★ 斜線が引いてある欄には書かず、理由を知らせる');
+  eq(crossRes.slots.map(function (s) { return s.fields.map(function (f) { return f.field + '@' + f.ref; }).join(','); }),
+    ['name@C2', 'name@C3,birth@D3'], '斜線の無い欄には今までどおり書く');
+
+  // 実物の xlsx から斜線を見分けられるか（様式D の監督の行。本物の百万石と同じ作り）
+  return read(path.join(FIX, 'form-d-blank.xlsx')).then(function (book) {
+    eq(['D5', 'E5', 'D6', 'B5'].map(function (ref) { return X.crossedOut(book, 0, ref) ? '斜線' : '—'; }),
+      ['斜線', '斜線', '—', '—'], '★ 監督の行の生年月日・年齢だけ斜線と分かる（選手の行は書ける）');
+    return eventTail(cells, merges, names);
+  });
+}
+
+function eventTail(cells, merges, names) {
   // ★ 種目の欄に文字が印刷されていたら書かない（ほかの欄と同じ守り）
   var cells3 = cells.concat([{ ref: 'M2', row: 2, col: 13, text: '男子' }]);
   var res3 = M.slotsFor(M.normalize(RU.map(cells3, merges, { names: names, suspects: [] })), names,
