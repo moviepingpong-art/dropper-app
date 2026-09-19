@@ -474,7 +474,24 @@ function mapSection(roster) {
   eq(urlLines, [], 'entry-postal.js のコメント以外に、よそのサイトの URL が無い');
   check(!fs.existsSync(path.join(__dirname, '..', 'entry-ai.js')), 'Gemini を呼ぶ entry-ai.js は無い');
   var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  check(!/gtag|googletagmanager|hits\.sh|key-modal|entry-ai\.js/.test(html), 'index.html に解析・訪問者カウンター・キー入力・entry-ai.js が無い（試作中）');
+  check(!/key-modal|entry-ai\.js/.test(html), 'index.html に API キーの入力欄・entry-ai.js が無い（AI を使わないので要らない）');
+  // ★ 公開にあたって入れたもの（2026-09-19）。ほかの3本と揃っているか。
+  check(/googletagmanager\.com\/gtag\/js\?id=G-PQPKYYYXKG/.test(html), 'index.html に GA4 が入っている（ほかの3本と同じ測定ID）');
+  check(/hits\.sh\/app\.dropper-tools\.com\/entry\.svg/.test(html), 'index.html に訪問者カウンターが入っている（区分けは entry）');
+  check(!/name="robots"/.test(html), 'index.html に noindex が残っていない（検索に出す）');
+  check(/rel="canonical" href="https:\/\/app\.dropper-tools\.com\/entry\/"/.test(html), 'index.html に canonical がある');
+  // ★ カウンターは window.LANG より後ろに置くこと。ほかの3本でここを間違え、en/in の訪問が ja に混ざった。
+  //   ★ 語ではなく「代入そのもの」と「実際の URL」を見る。注意書きにも window.LANG や hits.sh の語が
+  //     出てくるので、語で探すと素通りする（2026-09-19 に踏んだ）。コメントを機械で外すのは
+  //     URL の // まで削るので、やらない
+  var atLang = html.indexOf('window.LANG =');
+  var atHits = html.indexOf('hits.sh/app.dropper-tools.com/entry.svg');
+  check(atLang >= 0 && atHits >= 0 && atLang < atHits, '訪問者カウンターは window.LANG を設定したあとに走る');
+  // ★ 日本語のみと決めたので、他言語版への指示は書かない（CLAUDE.md「申込書ドロッパーは日本語のみ」）
+  // ★ 「hreflang」の語ではなく、実際の属性を見る。説明のコメントに反応してはいけない（2026-09-19 に踏んだ）
+  check(!/<link\b[^>]*\bhreflang=/.test(html), 'index.html に hreflang の link が無い（日本語のみなので、他言語版への指示は嘘になる）');
+  // コメント（<!-- --> の中）を取り除いてから見る。説明の文に反応させない
+  check(!/試作/.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'index.html に「試作」の表示が残っていない');
 
   // --- 自作の様式3つ: 規則の答えが、手で書いた正解と一致する ---
   ['A', 'B', 'C'].forEach(function (k) {
