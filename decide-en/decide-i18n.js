@@ -17,11 +17,12 @@
       toolEvent: '🎪 イベント',
       toolSchedule: '📅 予定表',
       toolDecide: '✅ 決めごと',
-      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと',
+      toolEntry: '📝 申込書',
+      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと ／ 申込書＝大会の申込書に、名簿から記入',
       // --- 「何ができる？」ポップアップ（#tools-modal）---
       // 3本の違いは「1枚から何が、いくつ出てくるか」に尽きる。図のラベルもそこだけを言う。
       tmBtn: '🔍 何ができる？',
-      tmTitle: '🎁 3つのドロッパー、何ができる？',
+      tmTitle: '🎁 4つのドロッパー、何ができる？',
       tmIntro: 'どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。',
       tmNameEvent: '🎪 イベントドロッパー',
       tmOneEvent: 'チラシ1枚から、予定1件と、そのまま配れる案内文。',
@@ -54,6 +55,15 @@
       tmGoEvent: '🎪 イベントドロッパーを使ってみる',
       tmGoSchedule: '📅 予定表ドロッパーを使ってみる',
       tmHere: 'いま使っています',
+      tmNameEntry: '📝 申込書ドロッパー',
+      tmOneEntry: '大会の申込書に、名簿から生年月日・年齢・住所を埋めて返します。',
+      tmFigForm: '申込書（空でも可）',
+      tmFigRoster: '名簿から選ぶ',
+      tmFigFilled: '記入済みで保存',
+      tmTagEntry1: 'ログイン不要で試せる',
+      tmTagEntry2: '生年月日・年齢・住所を自動',
+      tmTagEntry3: '名簿もこのツールで作れる',
+      tmGoEntry: '📝 申込書ドロッパーを使ってみる',
       tmClose: '閉じる',
       tmFoot: '※ この説明は「何ができる？」からいつでも見られます。',
       tmLineTitle: 'LINEでも使えます',
@@ -168,6 +178,7 @@
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
       toolDecide: '✅ Decide',
+      toolEntry: '📝 Entry forms',
       toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries / Decide = what was settled, from chats and notes',
       tmBtn: '🔍 What can these do?',
       tmTitle: '🎁 Three droppers — what does each one do?',
@@ -203,6 +214,15 @@
       tmGoEvent: '🎪 Try Event Dropper',
       tmGoSchedule: '📅 Try Schedule Dropper',
       tmHere: 'You are here',
+      tmNameEntry: '📝 Entry Form Dropper',
+      tmOneEntry: 'Fills a tournament entry form with dates of birth, ages and addresses from your club roster.',
+      tmFigForm: 'The entry form',
+      tmFigRoster: 'Pick from the roster',
+      tmFigFilled: 'Saved, filled in',
+      tmTagEntry1: 'No login needed',
+      tmTagEntry2: 'Birth dates, ages and addresses',
+      tmTagEntry3: 'Build the roster here too',
+      tmGoEntry: '📝 Try the Entry Form Dropper',
       tmClose: 'Close',
       tmFoot: 'You can open this again any time from "What can these do?".',
       tmLineTitle: 'Also on LINE',
@@ -308,6 +328,7 @@
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
       toolDecide: '✅ Decide',
+      toolEntry: '📝 Entry forms',
       toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries / Decide = chat ya notes se jo tay hua',
       tmBtn: '🔍 Ye kya kar sakte hain?',
       tmTitle: '🎁 Teen dropper — kaunsa kya karta hai?',
@@ -343,6 +364,15 @@
       tmGoEvent: '🎪 Event Dropper try karein',
       tmGoSchedule: '📅 Schedule Dropper try karein',
       tmHere: 'Abhi yahi khula hai',
+      tmNameEntry: '📝 Entry Form Dropper',
+      tmOneEntry: 'Tournament entry form mein roster se date of birth, age aur address bhar deta hai.',
+      tmFigForm: 'Entry form',
+      tmFigRoster: 'Roster se chunein',
+      tmFigFilled: 'Bhara hua save',
+      tmTagEntry1: 'Login ki zaroorat nahin',
+      tmTagEntry2: 'Date of birth, age, address',
+      tmTagEntry3: 'Roster bhi yahin banayein',
+      tmGoEntry: '📝 Entry Form Dropper aazmayein',
       tmClose: 'Band karein',
       tmFoot: 'Ise kabhi bhi "Ye kya kar sakte hain?" se dobara dekh sakte hain.',
       tmLineTitle: 'LINE par bhi',
@@ -466,6 +496,15 @@
     // 他のドロッパーへのリンクは、同じ言語の版へ送ること（en の利用者を ja のページへ飛ばさない）
     var ev = document.getElementById('tabEvent');
     if (ev) ev.href = (global.LANG === 'en') ? '/calendar-en/' : (global.LANG === 'in') ? '/calendar-in/' : '/calendar/';
+    // ★ 申込書ドロッパーは日本語のみ（dropper-app/CLAUDE.md）。en/in では出さない。
+    //   日本語だけのツールへ飛ばすと行き止まりになる。HTML は3言語ともバイト同一のまま。
+    var te = document.getElementById('tabEntry');
+    if (te) { te.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
+    // 「何ができる？」の中の4本目も、同じ理由で日本語のときだけ出す
+    ['tmTabEntry', 'tmPanelEntry'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
+    });
     var sc = document.getElementById('tabSchedule');
     if (sc) sc.href = (global.LANG === 'en') ? '/schedule-en/' : (global.LANG === 'in') ? '/schedule-in/' : '/schedule/';
     // 「何ができる？」ポップアップの「使ってみる」も、タブと同じ規則で張り替える
