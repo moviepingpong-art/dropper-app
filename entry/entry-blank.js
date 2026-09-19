@@ -105,12 +105,32 @@
     return (t && t.length <= 10 && !/^\d+$/.test(t)) ? t : '';
   }
 
+  // ★ 「記入例」の札。見出しのすぐ下に書き方の見本を載せる様式がある（2026-09-20、本物の
+  //   関東ラージボール卓球大会の様式で発覚。7〜10行目が取手太郎などの見本で、そこで行き止まりになり
+  //   表を1つも見つけられず、シートごと落ちていた）
+  var EXAMPLE_RE = /記入例|記載例|見本|例示/;
+
+  // その行が見本の行か（名前の列より左にある札を見る。札は結合されて先頭行にしか無いことがある）
+  function isExampleRow(g, r, col) {
+    for (var c = 1; c < col; c++) {
+      var t = g.text(r, c);
+      if (t && EXAMPLE_RE.test(nfkc(t))) return true;
+    }
+    return false;
+  }
+
   // 見出しの下に続く「書ける行」を数える
   function rowsBelow(g, headerRow, col) {
-    var from = null, to = null, shape = null;
+    var from = null, to = null, shape = null, inExample = false;
     for (var r = headerRow + 1; r <= headerRow + LOOK_DOWN; r++) {
       var cell = g.at(r, col);
       var own = cell ? nfkc(cell.text) : '';
+      // ★ 見本の行は飛ばす。札は結合で先頭行にしかないことがあるので、いちど見たら
+      //   名前の欄が空く行まで飛ばし続ける。表が始まったあとは飛ばさない（別の表の見出しを吸わないため）
+      if (from == null) {
+        if (isExampleRow(g, r, col)) inExample = true;
+        if (inExample) { if (own) continue; inExample = false; }
+      }
       if (own && !/^\d+$/.test(own)) break;              // 名前の欄に文字（別の表の見出し）
       if (otherText(g, r, col)) {
         if (from == null) continue;                     // 見出しの2行目（「年」「月」「日」）は読み飛ばす

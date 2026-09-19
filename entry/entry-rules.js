@@ -148,7 +148,9 @@
         else if (/^男(性)?$/.test(near)) f = 'genderMale';
         else if (/^女(性)?$/.test(near)) f = 'genderFemale';
         else if (/性別|男女/.test(near)) f = 'gender';
-        else if (/合計/.test(all) && /年齢/.test(all)) f = 'ageSum';
+        // ★「年令」（齢ではなく令）と書く様式がある。単独の「年令」は下で見ているのに、
+        //   合計のほうだけ抜けていた（2026-09-20、本物の神奈川県の様式5シートで発覚）
+        else if (/合計/.test(all) && /年[齢令]/.test(all)) f = 'ageSum';
         // ★ ダブルスの種目（男子／女子／混合）。組ごとに1つ書く欄（2026-09-18、本人の要望）
         else if (/^(種目|参加種目|種別)$/.test(near)) f = 'event';
         else if (/^(年齢|年令)/.test(near)) f = 'age';

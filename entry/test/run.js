@@ -1093,6 +1093,14 @@ function eventSection() {
   var mapping = M.normalize(RU.map(cells, merges, { names: names, suspects: [] }));
   var tb = mapping.tables[0];
   eq([tb.pairSize, tb.ageSumCol, tb.eventCol], [2, 'L', 'M'], '種目の列と、2人1組であることを見つける');
+
+  // ★「年令」（齢ではなく令）と書く様式がある。単独の「年令」は前から読めたのに、
+  //   合計のほうだけ抜けていた（2026-09-20、本物の神奈川県の様式5シートで発覚）
+  var cellsRei = cells.map(function (c) {
+    return c.ref === 'L1' ? { ref: 'L1', row: 1, col: 12, text: '合計\n年令' } : c;
+  });
+  var tbRei = M.normalize(RU.map(cellsRei, merges, { names: names, suspects: [] })).tables[0];
+  eq([tbRei.pairSize, tbRei.ageSumCol], [2, 'L'], '★「合計年令」も合計年齢として読む');
   var res = M.slotsFor(mapping, names, { cells: cells, anchorOf: function (r) { return r; } });
   eq(res.groups.map(function (g) { return g.ageSum + '/' + g.event + '=' + g.slots.join('+'); }),
     ['L2/M2=0+1', 'L4/M4=2+3'], '組ごとに、合計年齢と種目の欄が決まる');
@@ -1323,6 +1331,20 @@ function blankSection(roster) {
     ['A+B:2-3'], '「姓」と「名」が並んでいれば1つの表にする');
   eq(shownOf(B_.tables([cell(2, 1, '氏　名'), cell(1, 2, '監督'), cell(2, 2, ''), cell(1, 3, '1'), cell(2, 3, '')])),
     ['B:2-3'], '見出しの空白と、左の行の名札（監督）を越えて数える');
+
+  // ★ 見出しのすぐ下に「記入例」を載せる様式がある（2026-09-20、本物の関東ラージボール大会）。
+  //   そこで行き止まりになり、表を1つも見つけられずシートごと落ちていた。
+  //   札は結合で先頭行にしか無いので、名前の欄が空く行まで飛ばし続ける
+  eq(shownOf(B_.tables([
+    cell(2, 1, '氏名'),
+    cell(1, 2, '記入例'), cell(2, 2, '取手太郎'), cell(3, 2, '男'),   // 見本の行（札はここだけ）
+    cell(2, 3, '藤代華子'), cell(3, 3, '女'),                        // 見本の続き（札が無い）
+    cell(2, 4, ''), cell(3, 4, ''), cell(2, 5, ''), cell(3, 5, '')   // ここから書ける
+  ])), ['B:4-5'], '★ 記入例の行を飛ばして、その下の書ける行から数える');
+
+  // 見本のあとに表が無ければ、表は作らない（飛ばした結果、何も無いのに表を作らない）
+  eq(B_.tables([cell(2, 1, '氏名'), cell(1, 2, '記入例'), cell(2, 2, '取手太郎')]), [],
+    '記入例だけで書ける行が無ければ、表は作らない');
   // 表の名前は、見出しのすぐ上の同じ列の短い文字だけ（遠くの文字は拾わない）
   eq(B_.tables([cell(2, 1, '連絡責任者'), cell(2, 2, '氏名'), cell(2, 3, ''), cell(3, 3, '')])[0].label, '連絡責任者',
     '表の名前を、見出しのすぐ上から拾う');
