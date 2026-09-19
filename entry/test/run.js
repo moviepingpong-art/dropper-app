@@ -1093,6 +1093,42 @@ function eventSection() {
   var mapping = M.normalize(RU.map(cells, merges, { names: names, suspects: [] }));
   var tb = mapping.tables[0];
   eq([tb.pairSize, tb.ageSumCol, tb.eventCol], [2, 'L', 'M'], '種目の列と、2人1組であることを見つける');
+
+  // ★「年令」（齢ではなく令）と書く様式がある。単独の「年令」は前から読めたのに、
+  //   合計のほうだけ抜けていた（2026-09-20、本物の神奈川県の様式5シートで発覚）
+  var cellsRei = cells.map(function (c) {
+    return c.ref === 'L1' ? { ref: 'L1', row: 1, col: 12, text: '合計\n年令' } : c;
+  });
+  var tbRei = M.normalize(RU.map(cellsRei, merges, { names: names, suspects: [] })).tables[0];
+  eq([tbRei.pairSize, tbRei.ageSumCol], [2, 'L'], '★「合計年令」も合計年齢として読む');
+
+  // ★ 左右に並ぶ表を分ける（2026-09-20、本物の神奈川県の様式5シートで発覚）。
+  //   シングルス（B〜E）とダブルス（G〜J）が左右に並ぶ様式。分けないと、どちらの表も
+  //   シート全部の列を見てしまい、シングルスがダブルス側の結合で「2人1組」になる。
+  //   分ける手がかりは、両方の表が同じ見出しの並びを繰り返していること
+  var sideCells = [
+    { ref: 'B1', row: 1, col: 2, text: '種目' }, { ref: 'C1', row: 1, col: 3, text: '氏名' },
+    { ref: 'D1', row: 1, col: 4, text: '所属' }, { ref: 'E1', row: 1, col: 5, text: '年令' },
+    { ref: 'G1', row: 1, col: 7, text: '種目' }, { ref: 'H1', row: 1, col: 8, text: '氏名' },
+    { ref: 'I1', row: 1, col: 9, text: '所属' }, { ref: 'J1', row: 1, col: 10, text: '合計年令' },
+    { ref: 'C2', row: 2, col: 3, text: '山田 太郎' }, { ref: 'C3', row: 3, col: 3, text: '山田 花子' },
+    { ref: 'H2', row: 2, col: 8, text: '田中 誠' }, { ref: 'H3', row: 3, col: 8, text: '加藤 健' }
+  ];
+  // ダブルス側だけ、種目と合計年令が2行ずつ縦に結合されている（＝2人1組）
+  var sideMerges = [{ top: 2, bottom: 3, left: 7, right: 7 }, { top: 2, bottom: 3, left: 10, right: 10 }];
+  var sideNames = [['C2', 2, 3], ['C3', 3, 3], ['H2', 2, 8], ['H3', 3, 8]].map(function (a) {
+    return { refs: [a[0]], row: a[1], col: a[2], text: 'x', match: { status: 'exact', member: null } };
+  });
+  var sideTb = M.normalize(RU.map(sideCells, sideMerges, { names: sideNames, suspects: [] })).tables;
+  eq(sideTb.map(function (t) { return t.nameCol; }), ['C', 'H'], '左右に並ぶ表を2つとして数える');
+  eq(sideTb[0].cols.map(function (c) { return c.col; }), ['D', 'E'],
+    '★ 左の表（シングルス）は、自分の列だけを見る');
+  eq([sideTb[0].pairSize, !!sideTb[0].ageSumCol, !!sideTb[0].eventCol], [1, false, false],
+    '★ 左の表を、右の表の結合を見て「2人1組」にしない');
+  eq(sideTb[1].cols.map(function (c) { return c.col; }), ['I'],
+    '★ 右の表（ダブルス）も、自分の列だけを見る');
+  eq([sideTb[1].pairSize, sideTb[1].ageSumCol, sideTb[1].eventCol], [2, 'J', 'G'],
+    '右の表は2人1組で、合計年齢と種目の欄を持つ');
   var res = M.slotsFor(mapping, names, { cells: cells, anchorOf: function (r) { return r; } });
   eq(res.groups.map(function (g) { return g.ageSum + '/' + g.event + '=' + g.slots.join('+'); }),
     ['L2/M2=0+1', 'L4/M4=2+3'], '組ごとに、合計年齢と種目の欄が決まる');
@@ -1323,6 +1359,29 @@ function blankSection(roster) {
     ['A+B:2-3'], '「姓」と「名」が並んでいれば1つの表にする');
   eq(shownOf(B_.tables([cell(2, 1, '氏　名'), cell(1, 2, '監督'), cell(2, 2, ''), cell(1, 3, '1'), cell(2, 3, '')])),
     ['B:2-3'], '見出しの空白と、左の行の名札（監督）を越えて数える');
+
+  // ★ 見出しのすぐ下に「記入例」を載せる様式がある（2026-09-20、本物の関東ラージボール大会）。
+  //   そこで行き止まりになり、表を1つも見つけられずシートごと落ちていた。
+  //   札は結合で先頭行にしか無いので、名前の欄が空く行まで飛ばし続ける
+  eq(shownOf(B_.tables([
+    cell(2, 1, '氏名'),
+    cell(1, 2, '記入例'), cell(2, 2, '取手太郎'), cell(3, 2, '男'),   // 見本の行（札はここだけ）
+    cell(2, 3, '藤代華子'), cell(3, 3, '女'),                        // 見本の続き（札が無い）
+    cell(2, 4, ''), cell(3, 4, ''), cell(2, 5, ''), cell(3, 5, '')   // ここから書ける
+  ])), ['B:4-5'], '★ 記入例の行を飛ばして、その下の書ける行から数える');
+
+  // 見本のあとに表が無ければ、表は作らない（飛ばした結果、何も無いのに表を作らない）
+  eq(B_.tables([cell(2, 1, '氏名'), cell(1, 2, '記入例'), cell(2, 2, '取手太郎')]), [],
+    '記入例だけで書ける行が無ければ、表は作らない');
+
+  // ★ 表が始まったあとの記入例は飛ばさない。飛ばすと、その先の行まで1つの表に飲み込む
+  eq(shownOf(B_.tables([
+    cell(2, 1, '氏名'),
+    cell(2, 2, ''), cell(3, 2, ''),                                   // 書ける行
+    cell(2, 3, ''), cell(3, 3, ''),
+    cell(1, 4, '記入例'), cell(2, 4, '取手太郎'), cell(3, 4, '男'),    // ここから先は別の話
+    cell(2, 5, ''), cell(3, 5, '')
+  ])), ['B:2-3'], '★ 表が始まったあとの記入例は飛ばさない（その先まで飲み込まない）');
   // 表の名前は、見出しのすぐ上の同じ列の短い文字だけ（遠くの文字は拾わない）
   eq(B_.tables([cell(2, 1, '連絡責任者'), cell(2, 2, '氏名'), cell(2, 3, ''), cell(3, 3, '')])[0].label, '連絡責任者',
     '表の名前を、見出しのすぐ上から拾う');
