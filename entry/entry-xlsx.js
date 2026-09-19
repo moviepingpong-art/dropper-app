@@ -534,13 +534,21 @@
   //      Excel が「修復しました」と言うので、<pageSetup> の r:id は外す。
   //      用紙・向き・拡大率は <pageSetup> の属性そのものに入っているので残る
   //   4. シート名は31文字まで・重複不可・XML の書き方が要る（本物に「V & C」があった）
+  // 複製できない理由。できるなら '' を返す。画面が先に聞いて、押せない理由を出すために使う
+  function copyBlocker(book, index) {
+    var src = book.sheets[index];
+    if (!src) return 'no-sheet';
+    if (!book.parts['[Content_Types].xml']) return 'no-content-types';
+    return (/<(drawing|legacyDrawing|picture|tableParts|oleObjects|controls)\b/.exec(book.parts[src.path]) || [])[1] || '';
+  }
+
   function copySheet(book, index, wantName) {
     var src = book.sheets[index];
     if (!src) throw fail('no-sheet');
     var xml = book.parts[src.path];
 
     // 連れて行けないものがあるなら、壊れたファイルを作らずに断る
-    var hard = (/<(drawing|legacyDrawing|picture|tableParts|oleObjects|controls)\b/.exec(xml) || [])[1];
+    var hard = copyBlocker(book, index);
     if (hard) throw fail('sheet-has-parts', hard);
 
     // 新しい置き場（既にある番号を避ける）
@@ -686,7 +694,7 @@
 
   global.EntryXlsx = {
     open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
-    crossedOut: crossedOut, copySheet: copySheet,
+    crossedOut: crossedOut, copySheet: copySheet, copyBlocker: copyBlocker,
     setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }

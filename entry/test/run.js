@@ -1204,9 +1204,29 @@ function copySheetTail() {
     eq(defs, ["0:'申込書 A'!$A$1:$D$8", "1:'申込書 A (2)'!$A$1:$D$8", "2:'申込書 B'!$A$1:$D$8"],
       '★ 印刷範囲: 複製にも付き、後ろのシートの番号がずれない');
 
+    // ★ 2枚足す場合。うしろの枚数から作ると、並びが (2)(3) の順になる（アプリの保存と同じ手順）
+    var book2;
+    var made = read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (b) {
+      book2 = b;
+      var base = X.sheetNames(b)[0];
+      X.copySheet(b, 0, base + ' (3)');
+      X.copySheet(b, 0, base + ' (2)');
+      eq(X.sheetNames(b), ['申込書 A', '申込書 A (2)', '申込書 A (3)', '申込書 B'],
+        '★ 2枚足しても並びが (2)(3) の順になる');
+      var ids = (b.parts['xl/workbook.xml'].match(/<definedName\b[^>]*localSheetId="(\d+)"/g) || [])
+        .map(function (s) { return (/(\d+)/.exec(s))[1]; }).sort();
+      eq(ids, ['0', '1', '2', '3'], '印刷範囲は4枚ぶん、番号が重ならない');
+      X.setCell(b, 1, 'B5', '架空 次郎');
+      X.setCell(b, 2, 'B5', '架空 三郎');
+      return X.save(b).then(function (u8) {
+        expectForExcel.push({ file: 'copied-2sheets.xlsx', sheet: '申込書 A (3)', cells: { B5: '架空 三郎' } });
+        fs.writeFileSync(path.join(OUT, 'copied-2sheets.xlsx'), Buffer.from(u8));
+      });
+    });
+
     // 書いて保存し、読み直しても崩れないか
     X.setCell(book, pos, 'B5', '架空 太郎');
-    return X.save(book).then(function (u8) {
+    return made.then(function () { return X.save(book); }).then(function (u8) {
       return X.open(u8).then(function (b2) {
         eq(X.sheetNames(b2), ['申込書 A', '申込書 A (2)', '申込書 B'], '保存して読み直しても3シート');
         var got = X.cells(b2, 1).filter(function (c) { return c.ref === 'B5'; })[0];
@@ -1235,6 +1255,15 @@ function copySheetTail() {
       check(!!ps && /paperSize="9"/.test(ps[0]) && /orientation="portrait"/.test(ps[0]),
         '用紙と向きは残る（<pageSetup> の属性そのものなので失わない）');
     });
+  }).then(function () {
+    // ★ 同じ欄への書き込みが重なったら、あとのほうだけ残す（2026-09-20）。
+    //   空の申込書では名前をこちらが書くが、欄ごとの書き込みにも名前が入っていて二重になり、
+    //   ④の「{n}か所に書き込みます」が水増しされていた（値は同じなので害は無かった）
+    var dup = [{ ref: 'B5', value: '山田 太郎' }, { ref: 'C5', value: '1950/4/1' }, { ref: 'B5', value: '山田 太郎' }];
+    var seen = {}, once = [];
+    dup.forEach(function (w) { if (seen[w.ref]) return; seen[w.ref] = true; once.push(w); });
+    eq(once.map(function (w) { return w.ref; }), ['B5', 'C5'],
+      '★ 同じ欄への書き込みは1回に数える（件数の水増しを防ぐ。書く順番は変えない）');
   }).then(function () {
     // 連れて行けないものがある様式は、壊れたファイルを作らずに断る
     return read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (book) {

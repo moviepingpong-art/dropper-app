@@ -748,11 +748,38 @@
     return tb.label ? t('pickTableNamed', { label: tb.label, where: where }) : where;
   }
 
+  // ★ 2枚目を足せない様式かどうか（図などが入っていると写せない）。理由の語を返す
+  function copyBlocker(sh) {
+    if (!state.form || !state.form.book) return '';
+    try { return X.copyBlocker(state.form.book, sh.index) || ''; } catch (e) { return ''; }
+  }
+
+  // その表を何枚に分けて書くか（2枚目を足さないなら必ず1）
+  function pagesOfTable(sh, ti) {
+    var tb = sh.tables && sh.tables[ti];
+    if (!tb || !tb.rows.length) return 1;
+    var more = !!(sh.more && sh.more[ti]);
+    if (!more) return 1;
+    return Math.max(1, Math.ceil((sh.picks[ti] || []).length / tb.rows.length));
+  }
+  // そのシート全体で何枚要るか
+  function pagesOf(sh) {
+    if (!sh.blank || !sh.tables) return 1;
+    return sh.tables.reduce(function (n, tb, ti) { return Math.max(n, pagesOfTable(sh, ti)); }, 1);
+  }
+
   function renderPickSheet(sh, sec) {
     sh.tables.forEach(function (tb, ti) {
       var picks = sh.picks[ti];
       var box = h('div', { class: 'pick-table' });
       box.appendChild(h('p', { class: 'sub-title', text: tableLabel(tb) }));
+
+      // ★ 2枚目を足すかどうか。足すなら、表の行数を超えて選べる（2026-09-20）
+      var cap = tb.rows.length;
+      var more = !!(sh.more && sh.more[ti]);
+      var pages = more ? Math.max(1, Math.ceil(picks.length / cap) + (picks.length % cap === 0 ? 1 : 0)) : 1;
+      if (pages > 1) box.appendChild(h('p', { class: 'hint',
+        text: t('pickPages', { pages: Math.ceil(picks.length / cap) || 1, n: picks.length, cap: cap }) }));
 
       // 選んだ人（上の行から順に入る）
       if (!picks.length) {
@@ -760,9 +787,11 @@
       } else {
         var ul = h('ol', { class: 'picked' });
         picks.forEach(function (m, i) {
-          var row = tb.rows[i];
+          var row = tb.rows[i % cap];
+          var page = Math.floor(i / cap);
           ul.appendChild(h('li', {}, [
-            h('span', { class: 'ref', text: (tb.nameCol || tb.familyCol) + row }),
+            h('span', { class: 'ref', text: (page ? t('pickPageMark', { p: page + 1 }) + ' ' : '') +
+              (tb.nameCol || tb.familyCol) + row }),
             h('span', { class: 'typed', text: m.name }),
             h('span', { class: 'hint', text: ymdText(m.birth) }),
             h('button', { type: 'button', class: 'link-btn', text: t('pickUp'), disabled: i === 0,
@@ -779,11 +808,11 @@
       // 名簿から選ぶ（男子・女子）
       // ★ ちょうど入りきったときは「いっぱいです」と出さない（入れすぎたと勘違いする。2026-09-19、本人の指摘）。
       //   「ちょうどそろいました」と伝え、入れ替えは上の一覧の「外す」でできることを添える
-      var full = picks.length >= tb.rows.length;
+      var full = !more && picks.length >= cap;
       var details = h('details', { class: 'cols-box' + (full ? ' done' : ''), open: !picks.length || sh.pickOpen === ti });
       details.addEventListener('toggle', function () { sh.pickOpen = details.open ? ti : null; });
       details.appendChild(h('summary', { class: full ? 'done' : null,
-        text: full ? t('pickComplete', { n: tb.rows.length }) : t('pickFrom') }));
+        text: full ? t('pickComplete', { n: cap }) : t('pickFrom') }));
       if (!full) {
         B.SHEETS.forEach(function (g) {
           var list = (state.book && state.book.people[g]) || [];
@@ -800,7 +829,7 @@
             wrap.appendChild(h('button', { type: 'button', class: 'btn-sub pick-one', disabled: already,
               text: label, title: ymdText(m.birth),
               onclick: function () {
-                if (picks.length >= tb.rows.length) return;
+                if (!more && picks.length >= cap) return;
                 picks.push(m);
                 sh.pickOpen = ti;
                 renderNames();
@@ -811,6 +840,33 @@
       }
       box.appendChild(details);
 
+      // ★ 表がいっぱいになったら「2枚目を足す」を出す。勝手には増やさない（驚くため）
+      var why = copyBlocker(sh);
+      if (picks.length >= cap && !more && !why) {
+        box.appendChild(h('p', {}, [
+          h('button', { type: 'button', class: 'btn-sub', text: t('pickMore'),
+            onclick: function () {
+              sh.more = sh.more || {};
+              sh.more[ti] = true;
+              sh.pickOpen = ti;
+              renderNames();
+            } })
+        ]));
+      } else if (picks.length >= cap && !more && why) {
+        box.appendChild(h('p', { class: 'warn', text: t('pickMoreCannot', { why: why }) }));
+      } else if (more) {
+        box.appendChild(h('p', { class: 'small' }, [
+          h('span', { class: 'ok-text', text: t('pickMoreOn') }),
+          h('button', { type: 'button', class: 'link-btn', text: t('pickMoreOff'),
+            onclick: function () {
+              sh.more[ti] = false;
+              sh.picks[ti] = picks.slice(0, cap);
+              renderNames();
+            } })
+        ]));
+        box.appendChild(h('p', { class: 'hint', text: t('pickMoreNote') }));
+      }
+
       // ★ 表の見つけ方が外れたときの逃げ道。書く行を本人が直せる
       var from = h('input', { type: 'number', class: 'row-num', value: String(tb.firstRow), min: '1', max: '2000' });
       var to = h('input', { type: 'number', class: 'row-num', value: String(tb.lastRow), min: '1', max: '2000' });
@@ -820,7 +876,8 @@
         tb.firstRow = f; tb.lastRow = t2;
         tb.rows = [];
         for (var r = f; r <= t2; r++) tb.rows.push(r);
-        sh.picks[ti] = picks.slice(0, tb.rows.length);
+        // 2枚目を足すなら、行数を超えていても切らない（何枚に分けるかが変わるだけ）
+        if (!(sh.more && sh.more[ti])) sh.picks[ti] = picks.slice(0, tb.rows.length);
         renderNames();
       };
       from.addEventListener('change', apply);
@@ -833,10 +890,15 @@
   }
 
   // 選んだ人から、いままでの道（見出しの規則・④・⑤）が使う形を作る
-  function foundFromPicks(sh) {
+  // page: 何枚目か（0 が元の様式）。2枚目以降は、同じ行に続きの人を当てる
+  function foundFromPicks(sh, page) {
+    page = page || 0;
     var names = [];
     sh.tables.forEach(function (tb, ti) {
-      sh.picks[ti].forEach(function (m, i) {
+      var cap = tb.rows.length;
+      var slice = (sh.more && sh.more[ti]) ? sh.picks[ti].slice(page * cap, (page + 1) * cap)
+        : (page ? [] : sh.picks[ti]);
+      slice.forEach(function (m, i) {
         var row = tb.rows[i];
         if (!row) return;
         var refs = tb.nameCol ? [tb.nameCol + row] : [tb.familyCol + row, tb.givenCol + row];
@@ -1142,7 +1204,15 @@
     return details;
   }
 
-  function computeSheet(sh) {
+  // page: 何枚目ぶんを作るか（0 が元の様式。2枚目以降は写した様式に同じ形で書く）
+  function computeSheet(sh, page) {
+    var keep = null;
+    if (page) { keep = sh.found; sh.found = foundFromPicks(sh, page); }
+    try { return computeSheet_(sh); }
+    finally { if (keep) sh.found = keep; }
+  }
+
+  function computeSheet_(sh) {
     var mapping = withFmt(sh);
     // ★ 年齢区分は、申込書に書かれていなければ本人が④で貼り付けたものを使う（要項の文）
     if (sh.ageClassesRaw) {
@@ -1203,7 +1273,17 @@
         }
       }
     });
-    return { mapping: mapping, res: res, base: base, people: people, groups: groups, writes: writes };
+    // ★ 同じ欄への書き込みが重なっていたら、先のほうだけ残す（2026-09-20）。
+    //   空の申込書では名前をこちらが書くが、欄ごとの書き込みにも名前が入っていて二重になり、
+    //   「24か所に書き込みます」のように件数が水増しされていた（値は同じなので害は無かった）。
+    //   先のほうを残すのは、書く順番を変えないため
+    var seen = {}, once = [];
+    writes.forEach(function (w) {
+      if (seen[w.ref]) return;
+      seen[w.ref] = true;
+      once.push(w);
+    });
+    return { mapping: mapping, res: res, base: base, people: people, groups: groups, writes: once };
   }
 
   function display(v) { return v == null ? '' : String(v); }
@@ -1259,6 +1339,8 @@
       if (bi.needed && !sh.birthStyle) waitingBirth++;
       var c = computeSheet(sh);
       total += c.writes.length;
+      // ★ 2枚目以降も同じだけ書く。④の件数に入れないと、保存の数と合わない（2026-09-20）
+      for (var pg = 1; pg < pagesOf(sh); pg++) total += computeSheet(sh, pg).writes.length;
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
 
       // 基準日
@@ -1544,12 +1626,33 @@
     setMsg('saveMsg', t('saving'), 'wait');
     // 元のバイト列から開き直して書く（確認画面で選び直しても、書き込みが重ならないように）
     X.open(state.form.bytes).then(function (book) {
-      var failed = [], count = 0;
-      state.sheets.forEach(function (sh) {
-        var c = computeSheet(sh);
-        c.writes.forEach(function (w) {
-          var r = X.setCell(book, sh.index, w.ref, w.value, { shrink: el('shrinkChk').checked });
-          if (r.ok) count++; else failed.push(sh.name + ' ' + r.ref + '（' + t('skip.target-is-formula', { ref: r.ref, field: '' }) + '）');
+      var failed = [], count = 0, added = 0;
+
+      // ★ 2枚目以降は「書く前に」写す。書いたあとに写すと、1枚目の名前まで写ってしまう。
+      //   シートを足すと後ろのシートの番号がずれるので、**うしろから**作り、
+      //   書くときは番号ではなく名前で引く（2026-09-20）
+      var plan = state.sheets.map(function (sh) {
+        return { sh: sh, names: [X.sheetNames(book)[sh.index]] };
+      });
+      for (var i = state.sheets.length - 1; i >= 0; i--) {
+        var sh = state.sheets[i], P = pagesOf(sh);
+        if (P < 2) continue;
+        var base = X.sheetNames(book)[sh.index];
+        for (var p = P - 1; p >= 1; p--) {     // うしろの枚数から作ると、並びが 1,2,3… になる
+          var pos = X.copySheet(book, sh.index, base + ' (' + (p + 1) + ')');
+          plan[i].names[p] = X.sheetNames(book)[pos];
+          added++;
+        }
+      }
+
+      plan.forEach(function (pl) {
+        pl.names.forEach(function (name, page) {
+          var idx = X.sheetNames(book).indexOf(name);
+          if (idx < 0) return;
+          computeSheet(pl.sh, page).writes.forEach(function (w) {
+            var r = X.setCell(book, idx, w.ref, w.value, { shrink: el('shrinkChk').checked });
+            if (r.ok) count++; else failed.push(name + ' ' + r.ref + '（' + t('skip.target-is-formula', { ref: r.ref, field: '' }) + '）');
+          });
         });
       });
       return X.save(book).then(function (bytes) {
@@ -1560,7 +1663,9 @@
         document.body.appendChild(a);
         a.click();
         setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
-        setMsg('saveMsg', t('saved', { name: name, n: count }) + (failed.length ? ' ' + t('savedFailed', { list: failed.join('、') }) : ''), 'ok');
+        setMsg('saveMsg', t('saved', { name: name, n: count }) +
+          (added ? ' ' + t('savedPages', { n: added }) : '') +
+          (failed.length ? ' ' + t('savedFailed', { list: failed.join('、') }) : ''), 'ok');
         btn.disabled = false;
       });
     }).catch(function (e) {
