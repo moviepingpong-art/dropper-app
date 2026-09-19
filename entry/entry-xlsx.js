@@ -195,10 +195,14 @@
     var book = { entries: entries, byName: byName, parts: {}, dirty: {} };
     return Promise.all([
       text('xl/workbook.xml'), text('xl/_rels/workbook.xml.rels'),
-      text('xl/sharedStrings.xml'), text('xl/styles.xml')
+      text('xl/sharedStrings.xml'), text('xl/styles.xml'), text('[Content_Types].xml')
     ]).then(function (r) {
       if (!r[0] || !r[1]) throw fail('not-xlsx');
       book.parts['xl/workbook.xml'] = r[0];
+      book.parts['xl/_rels/workbook.xml.rels'] = r[1];
+      // ★ 2枚目のシートを足すときに要る。OPC は「全部品の種類をここで宣言する」決まりで、
+      //   宣言の無い部品があると Excel は開かない（2026-09-20、足した部品が開けずに分かった）
+      if (r[4]) book.parts['[Content_Types].xml'] = r[4];
       var rels = {};
       r[1].replace(/<Relationship\b[^>]*>/g, function (tag) { var a = attrs(tag); rels[a.Id] = a.Target; });
       book.sheets = [];
@@ -517,6 +521,115 @@
     return st;
   }
 
+  // ===== シートを複製する（2枚目の様式） =====
+  // ★ 人数が表に入りきらないとき、様式をもう1枚足してそこへ続きを書くため（2026-09-20）。
+  //   このツールが初めて「セルを埋める」以外の形でブックをさわる所なので、踏むと壊れる所を並べておく。
+  //
+  //   1. OPC は全部品の種類を [Content_Types].xml で宣言する決まり。宣言の無い部品があると
+  //      Excel は開かない（最初これで開けなかった）
+  //   2. 印刷範囲（definedName の _xlnm.Print_Area）は localSheetId＝**並び順の番号**で紐づく。
+  //      途中に挿すと後ろのシートの番号がずれる。直さないと本物の百万石で
+  //      「個人戦の印刷範囲が団体戦を指す」ことになる
+  //   3. シートが自分の rels（printerSettings など）を持つことがある。複製に参照だけ残すと
+  //      Excel が「修復しました」と言うので、<pageSetup> の r:id は外す。
+  //      用紙・向き・拡大率は <pageSetup> の属性そのものに入っているので残る
+  //   4. シート名は31文字まで・重複不可・XML の書き方が要る（本物に「V & C」があった）
+  function copySheet(book, index, wantName) {
+    var src = book.sheets[index];
+    if (!src) throw fail('no-sheet');
+    var xml = book.parts[src.path];
+
+    // 連れて行けないものがあるなら、壊れたファイルを作らずに断る
+    var hard = (/<(drawing|legacyDrawing|picture|tableParts|oleObjects|controls)\b/.exec(xml) || [])[1];
+    if (hard) throw fail('sheet-has-parts', hard);
+
+    // 新しい置き場（既にある番号を避ける）
+    var used = {};
+    Object.keys(book.byName).concat(Object.keys(book.parts)).forEach(function (p) {
+      var m = /^xl\/worksheets\/sheet(\d+)\.xml$/.exec(p);
+      if (m) used[Number(m[1])] = true;
+    });
+    var n = 1;
+    while (used[n]) n++;
+    var newPath = 'xl/worksheets/sheet' + n + '.xml';
+
+    // 3. 自分の rels は連れて行かないので、参照だけ残さない
+    var body = xml.replace(/<pageSetup\b[^>]*>/g, function (tag) {
+      return tag.replace(/\s+r:id="[^"]*"/, '');
+    });
+
+    // 4. 名前
+    var names = {};
+    book.sheets.forEach(function (s) { names[s.name] = true; });
+    var base = String(wantName || (src.name + ' (2)'));
+    var name = base, k = 2;
+    while (names[name] || name.length > 31) {
+      name = base.slice(0, Math.max(1, 31 - (' (' + k + ')').length)) + ' (' + k + ')';
+      k++;
+    }
+
+    // 1. 種類の宣言
+    var ct = book.parts['[Content_Types].xml'];
+    if (!ct) throw fail('no-content-types');
+    if (ct.indexOf('PartName="/' + newPath + '"') < 0) {
+      book.parts['[Content_Types].xml'] = ct.replace('</Types>',
+        '<Override PartName="/' + newPath + '" ContentType="application/vnd.openxmlformats-' +
+        'officedocument.spreadsheetml.worksheet+xml"/></Types>');
+      book.dirty['[Content_Types].xml'] = true;
+    }
+
+    // 関係（新しい rId）
+    var relsPath = 'xl/_rels/workbook.xml.rels';
+    var rels = book.parts[relsPath];
+    var rid = 'rId1', m2 = 1;
+    while (rels.indexOf('Id="rId' + m2 + '"') >= 0) m2++;
+    rid = 'rId' + m2;
+    book.parts[relsPath] = rels.replace('</Relationships>',
+      '<Relationship Id="' + rid + '" Type="http://schemas.openxmlformats.org/officeDocument/' +
+      '2006/relationships/worksheet" Target="worksheets/sheet' + n + '.xml"/></Relationships>');
+    book.dirty[relsPath] = true;
+
+    // workbook.xml に並びを1つ足す（元のシートのすぐ後ろ）
+    var wb = book.parts['xl/workbook.xml'];
+    var tags = wb.match(/<sheet\b[^>]*\/>/g) || [];
+    if (tags.length !== book.sheets.length) throw fail('sheet-list-mismatch');
+    var sheetId = 1;
+    tags.forEach(function (t) { var a = attrs(t); if (Number(a.sheetId) >= sheetId) sheetId = Number(a.sheetId) + 1; });
+    var mine = tags[index];
+    var at = wb.indexOf(mine) + mine.length;
+    wb = wb.slice(0, at) +
+      '<sheet name="' + encodeXml(name) + '" sheetId="' + sheetId + '" r:id="' + rid + '"/>' +
+      wb.slice(at);
+
+    // 2. 印刷範囲。後ろのシートの番号をずらし、元のシートの範囲を写す
+    var pos = index + 1;                       // 新しいシートの並び順
+    wb = wb.replace(/<definedName\b[^>]*localSheetId="(\d+)"[^>]*>[\s\S]*?<\/definedName>/g, function (tag, id) {
+      return Number(id) >= pos ? tag.replace('localSheetId="' + id + '"', 'localSheetId="' + (Number(id) + 1) + '"') : tag;
+    });
+    var mineDef = new RegExp('<definedName\\b[^>]*name="_xlnm\\.Print_Area"[^>]*localSheetId="' + index + '"[^>]*>([\\s\\S]*?)</definedName>');
+    var dm = mineDef.exec(wb);
+    if (dm) {
+      // 範囲の中の「シート名!」を新しい名前に付け替える
+      var area = dm[1].replace(/^(?:'[^']*'|[^!]*)!/, quoteSheet(name) + '!');
+      var add = '<definedName name="_xlnm.Print_Area" localSheetId="' + pos + '">' + area + '</definedName>';
+      wb = wb.slice(0, dm.index + dm[0].length) + add + wb.slice(dm.index + dm[0].length);
+    }
+    book.parts['xl/workbook.xml'] = wb;
+    book.dirty['xl/workbook.xml'] = true;
+
+    // 中身を置き、book の並びにも入れる
+    book.parts[newPath] = body;
+    book.added = book.added || {};
+    book.added[newPath] = true;
+    book.sheets.splice(pos, 0, { name: name, state: 'visible', path: newPath });
+    return pos;
+  }
+
+  // 印刷範囲に書くときのシート名。記号や空白があれば ' で囲む（Excel の書き方）
+  function quoteSheet(name) {
+    return /^[A-Za-z0-9_぀-ヿ一-鿿]+$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'";
+  }
+
   // ===== 保存 =====
   function save(book) {
     var enc = new TextEncoder();
@@ -535,9 +648,17 @@
         paths.push(wbPath);
       }
     }
+    // ★ 元の ZIP に無い部品（2枚目のシートなど）は、差し替えではなく足す。
+    //   book.added に名前を入れておくと、ここで新しい入れ物を作る（2026-09-20）
+    var addPaths = Object.keys(book.added || {}).filter(function (p) {
+      return !book.byName[p];                       // 元からある名前は差し替えで足りる
+    });
+    addPaths.forEach(function (p) { if (paths.indexOf(p) < 0) paths.push(p); });
+
     var changed = {};
     return Promise.all(paths.map(function (p) {
-      var data = enc.encode(book.parts[p]);
+      var src = book.parts[p];
+      var data = typeof src === 'string' ? enc.encode(src) : src;   // bin の部品はそのまま
       return deflate(data).then(function (raw) { changed[p] = { data: data, raw: raw }; });
     })).then(function () {
       var out = book.entries.map(function (e) {
@@ -549,13 +670,23 @@
         if (n.versionNeeded < 20) n.versionNeeded = 20;
         return n;
       });
+      addPaths.forEach(function (p) {
+        var c = changed[p];
+        out.push({
+          versionMade: 20, versionNeeded: 20, flags: 0, method: 8,
+          time: 0, date: 0x21,                       // 1980-01-01。日付は中身に関係が無い
+          crc: crc32(c.data), csize: c.raw.length, usize: c.data.length,
+          internalAttr: 0, externalAttr: 0,
+          nameBytes: enc.encode(p), name: p, raw: c.raw
+        });
+      });
       return writeZip(out);
     });
   }
 
   global.EntryXlsx = {
     open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
-    crossedOut: crossedOut,
+    crossedOut: crossedOut, copySheet: copySheet,
     setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }

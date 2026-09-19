@@ -116,7 +116,18 @@ function buildXlsx(sheets) {
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
     '<sheets>' + sheets.map(function (s, i) {
       return '<sheet name="' + esc(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
-    }).join('') + '</sheets></workbook>';
+    }).join('') + '</sheets>' +
+    // ★ 印刷範囲は localSheetId＝並び順の番号で紐づく。シートを途中に挿すと後ろがずれる。
+    //   本物の百万石で踏んだ罠なので、見本にも仕込んでどこでも試せるようにする（2026-09-20）
+    (sheets.some(function (s) { return s.printArea; })
+      ? '<definedNames>' + sheets.map(function (s, i) {
+        return s.printArea
+          ? '<definedName name="_xlnm.Print_Area" localSheetId="' + i + '">' +
+            "'" + s.name.replace(/'/g, "''") + "'!" + s.printArea + '</definedName>'
+          : '';
+      }).join('') + '</definedNames>'
+      : '') +
+    '</workbook>';
   var n = sheets.length;
   parts['xl/_rels/workbook.xml.rels'] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
@@ -282,13 +293,34 @@ function formD() {
   return { name: '参加申込書', cols: [6, 18, 6, 14, 6, 34], cells: cells, merges: [] };
 }
 
+// ★ 2シート＋印刷範囲つきの様式（2026-09-20）。2枚目のシートを足す道で使う。
+//   印刷範囲は localSheetId＝並び順の番号で紐づくので、**途中に挿すと後ろがずれる**。
+//   本物の百万石でしか出ない罠だったので、見本にも同じ形を入れて、どこでも試せるようにした。
+//   名前に空白を入れてあるのは、印刷範囲に書くとき ' で囲む必要があるため（本物に「V & C」があった）。
+function formE(which) {
+  var cells = { A1: { v: '第1回 架空カップ 参加申込書（' + which + '）', s: 4 } };
+  cells['A3'] = { v: 'チーム名', s: 2 };
+  cells['B3'] = { s: 1 };
+  cells['A4'] = { v: 'No', s: 2 };
+  cells['B4'] = { v: '氏名', s: 2 };
+  cells['C4'] = { v: '生年月日', s: 2 };
+  cells['D4'] = { v: '年齢', s: 2 };
+  for (var i = 1; i <= 4; i++) cells['A' + (4 + i)] = { v: i, s: 1 };   // 4人しか書けない＝あふれる
+  box(cells, 'B5', 'D8', 1);
+  return {
+    name: '申込書 ' + which, cols: [6, 18, 14, 6], cells: cells, merges: [],
+    printArea: '$A$1:$D$8'
+  };
+}
+
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 Promise.all([
   rosterBook().then(function (b) { fs.writeFileSync(path.join(OUT, 'roster.xlsx'), Buffer.from(b)); }),
   buildXlsx([formA()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-a-all-fields.xlsx'), b); }),
   buildXlsx([formB()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-b-pairs.xlsx'), b); }),
   buildXlsx([formC()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-c-split.xlsx'), b); }),
-  buildXlsx([formD()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-d-blank.xlsx'), b); })
+  buildXlsx([formD()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-d-blank.xlsx'), b); }),
+  buildXlsx([formE('A'), formE('B')]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-e-two-sheets.xlsx'), b); })
 ]).then(function () {
   console.log('fixtures を作りました: ' + fs.readdirSync(OUT).join(', '));
 }).catch(function (e) { console.error(e); process.exit(1); });

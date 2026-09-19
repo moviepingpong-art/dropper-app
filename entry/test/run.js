@@ -1181,6 +1181,70 @@ function eventTail(cells, merges, names) {
     { cells: cells3, anchorOf: function (r) { return r; } });
   eq(res3.problems.filter(function (p) { return p.field === 'event'; }).map(function (p) { return p.code + ' ' + p.ref; }),
     ['target-has-text M2'], '種目の欄に文字が入っていたら書かずに知らせる');
+  return copySheetTail();
+}
+
+// ===== 13. 人数が入りきらないとき、2枚目の様式を足す =====
+// ★ ここは「セルを埋める」以外で初めてブックをさわる所。踏むと壊れる所を試験で押さえる。
+function copySheetTail() {
+  return read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (book) {
+    var before = X.sheetNames(book);
+    eq(before, ['申込書 A', '申込書 B'], '2シートの様式を読める');
+
+    var pos = X.copySheet(book, 0);
+    eq(pos, 1, '2枚目は元の様式のすぐ後ろに入る');
+    eq(X.sheetNames(book), ['申込書 A', '申込書 A (2)', '申込書 B'], '名前は Excel の流儀「(2)」');
+
+    // ★ 印刷範囲は localSheetId＝並び順の番号。途中に挿したら後ろをずらすこと。
+    //   これを忘れると、本物の百万石で「個人戦の印刷範囲が団体戦を指す」ことになる
+    var defs = (book.parts['xl/workbook.xml'].match(/<definedName\b[^>]*localSheetId="\d+"[^>]*>[\s\S]*?<\/definedName>/g) || [])
+      .map(function (d) {
+        return (/localSheetId="(\d+)"/.exec(d))[1] + ':' + d.replace(/^[\s\S]*>([^<]*)<\/definedName>$/, '$1');
+      }).sort();
+    eq(defs, ["0:'申込書 A'!$A$1:$D$8", "1:'申込書 A (2)'!$A$1:$D$8", "2:'申込書 B'!$A$1:$D$8"],
+      '★ 印刷範囲: 複製にも付き、後ろのシートの番号がずれない');
+
+    // 書いて保存し、読み直しても崩れないか
+    X.setCell(book, pos, 'B5', '架空 太郎');
+    return X.save(book).then(function (u8) {
+      return X.open(u8).then(function (b2) {
+        eq(X.sheetNames(b2), ['申込書 A', '申込書 A (2)', '申込書 B'], '保存して読み直しても3シート');
+        var got = X.cells(b2, 1).filter(function (c) { return c.ref === 'B5'; })[0];
+        eq(got && got.text, '架空 太郎', '2枚目に書いた名前が残っている');
+        eq(X.cells(b2, 0).length, X.cells(book, 0).length, '元のシートは変わっていない');
+        // 種類の宣言（これが無いと Excel は開かない）
+        var ct = b2.parts['[Content_Types].xml'];
+        check(ct.indexOf('PartName="/xl/worksheets/') >= 0 &&
+          (ct.match(/spreadsheetml\.worksheet\+xml/g) || []).length === 3,
+          '★ [Content_Types].xml に3枚ぶんの宣言がある（宣言が無いと Excel は開かない）');
+        expectForExcel.push({ file: 'copied-sheet.xlsx', sheet: '申込書 A (2)', cells: { B5: '架空 太郎' } });
+        fs.writeFileSync(path.join(OUT, 'copied-sheet.xlsx'), Buffer.from(u8));
+      });
+    });
+  }).then(function () {
+    // ★ シートが自分の rels（printerSettings）を持つ様式。複製に参照だけ残すと Excel が「修復しました」と言う。
+    //   本物の百万石と Thanet がこの形。見本には rels が無いので、ここで同じ形を作って試す
+    return read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (book) {
+      var p = book.sheets[0].path;
+      book.parts[p] = book.parts[p].replace('</worksheet>',
+        '<pageSetup paperSize="9" orientation="portrait" r:id="rId1"/></worksheet>');
+      var pos = X.copySheet(book, 0);
+      var ps = /<pageSetup\b[^>]*>/.exec(book.parts[book.sheets[pos].path]);
+      check(!!ps && ps[0].indexOf('r:id') < 0,
+        '★ 複製の pageSetup から r:id を外す（連れて行かない部品を参照しない）');
+      check(!!ps && /paperSize="9"/.test(ps[0]) && /orientation="portrait"/.test(ps[0]),
+        '用紙と向きは残る（<pageSetup> の属性そのものなので失わない）');
+    });
+  }).then(function () {
+    // 連れて行けないものがある様式は、壊れたファイルを作らずに断る
+    return read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (book) {
+      book.parts[book.sheets[0].path] = book.parts[book.sheets[0].path]
+        .replace('</worksheet>', '<drawing r:id="rId99"/></worksheet>');
+      var code = '';
+      try { X.copySheet(book, 0); } catch (e) { code = e.code || e.message; }
+      eq(code, 'sheet-has-parts', '★ 図などを持つ様式は、壊れたファイルを作らずに断る');
+    });
+  });
 }
 
 // ===== 空の様式から「名前を書く表」を見つける =====
