@@ -89,10 +89,66 @@
       groups.push({ letters: g.letters, rows: cur, above: prevLast });
     });
 
+    // ★ 左右に並ぶ表を分ける（2026-09-20、本物の神奈川県の様式5シートで発覚）。
+    //   シングルスとダブルスが左右に並ぶ様式があり、どちらの表も**シート全部の列**を見ていたため、
+    //   別の表の列を抱え、シングルスをダブルス側の結合を見て「2人1組」と誤認していた。
+    //
+    //   分ける手がかり: **両方の表が同じ見出しの並びを繰り返している**。
+    //   （種目・氏名・所属・年令 ／ 種目・氏名・所属・合計年令）
+    //   だから「自分より左にもある語」が名前の列より右に再び出てきたら、そこが次の表の始まり。
+    //   ★ 行が重なる表が1つしかなければ、左右の境は付けない（今までと同じ動き）。
+    //     百万石・スポレク・自作の様式を壊さないための歯止め
+    function headerWordAt(hr, col) {
+      var t = nfkc(textAt(hr, col) || '').replace(/\s/g, '');
+      return t && !isNumberOnly(t) ? t : '';
+    }
+    function nameHeaderRow(firstRow, col) {
+      for (var r = firstRow - 1; r >= Math.max(1, firstRow - 12); r--) {
+        if (headerWordAt(r, col)) return r;
+      }
+      return 0;
+    }
+    function limitsFor(g, firstRow, lastRow, nameCol) {
+      // 行が重なる表の名前の列を、左から順に並べる（重ならない＝上下に並ぶ表は関係ない）
+      var cols = [];
+      groups.forEach(function (o) {
+        var oFirst = o.rows[0], oLast = o.rows[o.rows.length - 1];
+        if (oLast < firstRow || oFirst > lastRow) return;
+        var c = colToNum(o.letters[0]);
+        if (cols.indexOf(c) < 0) cols.push(c);
+      });
+      cols.sort(function (a, b) { return a - b; });
+      if (cols.length < 2) return { left: 1, right: maxCol };   // 今までどおり
+      var hr = nameHeaderRow(firstRow, nameCol);
+      if (!hr) return { left: 1, right: maxCol };
+
+      // ★ 左から順に区切る。左の境は「前の表の右端の次」。
+      //   右の境は「自分より左にもある見出しの語が、また出てきた所の手前」
+      var left = 1;
+      for (var i = 0; i < cols.length; i++) {
+        var here = cols[i];
+        var right = maxCol;
+        if (i + 1 < cols.length) {
+          var next = cols[i + 1];
+          var mine = {};
+          for (var c1 = left; c1 < here; c1++) { var w1 = headerWordAt(hr, c1); if (w1) mine[w1] = true; }
+          right = next - 1;
+          for (var c2 = next - 1; c2 > here; c2--) {
+            var w2 = headerWordAt(hr, c2);
+            if (w2 && mine[w2]) right = c2 - 1;
+          }
+        }
+        if (here === nameCol) return { left: left, right: right };
+        left = right + 1;
+      }
+      return { left: 1, right: maxCol };
+    }
+
     var tables = [], extras = [], extraCols = {};
     groups.forEach(function (g) {
       var firstRow = g.rows[0], lastRow = g.rows[g.rows.length - 1];
       var nameCols = g.letters.map(colToNum);
+      var limits = limitsFor(g, firstRow, lastRow, nameCols[0]);
       // 名前の欄が横に結合されていれば、その右端までを名前の欄とみなす
       var nameRight = Math.max.apply(null, nameCols.map(function (c) {
         var m = mergeOf(firstRow, c); return m ? m.right : c;
@@ -130,7 +186,7 @@
         return out;
       }
       var cols = [];
-      for (var col = 1; col <= maxCol; col++) {
+      for (var col = limits.left; col <= limits.right; col++) {
         if (nameCols.indexOf(col) >= 0 || (col > nameCols[0] && col <= nameRight)) continue;
         var m0 = mergeOf(firstRow, col);
         if (m0 && m0.left !== col) continue;   // 横に結合された欄の途中の列は、左上の列で扱う
