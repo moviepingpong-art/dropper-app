@@ -212,6 +212,7 @@
         r[2].replace(/<si(?:\s[^>]*)?(?:\/>|>([\s\S]*?)<\/si>)/g, function (_, inner) { book.sst.push(richText(inner)); });
       }
       book.dateStyles = dateStyles(r[3] || '');
+      if (r[3]) book.parts['xl/styles.xml'] = r[3];   // 縮小して全体を表示を足すときに使う（使わなければ保存しても元のバイト列のまま）
       return Promise.all(book.sheets.map(function (s) {
         return text(s.path).then(function (x) {
           if (x == null) throw fail('broken-xlsx', s.path);
@@ -293,6 +294,59 @@
     return out;
   }
 
+  // 空のセルも含めて、シートに置かれているセルを並べる。{ ref, row, col, text, styled }
+  // ★ cells() は値の入ったセルだけを返す。空の様式（罫線だけ引いてある記入欄）を読むには、
+  //   空のセルの位置も要る（entry-blank.js が「書ける行」を数えるのに使う）。
+  function grid(book, sheet) {
+    var s = sheetOf(book, sheet);
+    var texts = {};
+    cells(book, sheet).forEach(function (c) { texts[c.ref] = c.text; });
+    var out = [];
+    var re = new RegExp(CELL_RE.source, 'g'), m;
+    var data = sheetData(book.parts[s.path]);
+    while ((m = re.exec(data))) {
+      var a = attrs('<c ' + m[1] + '>');
+      if (!a.r) continue;
+      var pr = parseRef(a.r);
+      out.push({ ref: a.r, row: pr.row, col: pr.col, text: texts[a.r] || '', styled: a.s !== undefined });
+    }
+    return out;
+  }
+
+  // ★ 斜線（×印）が引かれた欄かどうか（2026-09-19、本物の百万石で分かった）。
+  //   事務局の様式は「ここは書かなくてよい」を斜線で示すことがある（監督の行の生年月日・年齢）。
+  //   セルの書式 →（セルが無ければ）行や列の書式をたどり、その罫線に斜線があるかを見る。
+  function crossedOut(book, sheet, ref) {
+    var s = sheetOf(book, sheet);
+    var xml = book.parts[s.path];
+    var styles = book.parts['xl/styles.xml'];
+    if (!xml || !styles) return false;
+    var pos = parseRef(ref);
+    var st = null;
+    var cm = new RegExp('<c\\b(?=[^>]*\\sr="' + ref + '")([^>]*?)(?:\\/>|>[\\s\\S]*?<\\/c>)').exec(sheetData(xml));
+    if (cm) {
+      var ca = attrs('<c ' + cm[1] + '>');
+      if (ca.s !== undefined) st = ca.s;
+    }
+    if (st === null) {
+      var rm = new RegExp('<row\\b(?=[^>]*\\sr="' + pos.row + '")([^>]*?)(?:\\/>|>)').exec(xml);
+      var ra = rm ? attrs('<row ' + rm[1] + '>') : {};
+      st = ((ra.customFormat === '1' || ra.customFormat === 'true') && ra.s !== undefined) ? ra.s : colStyle(xml, pos.col);
+    }
+    if (st === '' || st === null || st === undefined) return false;
+    var xfs = (/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles) || ['', ''])[1]
+      .match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var xf = xfs[Number(st)];
+    if (!xf) return false;
+    var borderId = (/borderId="(\d+)"/.exec(xf) || [])[1];
+    if (borderId === undefined) return false;
+    var borders = (/<borders\b[^>]*>([\s\S]*?)<\/borders>/.exec(styles) || ['', ''])[1]
+      .match(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g) || [];
+    var b = borders[Number(borderId)];
+    // <diagonal/>（空）は斜線なし。<diagonal style="thin">…</diagonal> なら斜線あり
+    return !!b && /<diagonal\b[^>]*style=/.test(b);
+  }
+
   function merges(book, sheet) {
     var s = sheetOf(book, sheet);
     var out = [];
@@ -317,12 +371,14 @@
 
   // ===== 書く =====
   // value: 数値 → 数値のセル／文字列 → 文字のセル（inlineStr）／null・'' → 空にする（書式は残す）
+  // opts.shrink: true なら、そのセルの書式の写しに「縮小して全体を表示」を付けて使う（shrinkStyle）
   // 戻り値: { ok, ref, reason }。★ 式の入ったセルは上書きしない（reason: 'formula'）。
-  function setCell(book, sheet, ref, value) {
+  function setCell(book, sheet, ref, value, opts) {
     var s = sheetOf(book, sheet);
     ref = anchorOf(book, sheet, ref);
     var pos = parseRef(ref);
     var xml = book.parts[s.path];
+    var shrink = !!(opts && opts.shrink) && !(value === null || value === undefined || value === '');
 
     var cellRe = new RegExp('<c\\b(?=[^>]*\\sr="' + ref + '")([^>]*?)(?:\\/>|>([\\s\\S]*?)<\\/c>)');
     var hit = cellRe.exec(xml);
@@ -333,6 +389,13 @@
       style = a.s || '';
     }
     var build = function (st) {
+      // ★ 数を、日付の書式が付いたセルに書かない（2026-09-18、本人が本物の申込書で発見）。
+      //   年齢の欄のうち1つだけ日付の書式（yyyy-mm-dd）が付いていて、60 と書いたら Excel が
+      //   「1900-02-29」と表示した。そのセルだけ、書式の写しを作って日付の書式を外す
+      if (typeof value === 'number' && isFinite(value) && book.dateStyles && book.dateStyles[Number(st || 0)]) {
+        st = plainNumberStyle(book, st);
+      }
+      if (shrink) st = shrinkStyle(book, st);
       var head = '<c r="' + ref + '"' + (st ? ' s="' + st + '"' : '');
       if (value === null || value === undefined || value === '') return head + '/>';
       if (typeof value === 'number' && isFinite(value)) return head + '><v>' + value + '</v></c>';
@@ -347,6 +410,70 @@
     book.parts[s.path] = xml;
     book.dirty[s.path] = true;
     return { ok: true, ref: ref };
+  }
+
+  // 日付の書式を外した書式の写しを作る（罫線・フォント・揃えはそのまま）。
+  // 作り方は shrinkStyle と同じ決まり: 元の <xf> は書き換えず、cellXfs の末尾に足すだけ。
+  function plainNumberStyle(book, st) {
+    var made = cloneXf(book, st, 'numberMap', function (attrsPart) {
+      return attrsPart.replace(/\s+numFmtId="[^"]*"/, '').replace(/\s+applyNumberFormat="[^"]*"/, '') +
+        ' numFmtId="0" applyNumberFormat="1"';
+    });
+    if (made != null) book.dateStyles[Number(made)] = false;
+    return made == null ? st : made;
+  }
+
+  // ===== 縮小して全体を表示 =====
+  // Excel の書式は styles.xml の cellXfs に並んだ <xf> の番号でセルから指される。
+  // 元の書式（罫線・フォント・揃え）を写した <xf> を末尾に足し、alignment に shrinkToFit="1" を付ける。
+  // ★ 元の <xf> は書き換えない。同じ書式を使うほかのセル（見出しなど）まで縮小されてしまうため。
+  // ★ styles.xml は「書き換えたセル以外は変えない」の例外。変わるのは cellXfs の末尾への追加と count だけ
+  //   （run.js が確かめる）。同じ元の書式からの写しは1つだけ作る（book.shrinkMap）。
+  // ★ wrapText（折り返して全体を表示）があると Excel は縮小しないので、写しからは外す。
+  function shrinkStyle(book, st) {
+    var made = cloneXf(book, st, 'shrinkMap',
+      function (attrsPart) { return attrsPart.replace(/\s+applyAlignment="[^"]*"/, '') + ' applyAlignment="1"'; },
+      function (inner) {
+        if (/<alignment\b/.test(inner)) {
+          return inner.replace(/<alignment\b([^>]*?)(\/?)>/, function (_, a, slash) {
+            a = a.replace(/\s+shrinkToFit="[^"]*"/, '').replace(/\s+wrapText="[^"]*"/, '');
+            return '<alignment' + a + ' shrinkToFit="1"' + slash + '>';
+          });
+        }
+        return '<alignment shrinkToFit="1"/>' + inner;   // alignment は protection より前に置く決まり
+      });
+    return made == null ? st : made;
+  }
+
+  // 書式（<xf>）の写しを cellXfs の末尾に足して、その番号を返す。同じ元からの写しは1つだけ（book[mapName]）。
+  // 書式の一覧が無いブック（まず無い）や、元の書式が見つからないときは null を返す（呼び元は元の書式のまま書く）。
+  function cloneXf(book, st, mapName, fixAttrs, fixInner) {
+    var path = 'xl/styles.xml';
+    var xml = book.parts[path];
+    if (!xml) return null;
+    book[mapName] = book[mapName] || {};
+    var key = st || '0';
+    if (book[mapName][key] != null) return book[mapName][key];
+
+    var block = /<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/.exec(xml);
+    if (!block) return null;
+    var xfs = block[2].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var base = xfs[Number(key)] || xfs[0];
+    if (!base) return null;
+
+    var open = /^<xf\b([^>]*?)(\/?)>/.exec(base);
+    var attrsPart = fixAttrs ? fixAttrs(open[1]) : open[1];
+    var inner = open[2] === '/' ? '' : base.slice(open[0].length, base.length - '</xf>'.length);
+    if (fixInner) inner = fixInner(inner);
+    var clone = inner ? '<xf' + attrsPart + '>' + inner + '</xf>' : '<xf' + attrsPart + '/>';
+
+    var index = xfs.length;
+    var head = block[1].replace(/\s+count="\d+"/, '') + ' count="' + (index + 1) + '"';
+    var newBlock = '<cellXfs' + head + '>' + block[2] + clone + '</cellXfs>';
+    book.parts[path] = xml.slice(0, block.index) + newBlock + xml.slice(block.index + block[0].length);
+    book.dirty[path] = true;
+    book[mapName][key] = String(index);
+    return String(index);
   }
 
   // セルが無いところへ書くときは、列順を守って行に差し込む。書式は行か列の設定を引き継ぐ。
@@ -427,8 +554,9 @@
   }
 
   global.EntryXlsx = {
-    open: open, sheetNames: sheetNames, cells: cells, merges: merges, anchorOf: anchorOf,
-    setCell: setCell, save: save, parseRef: parseRef, toRef: toRef,
+    open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
+    crossedOut: crossedOut,
+    setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }
   };
