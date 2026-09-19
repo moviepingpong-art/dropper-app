@@ -54,6 +54,28 @@
     .visitor-badge { margin:10px 0 0; }
     .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
 
+    /* ドロッパーの切り替えタブ。見た目はほかの3本（decide/index.html）に揃えてある。
+       ★ ただし「🔍 何ができる？」のポップアップは、こちらには置かない。
+       あれは3本のフォルダで同じものを保つ決まり（tools/sync-check.js の 1〜3）の
+       もとにあり、ここへ4つ目の写しを作ると、向こうを直したときに黙ってずれる。 */
+    .tool-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 6px; }
+    .tool-tabs-label { font-size:13px; font-weight:700; color:var(--sub); }
+    .tool-tab {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700;
+      display:inline-block; padding:8px 16px; border-radius:999px;
+      color:var(--teal-d); background:#fff; border:2px solid var(--line); text-decoration:none;
+      transition:border-color .15s, background .15s, transform .12s;
+    }
+    .tool-tab:hover { transform:translateY(-1px); border-color:var(--teal); background:#f0fffb; }
+    /* 選択中のツール。押せないことが分かるよう、色を反転してカーソルも変えない */
+    .tool-tab.on {
+      border-color:transparent; color:#fff; cursor:default; transform:none;
+      background:linear-gradient(100deg,var(--teal),var(--teal-d));
+    }
+    .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
+    /* 狭い画面ではラベルを独立した行にして、タブが並んで入るようにする */
+    @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
+
     .card { background:var(--paper); border-radius:18px; padding:18px 16px; margin:0 0 16px;
       box-shadow:0 8px 26px rgba(6,182,164,.13); }
     .card > h2 { font-size:17px; font-weight:700; color:var(--teal-d); margin:0 0 10px; }
@@ -216,6 +238,18 @@
 </head>
 <body>
   <div class="wrap">
+    <!-- ★ 4本のドロッパーの行き来。ここが無いと、申込書ドロッパーからは
+         ほかの3本へ戻れない（2026-09-19 に気づいた）。このツールは日本語のみなので、
+         リンク先は日本語版で固定してよい（ほかの3本は i18n.js が言語ごとに張り替えている）。 -->
+    <nav class="tool-tabs">
+      <span class="tool-tabs-label" data-i18n="typePrompt">ドロッパーの選択</span>
+      <a class="tool-tab" href="/calendar/" data-i18n="toolEvent">🎪 イベント</a>
+      <a class="tool-tab" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
+      <a class="tool-tab" href="/decide/" data-i18n="toolDecide">✅ 決めごと</a>
+      <span class="tool-tab on" data-i18n="toolEntry">📝 申込書</span>
+    </nav>
+    <p class="tool-hint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと ／ 申込書＝大会の申込書に、名簿から記入</p>
+
     <h1 data-i18n="appName">申込書ドロッパー</h1>
     <p class="lead" data-i18n="lead">大会の申込書に名前だけ書いて入れると、名簿から性別・生年月日・年齢・住所・電話番号を埋めて返します。</p>
     <!-- 訪問者カウンター。src はページ末尾（window.LANG のあと）で入れる -->
