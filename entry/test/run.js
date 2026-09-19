@@ -1264,6 +1264,27 @@ function copySheetTail() {
     dup.forEach(function (w) { if (seen[w.ref]) return; seen[w.ref] = true; once.push(w); });
     eq(once.map(function (w) { return w.ref; }), ['B5', 'C5'],
       '★ 同じ欄への書き込みは1回に数える（件数の水増しを防ぐ。書く順番は変えない）');
+    return pdfTail();
+  });
+}
+
+// ===== PDF は名指しで断る（2026-09-20。対応しないと決めた。CLAUDE.md を参照） =====
+function pdfTail() {
+  var pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3]);
+  var zipish = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0]);
+  var ole = new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 0, 0, 0, 0]);
+  return X.open(pdf).then(function () { eq('開けた', '断る', 'PDF は断る'); }, function (e) {
+    eq(e.code, 'pdf', '★ PDF は「読めません」ではなく PDF だと名指しで知らせる');
+    // 辞書はこの試験に読み込んでいないので、ファイルから見る
+    var dict = fs.readFileSync(path.join(__dirname, '..', 'entry-i18n.js'), 'utf8');
+    var line = (/'err\.pdf':\s*'([^']*)'/.exec(dict) || [])[1] || '';
+    check(/Excel 版/.test(line) && /手書き/.test(line), 'その案内に、次にどうするかが書いてある');
+    return X.open(ole).then(function () { eq('開けた', '断る', '.xls は断る'); }, function (e2) {
+      eq(e2.code, 'xls-or-password', '.xls とパスワード付きは今までどおり');
+      return X.open(zipish).then(function () { eq('開けた', '断る', 'Excel でない ZIP は断る'); }, function (e3) {
+        eq(e3.code, 'not-xlsx', 'Excel でないファイルは今までどおり');
+      });
+    });
   }).then(function () {
     // 連れて行けないものがある様式は、壊れたファイルを作らずに断る
     return read(path.join(FIX, 'form-e-two-sheets.xlsx')).then(function (book) {

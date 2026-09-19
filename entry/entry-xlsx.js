@@ -180,6 +180,10 @@
     var u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     // 古い .xls と、パスワード付きの .xlsx は、どちらも OLE の箱（D0 CF 11 E0）で来る
     if (u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0) return Promise.reject(fail('xls-or-password'));
+    // ★ PDF だけは名指しで知らせる（2026-09-20）。主催者が PDF しか配っていない大会があり、
+    //   「読めません」だけでは次にどうすればよいか分からないため。PDF には対応しない
+    //   （CLAUDE.md の「PDF の様式には対応しない」を参照）
+    if (u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46) return Promise.reject(fail('pdf'));
     if (!(u8[0] === 0x50 && u8[1] === 0x4B)) return Promise.reject(fail('not-xlsx'));
     var entries;
     try { entries = readZip(u8); } catch (e) { return Promise.reject(e); }
