@@ -410,8 +410,15 @@
     if (opts && opts.oninput) input.addEventListener('input', opts.oninput);
     if (opts && opts.onchange) input.addEventListener('change', opts.onchange);
     if (opts && opts.mode) input.setAttribute('inputmode', opts.mode);
+    // ★ 入れなくてよい欄が分かるように、見出しに印を付ける（2026-09-20、本人の要望）。
+    //   必須は姓と名だけ。ほかは空のままでも保存できる
+    var need = !!(opts && opts.need);
+    var label2 = h('label', { for: 'pf-' + id }, [
+      h('span', { text: label }),
+      h('span', { class: need ? 'pf-need' : 'pf-any', text: need ? t('pfNeed') : t('pfAny') })
+    ]);
     return h('div', { class: 'pf-item' + (opts && opts.wide ? ' wide' : '') },
-      [h('label', { for: 'pf-' + id, text: label }), input,
+      [label2, input,
        opts && opts.note ? h('p', { class: 'pf-note', text: opts.note }) : null]);
   }
   function pfVal(id) { return el('pf-' + id) ? el('pf-' + id).value : ''; }
@@ -424,10 +431,11 @@
     var box = h('div', { class: 'person-form' });
     box.appendChild(h('p', { class: 'sub-title',
       text: state.editing.index == null ? t('formAdd', { g: state.editing.gender }) : t('formEdit', { g: state.editing.gender }) }));
+    box.appendChild(h('p', { class: 'hint', text: t('pfAnyNote') }));
 
     var grid = h('div', { class: 'pf-grid' }, [
-      field('family', t('colFamily'), p.family),
-      field('given', t('colGiven'), p.given),
+      field('family', t('colFamily'), p.family, { need: true }),
+      field('given', t('colGiven'), p.given, { need: true }),
       field('kanaFamily', t('colKanaFamily'), p.kanaFamily, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
       field('kanaGiven', t('colKanaGiven'), p.kanaGiven, { onchange: function (ev) { ev.target.value = toKatakana(ev.target.value); } }),
       field('birthText', t('colBirth'), p.birthText, { oninput: showBirth, hint: t('phBirth'), note: t('noteBirth') }),
