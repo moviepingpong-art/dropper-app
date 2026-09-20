@@ -387,6 +387,28 @@
     });
   }
 
+  // ===== 表が見つかる前に使う、シートの形の鍵 =====
+  // ★ 2026-09-20。③で「教えてもらった形」「直した書く行」を覚えるのに要る。
+  //   このときはまだ表が無く、formKey（表の形）は作れない。
+  //   **文字は見ず、「どこにセルがあるか」と結合の形だけ**で作るので、
+  //   大会名や日付を書き換えても変わらない（セルの有無は文字を変えても変わらない）。
+  //   ★ crypto.subtle は Promise を返す。③の組み立ては同期なので使えない。
+  //     短い同期のハッシュを3本並べて使う（取り違えても、覚えた行が出てくるだけで
+  //     書き込みは起きない。③の画面に列と行が出て、④にも書く場所が出る）
+  function hash32(text) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+  function layoutKey(grid, merges) {
+    var refs = (grid || []).map(function (c) { return c.ref; }).sort().join(',');
+    var mg = (merges || []).map(function (m) { return m.ref; }).sort().join(',');
+    return 'L' + hash32(refs) + hash32(mg) + hash32(refs + '|' + mg);
+  }
+
   // 様式ごとに、本人が選び直した書き方を覚える（個人情報は入らない）。端末の localStorage に置く。
   var prefs = {
     get: function (key) {
@@ -411,6 +433,6 @@
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, prefs: prefs, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
+    formKey: formKey, layoutKey: layoutKey, prefs: prefs, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
   };
 })(typeof window !== 'undefined' ? window : this);

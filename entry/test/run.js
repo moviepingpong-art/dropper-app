@@ -1517,12 +1517,64 @@ function blankSection(roster) {
   eq(B_.manual('C', 1, 300), null, '200行を超える指定は受け取らない');
   eq(B_.manual('C', 'あ', 8), null, '数でない行は受け取らない');
 
+  // ★ 教えてもらった形・直した「書く行」を覚える（2026-09-20）。一度教えたら次から聞かない
+  eq(B_.remember([{ nameCol: 'B', firstRow: 5, lastRow: 19 },
+    { nameCol: 'E', firstRow: 6, lastRow: 6, taught: true }]),
+    { rows: { B: [5, 19], E: [6, 6] }, taught: ['E'] },
+    '★ 覚えるのは列と行の番号だけ（名前も生年月日も入らない）');
+
+  // 表が見つかっているとき: 覚えている行に直す
+  var found2 = [{ nameCol: 'B', firstRow: 5, lastRow: 21, rows: [5, 6] }];
+  var back = B_.restore(found2, { rows: { B: [5, 19] }, taught: [] });
+  eq([back.changed, back.taught, found2[0].firstRow, found2[0].lastRow, found2[0].rows.length],
+    [true, false, 5, 19, 15], '★ 見つけた表に、覚えている書く行を当てる');
+  eq(B_.restore([{ nameCol: 'B', firstRow: 5, lastRow: 19, rows: [] }],
+    { rows: { B: [5, 19] }, taught: [] }).changed, false, '同じ行なら「直した」とは言わない');
+  eq(B_.restore([{ nameCol: 'B', firstRow: 5, lastRow: 19, rows: [] }],
+    { rows: { C: [1, 3] }, taught: [] }).changed, false, '別の列の覚えは当てない');
+  eq(B_.restore([{ nameCol: 'B', firstRow: 5, lastRow: 19, rows: [] }], null).changed, false,
+    '覚えが無ければ何もしない');
+
+  // 表が1つも見つからないとき: 教えてもらった形から作る
+  var made = B_.restore([], { rows: { E: [6, 8] }, taught: ['E'] });
+  eq([made.taught, made.changed, made.tables.length, made.tables[0].nameCol, made.tables[0].rows],
+    [true, true, 1, 'E', [6, 7, 8]], '★ 教えてもらった形から表を作り直す（もう一度聞かない）');
+  eq(B_.restore([], { rows: {}, taught: ['E'] }).tables, [], '行の覚えが無ければ作らない');
+  eq(B_.restore([], { rows: { E: [6, 8] }, taught: [] }).tables, [],
+    '★ 教えたのでない表は作らない（見つけた表の行だけを覚えているとき）');
+  eq(B_.restore([], null).tables, [], '覚えが無ければ作らない');
+
+  // ★ シートの名前が「記入例」なら、表が無くても教えてもらわない（書く紙ではない）
+  check(B_.isExampleName('記入例') && B_.isExampleName('記載例') && B_.isExampleName('見本'),
+    '★ 記入例のシートを名前で見分ける');
+  check(!B_.isExampleName('提出用') && !B_.isExampleName('申込書') && !B_.isExampleName('９人制'),
+    '書く紙のシートは記入例とみなさない');
+
+  // ★ ③で使う鍵は、シートの形（どこにセルがあるか・結合）だけで作る。文字は見ない
+  var gA = [{ ref: 'A1', row: 1, col: 1, text: '第1回 テスト大会' }, { ref: 'B5', row: 5, col: 2, text: '' }];
+  var gB = [{ ref: 'A1', row: 1, col: 1, text: '第99回 まったく別の大会' }, { ref: 'B5', row: 5, col: 2, text: '' }];
+  var gC = gA.concat([{ ref: 'C5', row: 5, col: 3, text: '' }]);
+  eq(M.layoutKey(gA, []), M.layoutKey(gB, []),
+    '★ 大会名を書き換えてもシートの形の鍵は変わらない（覚えた形が次の年も使える）');
+  check(M.layoutKey(gA, []) !== M.layoutKey(gC, []), 'セルが増えれば別の鍵');
+  check(M.layoutKey(gA, []) !== M.layoutKey(gA, [{ ref: 'A1:B1' }]), '結合が違えば別の鍵');
+  check(/^L[0-9a-f]{24}$/.test(M.layoutKey(gA, [])), '鍵の形（L と16進24文字）');
+
   var teachSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
   check(/sh\.teach = true;/.test(teachSrc) && /if \(tables\.length\) return;/.test(teachSrc),
     '★ 何も見つからなかったシートは捨てずに教える道へ（1人=2行と分かったものは断ったまま）');
   // ★ 文言があるかだけを見ない（2026-09-20）。条件を消しても文言は残るので素通りする
+  check(teachSrc.indexOf('sh.layoutKey = M.layoutKey(grid, sh.merges)') >= 0,
+    '★ ③で使う鍵は、シートの形から作る（表が見つかる前なので formKey は作れない）');
+  check(teachSrc.indexOf('saveRows(sh);') >= 0 && teachSrc.indexOf('BL.remember(sh.tables)') >= 0,
+    '教えた形と、直した書く行を覚える');
+  check(teachSrc.indexOf("sh.restored = 'teach'") >= 0 && teachSrc.indexOf("sh.restored = 'rows'") >= 0 &&
+    /teachRestored/.test(teachSrc) && /rowsRestored/.test(teachSrc),
+    '★ 覚えていた形を当てたときは、そう見せる（黙って当てない）');
   check(teachSrc.indexOf('state.sheets.some(function (sh) { return sh.teach; })') >= 0 &&
-    /teachWait/.test(teachSrc), '★ 教えてもらう途中のシートがあるうちは「次へ」を止める');
+    /teachWait/.test(teachSrc), '★ 教えてもらう途中のシートしか無いときは「次へ」を止める');
+  check(teachSrc.indexOf('state.sheets = state.sheets.filter(function (sh) { return !sh.teach; });') >= 0,
+    '★ 教えてもらえなかったシートは使わない（④以降へ持ち込まない）');
   check(/state\.sheets\.filter\(function \(x\) \{ return x !== sh; \}\)/.test(teachSrc),
     '教えずに「このシートは使わない」も選べる');
   var teachI18n = fs.readFileSync(path.join(__dirname, '..', 'entry-i18n.js'), 'utf8');
