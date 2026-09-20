@@ -518,9 +518,14 @@ function mapSection(roster) {
     { label: '表記ゆれ（ﾌﾘｶﾞﾅ・性　別・生 年 月 日・年令・〒・現住所・TEL）',
       headers: { C6: 'ﾌﾘｶﾞﾅ', D6: '性　別', E6: '生 年 月 日', F6: '年令', G6: '〒', H6: '現住所', I6: 'TEL' },
       want: 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone' },
-    { label: '言い回し（よみがな・ご住所・連絡先（携帯）・満年齢）【満年齢は見落とす】',
+    // ★ 2026-09-20 まで「満年齢は見落とす」を期待値にしていた。年齢の見出しを作り直して読めるようにした
+    { label: '言い回し（よみがな・ご住所・連絡先（携帯）・満年齢）',
       headers: { C6: 'よみがな', E6: '生年月日', F6: '満年齢', H6: 'ご住所', I6: '連絡先（携帯）' },
-      want: 'C:kana D:gender(kanji) E:birth(wareki) G:postal H:address(plain) I:phone' },
+      want: 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone' },
+    // ★ 本物の東京都卓球連盟の様式にあった書き方
+    { label: '大会年齢（本物の東京都卓球選手権の書き方）',
+      headers: { F6: '大会年齢' },
+      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) F:age G:postal H:address(plain) I:phone' },
     { label: '性別が「男・女」の1列【見落とす】',
       headers: { D6: '男・女' },
       want: 'C:kana E:birth(seireki-slash) F:age G:postal H:address(plain) I:phone' },
@@ -530,9 +535,10 @@ function mapSection(roster) {
     { label: '名簿に無い欄（段位・所属クラブ・備考）',
       headers: { C6: '段位', G6: '所属クラブ', I6: '備考' },
       want: 'D:gender(kanji) E:birth(seireki-slash) F:age H:address(plain)' },
-    { label: 'まぎらわしい語（年齢区分・緊急連絡先・住所（市町村まで））【年齢区分に年齢を書く＝誤爆】',
+    // ★ 2026-09-20 まで「年齢区分に年齢を書く＝誤爆」を期待値にしていた。いまは書かない
+    { label: 'まぎらわしい語（年齢区分・緊急連絡先・住所（市町村まで））【年齢区分には書かない】',
       headers: { F6: '年齢区分', I6: '緊急連絡先', H6: '住所（市町村まで）' },
-      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) F:age G:postal H:address(plain) I:phone' }
+      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) G:postal H:address(plain) I:phone' }
   ];
   var variantsDone = VARIANTS.reduce(function (p, v) {
     return p.then(function () {
@@ -565,15 +571,15 @@ function mapSection(roster) {
       .map(function (f) { return f.ref.replace(/\d+$/, '') + ':' + f.field + (f.fmt ? '(' + f.fmt + ')' : ''); }).join(' ');
   }
   var overridesDone = variantsDone.then(function () {
-    return variant({ C6: 'よみがな', E6: '生年月日', F6: '満年齢', H6: 'ご住所', I6: '連絡先（携帯）' });
+    return variant({ C6: 'よみがな', E6: '生年月日', F6: '歳', H6: 'ご住所', I6: '連絡先（携帯）' });
   }).then(function (v) {
     var tb = v.mapping.tables[0];
     eq(M.tableKey(tb), 'B@6', '表の鍵は「名前の列＠見出しの行」');
     eq(tb.cols.map(function (x) { return x.col + ':' + (x.field || '-'); }).join(' '), 'C:kana D:gender E:birth F:- G:postal H:address I:phone',
-      '一覧には見出しのある列がすべて並び、決められなかった列（満年齢）は種類なし');
+      '一覧には見出しのある列がすべて並び、決められなかった列（「歳」だけの見出し）は種類なし');
     var r = M.applyOverrides(v.mapping, { 'B@6': { F: 'age' } });
-    eq(firstRowItems(v, r.mapping), 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone', '見落とした「満年齢」を年齢に直すと、書くようになる');
-    eq(r.mapping.tables[0].cols.filter(function (x) { return x.col === 'F'; })[0], { col: 'F', header: '満年齢', field: 'age', overridden: true }, '直した列には印が付く（④で「選び直した列」と出す）');
+    eq(firstRowItems(v, r.mapping), 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone', '見落とした列（「歳」）を年齢に直すと、書くようになる');
+    eq(r.mapping.tables[0].cols.filter(function (x) { return x.col === 'F'; })[0], { col: 'F', header: '歳', field: 'age', overridden: true }, '直した列には印が付く（④で「選び直した列」と出す）');
     eq(r.duplicates, [], '重ならなければ警告は出ない');
     // 同じ種類を2列
     var d = M.applyOverrides(v.mapping, { 'B@6': { F: 'age', G: 'age' } });
