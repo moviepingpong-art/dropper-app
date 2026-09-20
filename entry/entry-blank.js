@@ -58,7 +58,7 @@
   }
 
   // 空の様式から表を探す。戻り値:
-  //   [{ nameCol, familyCol, givenCol, headerRow, firstRow, lastRow, rows, skip }]
+  //   [{ nameCol, familyCol, givenCol, headerRow, firstRow, lastRow, rows, skip, kanaAbove }]
   //   nameCol / familyCol+givenCol は列の英字。rows は書ける行の並び
   function tables(grid) {
     var g = index(grid);
@@ -69,9 +69,22 @@
       if (!kind) return;
       var span = rowsBelow(g, c.row, c.col);
       if (!span) return;
-      found.push({ kind: kind, col: c.col, headerRow: c.row, firstRow: span.from, lastRow: span.to,
-                   rows: span.rows,
-                   skip: span.rows.length === 1 && striped(g, span.from, c.col) ? 'two-rows' : '' });
+      var f = { kind: kind, col: c.col, headerRow: c.row, firstRow: span.from, lastRow: span.to,
+                rows: span.rows, skip: '' };
+      if (span.rows.length === 1 && striped(g, span.from, c.col)) {
+        // 点線で区切ってあれば、上段はふりがな。名前は**下の行**に書き、上の行にはふりがなを入れる
+        var pair = dottedPair(g, span.from, c.col) ? pairRows(g, span.from + 1, c.col) : [];
+        if (pair.length) {
+          f.rows = pair;
+          f.firstRow = pair[0];
+          f.lastRow = pair[pair.length - 1];
+          f.kanaAbove = true;
+        } else {
+          // 点線が無ければ、どちらの行が氏名か決められない。書かずに断る
+          f.skip = 'two-rows';
+        }
+      }
+      found.push(f);
     });
 
     // 「姓」と「名」が同じ行に並んでいたら、1つの表にまとめる
@@ -98,6 +111,7 @@
     if (!rows.length) for (var r = f.firstRow; r <= f.lastRow; r++) rows.push(r);
     var t = { headerRow: f.headerRow, firstRow: f.firstRow, lastRow: f.lastRow, rows: rows, label: labelOf(g, f) };
     if (f.skip) t.skip = f.skip;                 // 読めないと分かった表（1人=2行）
+    if (f.kanaAbove) t.kanaAbove = true;         // 1人=2行で、上の行がふりがな
     Object.keys(cols).forEach(function (k) { t[k] = cols[k]; });
     return t;
   }
@@ -138,6 +152,27 @@
   //   ★ 対応そのものは別の話。どちらが氏名の行かは文字の大きさで分かる（10pt と 16pt）が、
   //     取り違えると全員分を間違えるので、まず止めるほうを先にした
   var STRIPE_MIN = 3;          // 同じ形が3回くり返したら「2行で1人」と決める
+
+  // ★ 実線の枠の中が点線で区切られていたら、上段はふりがな（2026-09-20、本人の判断）。
+  //   日本の様式のふつうの書き方。**様式に「ふりがな」と印刷されていなくてもそう読んでよい**。
+  //   点線＝1人の中の区切り、実線＝人と人の区切り。本物の青梅市少年軟式野球連盟の
+  //   「選手登録届」がこの形で、上が 10pt・下が 16pt、行の高さも 18 と 25 で揃っている
+  var DOTTED_RE = /dash|dot/i;
+  function dottedPair(g, from, col) {
+    var a = g.at(from, col), b = g.at(from + 1, col);
+    if (!a || !b) return false;
+    return DOTTED_RE.test(a.bottom || '') && !!(b.bottom) && !DOTTED_RE.test(b.bottom);
+  }
+
+  // 2行ひと組の「名前の行」を並べる（start から1つ飛ばし）
+  function pairRows(g, start, col) {
+    var shape = shapeOf(g, start, col), out = [];
+    for (var r = start; r <= start + LOOK_DOWN * 2; r += 2) {
+      if (!g.at(r, col) || g.text(r, col) || shapeOf(g, r, col) !== shape) break;
+      out.push(r);
+    }
+    return out;
+  }
 
   // 1行で行き止まりになった表の下に、「2行ひと組」の並びが続いているか
   function striped(g, from, col) {
@@ -204,15 +239,17 @@
   //   様式は競技ごと団体ごとに無数にあり、見出しの規則で網羅はできないと決めた。
   //   規則が外れても、指してもらえば書ける。tables() と同じ形を返す（taught の印つき）。
   //   ★ 受け取れない指定は null を返す。呼び手が画面で知らせること
-  function manual(col, from, to) {
+  // step は行の間隔（1人=2行で上がふりがなの様式は 2）
+  function manual(col, from, to, step) {
     var c = String(col == null ? '' : col);
     try { c = c.normalize('NFKC'); } catch (e) {}
     c = c.replace(/\s+/g, '').replace(/列$/, '').toUpperCase();
     if (!/^[A-Z]{1,3}$/.test(c)) return null;
     var f = Math.floor(Number(from)), t = Math.floor(Number(to));
     if (!(f >= 1 && t >= f && t - f < 200)) return null;
+    var st = step === 2 ? 2 : 1;
     var rows = [];
-    for (var r = f; r <= t; r++) rows.push(r);
+    for (var r = f; r <= t; r += st) rows.push(r);
     return { headerRow: Math.max(1, f - 1), firstRow: f, lastRow: t, rows: rows,
              label: '', nameCol: c, taught: true };
   }
@@ -229,7 +266,7 @@
       tables.forEach(function (tb) {
         var got = tb.nameCol && rows[tb.nameCol];
         if (!got || got.length !== 2) return;
-        var tb2 = manual(tb.nameCol, got[0], got[1]);
+        var tb2 = manual(tb.nameCol, got[0], got[1], tb.kanaAbove ? 2 : 1);
         if (!tb2 || (tb.firstRow === tb2.firstRow && tb.lastRow === tb2.lastRow)) return;
         tb.firstRow = tb2.firstRow; tb.lastRow = tb2.lastRow; tb.rows = tb2.rows;
         changed = true;

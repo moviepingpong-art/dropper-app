@@ -263,7 +263,14 @@
         case 'addressPref': if (member.pref) put(f, member.pref); else miss(f, 'address-unsplit'); break;
         case 'addressRest': if (member.addressRest) put(f, member.addressRest); else miss(f, 'address-unsplit'); break;
         case 'phone': if (member.phone) put(f, member.phone); else miss(f, 'not-in-roster'); break;
-        default: miss(f, 'unknown-field');
+        default:
+          // ★ 名簿に足した項目（extra:0 …、2026-09-20）。番号は名簿の列の順。
+          //   入れていない人は「名簿に無い」として知らせる（黙って空にしない）
+          var em = /^extra:(\d{1,2})$/.exec(f.field);
+          if (!em) { miss(f, 'unknown-field'); break; }
+          var ev = (member.extras || [])[Number(em[1])];
+          if (ev) put(f, ev); else miss(f, 'not-in-roster');
+          break;
       }
     });
     return { writes: writes, problems: problems, age: age };

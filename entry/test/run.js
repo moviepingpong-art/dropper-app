@@ -1424,6 +1424,10 @@ function blankSection(roster) {
 
   // 手で作った小さな表で、細かい決まりを確かめる（grid は { ref, row, col, text, styled } の並び）
   var cell = function (col, row, text) { return { ref: X.toRef(col, row), row: row, col: col, text: text || '', styled: true }; };
+  // 下の罫線つき（点線＝1人の中の区切り、実線＝人と人の区切り）
+  var cellB = function (col, row, text, bottom) {
+    var c = cell(col, row, text); c.bottom = bottom || ''; return c;
+  };
   eq(B_.tables([cell(1, 1, '姓'), cell(1, 2, ''), cell(1, 3, '')]), [],
     '★ 「姓」だけで「名」の見出しが無い表は作らない（名前を書き分けられないため）');
   eq(shownOf(B_.tables([cell(1, 1, '姓'), cell(2, 1, '名'), cell(1, 2, ''), cell(2, 2, ''), cell(1, 3, ''), cell(2, 3, '')])),
@@ -1613,6 +1617,10 @@ function blankSection(roster) {
   check(/sh\.teach = true;/.test(teachSrc) && /if \(tables\.length\) return;/.test(teachSrc),
     '★ 何も見つからなかったシートは捨てずに教える道へ（1人=2行と分かったものは断ったまま）');
   // ★ 文言があるかだけを見ない（2026-09-20）。条件を消しても文言は残るので素通りする
+  check(teachSrc.indexOf("tb.fields.push({ field: 'kana', col: tb.nameCol, rowOffset: -1 })") >= 0,
+    '★ 上の行がふりがなの様式では、名前の列の1つ上にフリガナを書く');
+  check(teachSrc.indexOf('var st = tb.kanaAbove ? 2 : 1;') >= 0,
+    '★ 書く行を直しても、1つ飛ばしを守る（ふりがなの行に名前を書かない）');
   check(teachSrc.indexOf('sh.layoutKey = M.layoutKey(grid, sh.merges)') >= 0,
     '★ ③で使う鍵は、シートの形から作る（表が見つかる前なので formKey は作れない）');
   check(teachSrc.indexOf('saveRows(sh);') >= 0 && teachSrc.indexOf('BL.remember(sh.tables)') >= 0,
@@ -1637,6 +1645,48 @@ function blankSection(roster) {
   eq(oneRow[0].rows, [4], '本当に1行しか書けない表');
   eq(oneRow[0].skip, undefined, '★ 2行ひと組がくり返していなければ諦めない');
   eq(B_.tables(stripeGrid(2))[0].skip, undefined, '2組だけでは決めない（3組くり返して初めて決める）');
+
+  // ★ 実線の枠の中が点線で区切られていたら、上段はふりがな（2026-09-20、本人の判断）。
+  //   日本の様式のふつうの書き方で、様式に「ふりがな」と印刷されていなくてもそう読んでよい。
+  //   名前は**下の行**に書き、上の行にはフリガナを入れる
+  function dottedGrid(pairs) {
+    var g = [cell(2, 3, '選手名')];
+    for (var i = 0; i < pairs; i++) {
+      var top = 4 + i * 2;
+      g.push(cellB(1, top, String(i + 1), 'thin'), cellB(2, top, '', 'dotted'), cellB(3, top, '', 'dotted'));
+      g.push(cellB(2, top + 1, '', 'thin'), cellB(3, top + 1, '', 'thin'));
+    }
+    return g;
+  }
+  var dotted = B_.tables(dottedGrid(4));
+  eq(dotted.length, 1, '点線の様式でも表は1つ');
+  eq(dotted[0].skip, undefined, '★ 点線があれば諦めない（どちらの行が氏名か分かるため）');
+  eq(dotted[0].kanaAbove, true, '★ 上の行はふりがなの印を付ける');
+  eq(dotted[0].rows, [5, 7, 9, 11], '★ 名前を書くのは点線の下の行（1つ飛ばし）');
+  eq([dotted[0].firstRow, dotted[0].lastRow], [5, 11], '書く行の範囲も下の行で数える');
+  eq(B_.tables(stripeGrid(4))[0].kanaAbove, undefined,
+    '★ 点線が無ければ、ふりがなとは決めない（断るまま）');
+
+  // 見張り：どの行も点線なら「1人の枠」が無い＝どちらが氏名か決められない
+  function allDottedGrid(pairs) {
+    var g = [cell(2, 3, '選手名')];
+    for (var i = 0; i < pairs; i++) {
+      var top = 4 + i * 2;
+      g.push(cellB(1, top, String(i + 1), 'dotted'), cellB(2, top, '', 'dotted'), cellB(3, top, '', 'dotted'));
+      g.push(cellB(2, top + 1, '', 'dotted'), cellB(3, top + 1, '', 'dotted'));
+    }
+    return g;
+  }
+  eq(B_.tables(allDottedGrid(4))[0].kanaAbove, undefined,
+    '★ どの行も点線なら、ふりがなとは決めない（下の行が実線であることまで見る）');
+  eq(B_.tables(allDottedGrid(4))[0].skip, 'two-rows', 'そのときは今までどおり断る');
+
+  // 1つ飛ばしの表は、行を直しても1つ飛ばしのまま
+  eq(B_.manual('D', 21, 27, 2).rows, [21, 23, 25, 27], '★ 1つ飛ばしで数え直せる');
+  eq(B_.manual('D', 21, 24).rows, [21, 22, 23, 24], 'ふつうの表は今までどおり');
+  var keep = [{ nameCol: 'D', firstRow: 21, lastRow: 39, rows: [], kanaAbove: true }];
+  B_.restore(keep, { rows: { D: [21, 27] }, taught: [] });
+  eq(keep[0].rows, [21, 23, 25, 27], '★ 覚えていた行を当て直しても、1つ飛ばしを守る');
 
   // 見張り：すぐ下の行に文字が印刷してあれば、それは「1人の2行目」ではなく別の欄
   eq(B_.tables([cell(2, 3, '氏名'), cell(1, 4, '1'), cell(2, 4, ''), cell(3, 4, ''),
@@ -1751,8 +1801,8 @@ function blankSection(roster) {
     }
     // ★ 1人=2行の様式（本物の選手登録届）。表を全部諦めるのが正しい
     var twoRow = files.filter(function (f) { return /選手登録届.*\.xlsx$/.test(f); })[0];
-    if (twoRow) jobs.push({ label: '本物の選手登録届（1人=2行）', file: path.join(LOCAL, twoRow),
-      sheet: 0, names: [], want: 'skip' });
+    if (twoRow) jobs.push({ label: '本物の選手登録届（点線の上がふりがな）', file: path.join(LOCAL, twoRow),
+      sheet: 0, names: [], want: ['D:21-39', 'O:21-39'] });
     // ★ 左右に同じ表が並ぶ様式（本物のエントリー用紙）。左右が同じ行数になること
     var side = files.filter(function (f) { return /エントリー用紙.*\.xlsx$/.test(f); })[0];
     if (side) jobs.push({ label: '本物のエントリー用紙（左右に同じ表）', file: path.join(LOCAL, side),
@@ -1762,11 +1812,6 @@ function blankSection(roster) {
       return p.then(function () {
         return blankOf(j.file, j.sheet, j.names).then(function (book) {
           var tb = B_.tables(X.grid(book, j.sheet));
-          if (j.want === 'skip') {
-            check(tb.length > 0 && tb.every(function (t) { return t.skip === 'two-rows'; }),
-              '★ ' + j.label + '：表を全部諦める（ふりがなの行に書かないため）');
-            return;
-          }
           eq(shown(tb), j.want, j.label + ': 名前の列と書ける行');
         });
       });
@@ -1814,6 +1859,61 @@ function bookSection() {
     check(got.ok, '作った名簿ファイルを読める');
     eq([got.org, got.version], ['架空ラージボール卓球クラブ', 1], '団体名と形式の版を読み取る');
     eq(got.extraHeaders, { 男子: ['備考'], 女子: [] }, '自分で足した列の見出しを読み取る');
+
+  // ★ 名簿に足した項目を、申込書の同じ見出しの欄に書く（2026-09-20、本人の要望）。
+  //   競技や文化活動で要る項目が違う。本物15ファイルで最多だったのは「所属」。
+  //   ★ 当てるのは**見出しがぴったり同じとき**だけ（A案）。語を含めば当てる、にはしない
+  var exMember = { name: '山田 太郎', extras: ['白山中学校', ''] };
+  var exFill = R.fill(exMember, { fields: [{ field: 'extra:0', ref: 'C5' }] }, {});
+  eq(exFill.writes, [{ ref: 'C5', value: '白山中学校' }], '★ 足した項目の中身を書く');
+  eq(R.fill(exMember, { fields: [{ field: 'extra:1', ref: 'D5' }] }, {}).problems,
+    [{ ref: 'D5', field: 'extra:1', code: 'not-in-roster' }],
+    '入れていない人は「名簿に無い」と知らせる（黙って空にしない）');
+  eq(R.fill(exMember, { fields: [{ field: 'extra:99', ref: 'E5' }] }, {}).writes, [],
+    '名簿に無い番号の項目は書かない');
+  eq(R.fill(exMember, { fields: [{ field: 'nandemo', ref: 'F5' }] }, {}).problems,
+    [{ ref: 'F5', field: 'nandemo', code: 'unknown-field' }], '知らない種類は今までどおり');
+
+  // 欄の対応を検めるところも extra: を通す
+  var exMap = M.normalize({ tables: [{ nameCol: 'B', firstRow: 2, lastRow: 3, headerRow: 1,
+    fields: [{ field: 'extra:0', col: 'C', rowOffset: 0 }, { field: 'extra:x', col: 'D', rowOffset: 0 }],
+    cols: [{ col: 'C', header: '学校名', field: 'extra:0' }] }] });
+  eq(exMap.tables[0].fields, [{ field: 'extra:0', col: 'C', rowOffset: 0 }],
+    '★ extra:番号 は受け取り、それ以外の extra: は受け取らない');
+  eq(exMap.problems, [{ code: 'unknown-field', table: 0, field: 'extra:x' }], '受け取らなかったものは知らせる');
+  eq(exMap.tables[0].cols[0].field, 'extra:0', '④の一覧にも出る');
+
+  // 名簿の中身を、突き合わせに渡すところまで持って行く
+  var exRoster = B.toRoster({ 男子: [{ family: '白山', given: '太郎', kanaFamily: 'ハクサン',
+    kanaGiven: 'タロウ', extras: ['白山中学校'] }], 女子: [] });
+  eq(exRoster.members[0].extras, ['白山中学校'], '★ 足した項目を、申込書に書く側まで渡す');
+
+  // ★ 照合そのもの（A案の中身）。ここがゆるむと誤爆が増える
+  check(M.sameLabel('会社名', '会社名'), 'ぴったり同じなら当てる');
+  check(M.sameLabel('会 社 名', '会社名'), '空白は無視する');
+  check(M.sameLabel('勤務先所在地\r\n会社名', '会社名'), '★ 複数行の見出しは、行ごとに比べる');
+  check(!M.sameLabel('勤務先所在地会社名', '会社名'),
+    '★ 1行につながっているものは当てない（含み比べにしない。誤爆の元）');
+  check(M.sameLabel('所属(混成でも可)', '所属'), '★ うしろの括弧書きは外して比べる');
+  check(M.sameLabel('氏名（ふりがな）', '氏名'), '全角の括弧書きも外す');
+  check(!M.sameLabel('前所属', '所属'), '★ 前に字が付いていたら当てない');
+  check(!M.sameLabel('所属チーム', '所属'), '★ うしろに字が付いていても当てない');
+  check(!M.sameLabel('会社名', ''), '名前が空なら当てない');
+
+  var exSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  check(['所属', '学校名', '会社名', '学年', '身長', '段位・級位', '背番号'].every(function (w) {
+    return exSrc.indexOf("'" + w + "'") >= 0;
+  }), '★ 足せる項目の一覧がある（本物の様式で多かったもの＋本人の指定）');
+  check(exSrc.indexOf('GENDERS.forEach(function (g) { eh[g].push(name); });') >= 0,
+    '★ 項目はどの組にも同じ番号で足す（名簿ファイルの列がずれないため）');
+  check(exSrc.indexOf("extraNames().forEach(function (name, i) { p.extras[i] = pfVal('extra' + i); });") >= 0,
+    '1人ずつの入力から、足した項目の中身を拾う');
+  check(/extraRemoveConfirm/.test(exSrc) && exSrc.indexOf('p.extras.splice(i, 1)') >= 0,
+    '★ 項目を消すときは確かめてから（入れてある中身も消えるため）');
+  check(exSrc.indexOf('var raw = textAt[c.col + r];') >= 0,
+    '★ 照合はセルの生の文字で行う（規則が作る見出しは改行が取れている）');
+  check(exSrc.indexOf("tb.fields = tb.fields.filter(function (f) { return !(f.col === c.col && f.rowOffset === 0); });") >= 0,
+    '★ 見出しがぴったり同じなら、見出しの規則より名簿の項目を優先する（誤爆を止める）');
     eq(got.people['男子'].map(function (p) { return p.family + p.given; }), ['山田太郎', '髙橋一郎', '佐藤実'], '男子の並びは入れた順のまま');
     var t = got.people['男子'][0];
     eq([t.kanaFamily, t.kanaGiven, t.postal, t.pref, t.address, t.phone, t.extras[0], t.row],

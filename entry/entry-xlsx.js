@@ -302,13 +302,33 @@
     return out;
   }
 
-  // 空のセルも含めて、シートに置かれているセルを並べる。{ ref, row, col, text, styled }
+  // 書式の番号ごとに「下の罫線の種類」を並べる（thin / dotted / dashed / medium …。無ければ空）
+  // ★ 実線の枠の中を点線で区切る様式があり、その上段はふりがな欄（2026-09-20、本人の判断）。
+  //   これを読むために、セルの下の罫線が要る
+  function bottomStyles(book) {
+    var styles = book.parts['xl/styles.xml'];
+    if (!styles) return [];
+    var xfs = (/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles) || ['', ''])[1]
+      .match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var borders = (/<borders\b[^>]*>([\s\S]*?)<\/borders>/.exec(styles) || ['', ''])[1]
+      .match(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g) || [];
+    return xfs.map(function (xf) {
+      var id = (/borderId="(\d+)"/.exec(xf) || [])[1];
+      var b = borders[Number(id)] || '';
+      var mm = /<bottom\b([^>]*)/.exec(b);
+      return mm ? ((/style="([^"]+)"/.exec(mm[1]) || [])[1] || '') : '';
+    });
+  }
+
+  // 空のセルも含めて、シートに置かれているセルを並べる。{ ref, row, col, text, styled, bottom }
   // ★ cells() は値の入ったセルだけを返す。空の様式（罫線だけ引いてある記入欄）を読むには、
   //   空のセルの位置も要る（entry-blank.js が「書ける行」を数えるのに使う）。
+  // ★ bottom は、そのセル自身の書式から見た下の罫線。行や列の書式はたどらない
   function grid(book, sheet) {
     var s = sheetOf(book, sheet);
     var texts = {};
     cells(book, sheet).forEach(function (c) { texts[c.ref] = c.text; });
+    var bs = bottomStyles(book);
     var out = [];
     var re = new RegExp(CELL_RE.source, 'g'), m;
     var data = sheetData(book.parts[s.path]);
@@ -316,7 +336,8 @@
       var a = attrs('<c ' + m[1] + '>');
       if (!a.r) continue;
       var pr = parseRef(a.r);
-      out.push({ ref: a.r, row: pr.row, col: pr.col, text: texts[a.r] || '', styled: a.s !== undefined });
+      out.push({ ref: a.r, row: pr.row, col: pr.col, text: texts[a.r] || '',
+        styled: a.s !== undefined, bottom: a.s !== undefined ? (bs[Number(a.s)] || '') : '' });
     }
     return out;
   }

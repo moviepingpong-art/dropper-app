@@ -302,7 +302,9 @@
           postal: p.postal || null,
           pref: p.pref || null, addressRest: p.address || null,
           address: [p.pref, p.address].filter(Boolean).join('') || null,
-          phone: p.phone || null, problems: (p.problems || problemsOf(p)).slice()
+          phone: p.phone || null, problems: (p.problems || problemsOf(p)).slice(),
+          // ★ 自分で足した項目（所属・学校名など、2026-09-20）。番号は名簿の列の順のまま渡す
+          extras: (p.extras || []).slice()
         };
         m.key = R.nameKey(name);
         m.fold = R.foldKey(name);
