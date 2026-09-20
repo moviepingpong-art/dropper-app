@@ -57,7 +57,7 @@
   }
 
   // 空の様式から表を探す。戻り値:
-  //   [{ nameCol, familyCol, givenCol, headerRow, firstRow, lastRow, rows }]
+  //   [{ nameCol, familyCol, givenCol, headerRow, firstRow, lastRow, rows, skip }]
   //   nameCol / familyCol+givenCol は列の英字。rows は書ける行の並び
   function tables(grid) {
     var g = index(grid);
@@ -69,7 +69,8 @@
       var span = rowsBelow(g, c.row, c.col);
       if (!span) return;
       found.push({ kind: kind, col: c.col, headerRow: c.row, firstRow: span.from, lastRow: span.to,
-                   rows: span.rows });
+                   rows: span.rows,
+                   skip: span.rows.length === 1 && striped(g, span.from, c.col) ? 'two-rows' : '' });
     });
 
     // 「姓」と「名」が同じ行に並んでいたら、1つの表にまとめる
@@ -95,6 +96,7 @@
     var rows = f.rows && f.rows.length ? f.rows.slice() : [];
     if (!rows.length) for (var r = f.firstRow; r <= f.lastRow; r++) rows.push(r);
     var t = { headerRow: f.headerRow, firstRow: f.firstRow, lastRow: f.lastRow, rows: rows, label: labelOf(g, f) };
+    if (f.skip) t.skip = f.skip;                 // 読めないと分かった表（1人=2行）
     Object.keys(cols).forEach(function (k) { t[k] = cols[k]; });
     return t;
   }
@@ -126,6 +128,27 @@
   //   飛ばさないと1行目で行き止まりになり、表が見つからない。
   //   ★ 飛ばした行は「書ける行」に入れない。入れると、ふりがなの欄に名前を書いてしまう
   var KANA_LABEL_RE = /^(フリガナ|ふりがな|カナ|かな|ヨミ|よみ|読み|読み方)$/;
+
+  // ★ 1人分を2行に分けて書く様式（上の行がふりがな、下の行が氏名）。2026-09-20、本物の
+  //   青梅市少年軟式野球連盟「選手登録届」で発覚。No と背番号は2行にまたがって結合してあるのに、
+  //   名前の欄だけが2行に分かれている。行の並びが1行で行き止まりになるため、
+  //   **1人だけ・しかも「ふりがなの行」に**名前を書いていた。
+  //   黙って違う欄に書くほうが、書かないより重い。この形と分かった表は諦める（skip を付けて返す）。
+  //   ★ 対応そのものは別の話。どちらが氏名の行かは文字の大きさで分かる（10pt と 16pt）が、
+  //     取り違えると全員分を間違えるので、まず止めるほうを先にした
+  var STRIPE_MIN = 3;          // 同じ形が3回くり返したら「2行で1人」と決める
+
+  // 1行で行き止まりになった表の下に、「2行ひと組」の並びが続いているか
+  function striped(g, from, col) {
+    var even = shapeOf(g, from, col), odd = shapeOf(g, from + 1, col);
+    if (!g.at(from + 1, col) || g.text(from + 1, col) || odd === even) return false;
+    for (var k = 1; k < STRIPE_MIN; k++) {
+      var a = from + k * 2, b = a + 1;
+      if (!g.at(a, col) || g.text(a, col) || shapeOf(g, a, col) !== even) return false;
+      if (!g.at(b, col) || g.text(b, col) || shapeOf(g, b, col) !== odd) return false;
+    }
+    return true;
+  }
 
   // 見出しの下に続く「書ける行」を数える。rows は実際に書ける行の並び（飛ばした行は入らない）
   function rowsBelow(g, headerRow, col) {
