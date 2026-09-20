@@ -698,17 +698,30 @@
         pick: {}, key: null, mapping: null, fmt: {}, baseDate: null };
       if (!found.names.length && !found.suspects.length) {
         // ★ 名前が1つも書かれていない申込書。見出しと空の記入欄から表を見つけ、名簿から選んでもらう
-        var tables = BL.tables(X.grid(book, i));
+        var grid = X.grid(book, i);
+        var tables = BL.tables(grid);
+        // ★ 前に教えてもらった形・直した書く行（シートの形の鍵。大会名や日付では変わらない）
+        sh.layoutKey = M.layoutKey(grid, sh.merges);
+        var remembered = M.prefs.get(sh.layoutKey) || {};
         // ★ 読めないと分かった表（1人=2行）は諦める。黙って違う行に書くより、断るほうがよい
         var usable = tables.filter(function (tb) { return !tb.skip; });
         if (usable.length < tables.length) state.skipped = true;
         if (!usable.length) {
-          // ★ 1人=2行と分かった様式は断る（行が飛ぶので、範囲では教えられない）。
-          //   何も見つからなかった様式は捨てずに、本人に教えてもらう
+          // ★ 1人=2行と分かった様式は断る（行が飛ぶので、範囲では教えられない）
           if (tables.length) return;
-          sh.teach = true;
-          state.sheets.push(sh);
-          return;
+          // 前に教えてもらった形があれば、それで読む（もう一度聞かない）
+          var back = BL.restore([], remembered);
+          if (!back.tables.length) {
+            // ★ 「記入例」という名前のシートは書く紙ではない。教えてもらわず、今までどおり飛ばす
+            if (BL.isExampleName(sh.name)) return;
+            sh.teach = true;
+            state.sheets.push(sh);
+            return;
+          }
+          usable = back.tables;
+          sh.restored = 'teach';
+        } else if (BL.restore(usable, remembered).changed) {
+          sh.restored = 'rows';
         }
         sh.blank = true;
         sh.tables = usable;
@@ -797,10 +810,19 @@
     return sh.tables.reduce(function (n, tb, ti) { return Math.max(n, pagesOfTable(sh, ti)); }, 1);
   }
 
+  // ★ 教えてもらった形と、直した「書く行」を覚える（2026-09-20）。
+  //   様式は無数にあるので、規則で網羅するのではなく、**一度教えたら次から聞かない**形にする。
+  //   覚えるのは列と行の番号だけ（個人情報は入らない）
+  function saveRows(sh) {
+    if (!sh.layoutKey || !sh.tables) return;
+    M.prefs.put(sh.layoutKey, BL.remember(sh.tables));
+  }
+
   // ★ 表が見つからなかったシート。名前の列と書く行を教えてもらう（2026-09-20）
-  function renderTeachSheet(sh, sec) {
+  function renderTeachSheet(sh, sec, canSkip) {
     sec.appendChild(h('p', { class: 'name-note ng', text: t('teachTitle') }));
     sec.appendChild(h('p', { class: 'hint', text: t('teachHint') }));
+    if (canSkip) sec.appendChild(h('p', { class: 'hint', text: t('teachSkipNote') }));
     var col = h('input', { type: 'text', class: 'row-num', value: sh.teachCol || '', maxlength: '3' });
     var from = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
     var to = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
@@ -817,6 +839,7 @@
         sh.blank = true;
         sh.tables = [tb];
         sh.picks = [[]];
+        saveRows(sh);
         renderNames();
         setMsg('namesMsg', t('teachDone'), 'ok');
       } }),
@@ -937,6 +960,7 @@
         for (var r = f; r <= t2; r++) tb.rows.push(r);
         // 2枚目を足すなら、行数を超えていても切らない（何枚に分けるかが変わるだけ）
         if (!(sh.more && sh.more[ti])) sh.picks[ti] = picks.slice(0, tb.rows.length);
+        saveRows(sh);
         renderNames();
       };
       from.addEventListener('change', apply);
@@ -977,11 +1001,14 @@
     state.sheets.forEach(function (sh) {
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
       if (sh.teach) {
-        renderTeachSheet(sh, sec);
+        renderTeachSheet(sh, sec, state.sheets.some(function (x) { return !x.teach; }));
         body.appendChild(sec);
         return;
       }
       if (sh.blank) {
+        // ★ 覚えていた形を当てたときは、そう見せる（黙って当てない）
+        if (sh.restored) sec.appendChild(h('p', { class: 'name-note',
+          text: t(sh.restored === 'teach' ? 'teachRestored' : 'rowsRestored') }));
         renderPickSheet(sh, sec);
         body.appendChild(sec);
         return;
@@ -1057,8 +1084,10 @@
       return sum + (sh.blank ? sh.picks.reduce(function (s, p) { return s + p.length; }, 0) : 0);
     }, 0);
     var left = unresolvedCount();
-    // ★ 教えてもらう途中のシートがあるうちは進ませない（そのシートに何も書かないまま進むため）
-    if (state.sheets.some(function (sh) { return sh.teach; })) {
+    // ★ 教えてもらう途中のシートしか無いときは進ませない（何も書かないまま進むため）。
+    //   ほかに使えるシートがあれば進める。そのシートには書かないと、教える箱に出してある
+    if (state.sheets.some(function (sh) { return sh.teach; }) &&
+        !state.sheets.some(function (sh) { return !sh.teach; })) {
       el('namesNext').disabled = true;
       setMsg('namesMsg', t('teachWait'), 'wait');
       hideFrom('stepReview');
@@ -1078,6 +1107,8 @@
   // 規則は一瞬で終わるので、③の「次へ」でそのまま④へ進む。
   // 様式ごとに覚えるのは、本人が④で選び直した書き方（fmt）と書く欄（fields）だけ（EntryMap.prefs。個人情報は入らない）
   function onNamesNext() {
+    // 教えてもらえなかったシートは使わない（何も書かない）
+    state.sheets = state.sheets.filter(function (sh) { return !sh.teach; });
     Promise.all(state.sheets.map(function (sh) {
       // 空の申込書は、選んでもらった人から「名前がそこに書かれている」形を作って、いままでの道に合流する
       if (sh.blank) {

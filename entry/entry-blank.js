@@ -217,5 +217,47 @@
              label: '', nameCol: c, taught: true };
   }
 
-  global.EntryBlank = { tables: tables, manual: manual };
+  // ★ 前に教えてもらった形・直した「書く行」を当てる（2026-09-20）。
+  //   覚える形は { rows: { 列: [開始, 終了] }, taught: [列, ...] }（列と行の番号だけ。個人情報は入らない）。
+  //   - 表が見つかっているとき: 覚えている行に直す
+  //   - 表が1つも見つからないとき: 教えてもらった形から作る（もう一度聞かない）
+  //   戻り値 { tables, changed, taught }。changed が true のときは画面でそう知らせること
+  function restore(tables, remembered) {
+    var rows = (remembered && remembered.rows) || {};
+    if (tables && tables.length) {
+      var changed = false;
+      tables.forEach(function (tb) {
+        var got = tb.nameCol && rows[tb.nameCol];
+        if (!got || got.length !== 2) return;
+        var tb2 = manual(tb.nameCol, got[0], got[1]);
+        if (!tb2 || (tb.firstRow === tb2.firstRow && tb.lastRow === tb2.lastRow)) return;
+        tb.firstRow = tb2.firstRow; tb.lastRow = tb2.lastRow; tb.rows = tb2.rows;
+        changed = true;
+      });
+      return { tables: tables, changed: changed, taught: false };
+    }
+    var made = ((remembered && remembered.taught) || []).map(function (col) {
+      var got = rows[col];
+      return got && got.length === 2 ? manual(col, got[0], got[1]) : null;
+    }).filter(Boolean);
+    return { tables: made, changed: made.length > 0, taught: made.length > 0 };
+  }
+
+  // 覚える形を、いまの表から作る
+  function remember(tables) {
+    var rows = {}, taught = [];
+    (tables || []).forEach(function (tb) {
+      if (!tb.nameCol) return;
+      rows[tb.nameCol] = [tb.firstRow, tb.lastRow];
+      if (tb.taught) taught.push(tb.nameCol);
+    });
+    return { rows: rows, taught: taught };
+  }
+
+  // ★ シートの名前そのものが「記入例」の様式がある（2026-09-20、本物の青梅市の登録名簿）。
+  //   書く紙ではないので、表が見つからなくても教えてもらわない（前は黙って飛ばしていた）
+  function isExampleName(name) { return EXAMPLE_RE.test(nfkc(name)); }
+
+  global.EntryBlank = { tables: tables, manual: manual, restore: restore, remember: remember,
+                        isExampleName: isExampleName };
 })(typeof window !== 'undefined' ? window : this);
