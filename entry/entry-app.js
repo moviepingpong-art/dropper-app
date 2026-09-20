@@ -1297,22 +1297,30 @@
     var textAt = {};
     (sh.cells || []).forEach(function (x) { textAt[x.ref] = x.text; });
     (sh.mapping.tables || []).forEach(function (tb) {
+      var hits = [], byCol = {};
       (tb.cols || []).forEach(function (c) {
-        var hit = -1;
         var top = Math.max(1, (tb.headerRow || 1) - 3);
-        for (var r = tb.headerRow || 1; r >= top && hit < 0; r--) {
+        for (var r = tb.headerRow || 1; r >= top; r--) {
           var raw = textAt[c.col + r];
           if (!raw) continue;
           for (var i = 0; i < names.length; i++) {
-            if (M.sameLabel(raw, names[i])) { hit = i; break; }
+            if (!M.sameLabel(raw, names[i])) continue;
+            hits.push({ col: c.col, index: i });
+            byCol[c.col] = c;
+            return;
           }
         }
-        if (hit < 0) return;
+      });
+      // ★ 同じ項目に2つ以上の列が当たったら、名前の列にいちばん近い1つだけ（M.nearestCols）
+      var pick = M.nearestCols(tb.nameCol || tb.familyCol || 'A', hits);
+      Object.keys(pick).forEach(function (k) {
+        var c = byCol[pick[k]];
+        if (!c) return;
         // ★ 見出しがぴったり同じなら、見出しの規則より名簿の項目を優先する。
         //   本物のシニアフェスタの「勤務先所在地／会社名」に**自宅住所**を書く誤爆を、これで止める
         tb.fields = tb.fields.filter(function (f) { return !(f.col === c.col && f.rowOffset === 0); });
-        tb.fields.push({ field: 'extra:' + hit, col: c.col, rowOffset: 0, header: c.header });
-        c.field = 'extra:' + hit;
+        tb.fields.push({ field: 'extra:' + k, col: c.col, rowOffset: 0, header: c.header });
+        c.field = 'extra:' + k;
       });
     });
   }

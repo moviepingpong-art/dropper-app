@@ -1900,6 +1900,20 @@ function bookSection() {
   check(!M.sameLabel('所属チーム', '所属'), '★ うしろに字が付いていても当てない');
   check(!M.sameLabel('会社名', ''), '名前が空なら当てない');
 
+  // ★ 同じ項目に2つ以上の列が当たったら、名前の列にいちばん近い1つだけ（2026-09-20）。
+  //   本物の神奈川の様式で、シングルスとダブルスの「所属」が左右に並ぶ。
+  //   片方にしか人を入れないと左右の境が付かず、**誰も入れていないダブルスの行に**
+  //   所属だけ書く誤爆になっていた
+  eq(M.nearestCols('C', [{ col: 'D', index: 0 }, { col: 'I', index: 0 }]), { '0': 'D' },
+    '★ 名前の列に近いほうを選ぶ（シングルスの表は、シングルスの所属に書く）');
+  eq(M.nearestCols('H', [{ col: 'D', index: 0 }, { col: 'I', index: 0 }]), { '0': 'I' },
+    '★ 名前の列が右にあれば、右の所属を選ぶ');
+  eq(M.nearestCols('C', [{ col: 'B', index: 0 }, { col: 'E', index: 0 }]), { '0': 'B' },
+    '左右どちらでも、近いほうを選ぶ');
+  eq(M.nearestCols('C', [{ col: 'D', index: 0 }, { col: 'F', index: 1 }]), { '0': 'D', '1': 'F' },
+    '別の項目どうしは、それぞれ選ぶ');
+  eq(M.nearestCols('C', []), {}, '当たる列が無ければ何も選ばない');
+
   var exSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
   check(['所属', '学校名', '会社名', '学年', '身長', '段位・級位', '背番号'].every(function (w) {
     return exSrc.indexOf("'" + w + "'") >= 0;
@@ -1912,6 +1926,8 @@ function bookSection() {
     '★ 項目を消すときは確かめてから（入れてある中身も消えるため）');
   check(exSrc.indexOf('var raw = textAt[c.col + r];') >= 0,
     '★ 照合はセルの生の文字で行う（規則が作る見出しは改行が取れている）');
+  check(exSrc.indexOf("var pick = M.nearestCols(tb.nameCol || tb.familyCol || 'A', hits);") >= 0,
+    '★ 画面の側も「いちばん近い1つ」を使う（当たった列ぜんぶには書かない）');
   check(exSrc.indexOf("tb.fields = tb.fields.filter(function (f) { return !(f.col === c.col && f.rowOffset === 0); });") >= 0,
     '★ 見出しがぴったり同じなら、見出しの規則より名簿の項目を優先する（誤爆を止める）');
     eq(got.people['男子'].map(function (p) { return p.family + p.given; }), ['山田太郎', '髙橋一郎', '佐藤実'], '男子の並びは入れた順のまま');
