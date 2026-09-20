@@ -1036,11 +1036,14 @@
         sh.rules = null;
       }
       sh.mapping = sh.rules || M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
-      return M.formKey(sh.name, sh.cells, sh.merges, sh.found).then(function (k) {
+      return M.formKey(sh.mapping).then(function (k) {
         sh.key = k;
         var saved = M.prefs.get(k);
         sh.fmt = (saved && saved.fmt) || {};
         sh.overrides = (saved && saved.fields) || {};
+        // ★ 覚えていた選び直しを当てているときは、そう見せる（同じ形の別の様式に当たっていないか、
+        //   本人が気づけるようにするため。2026-09-20 に鍵をゆるめたので、この知らせが歯止めになる）
+        sh.remembered = Object.keys(sh.overrides).length > 0;
         // 大会の決まり（前にこの申込書で入れたもの）
         sh.ageClassesRaw = (saved && saved.ageClasses) || '';
         sh.eventWrite = (saved && saved.eventWrite) || '';
@@ -1048,6 +1051,8 @@
         sh.feeCount = (saved && saved.feeCount) || '';
         sh.feeManual = (saved && saved.feeManual) || '';
         sh.colsOpen = null;   // null = 決められなかった列があるときだけ開く。本人が開け閉めしたらそれに従う
+        // ★ 覚えていた直しを当てているときも開く。当てた中身を見せないと、歯止めにならない
+        if (sh.remembered) sh.colsOpen = true;
       });
     })).then(function () {
       show('stepReview');
@@ -1215,6 +1220,7 @@
       details.appendChild(box);
     });
 
+    if (sh.remembered) details.appendChild(h('p', { class: 'name-note', text: t('colsRemembered') }));
     if (Object.keys(sh.overrides || {}).length) {
       details.appendChild(h('p', { class: 'small' }, [h('button', { type: 'button', class: 'link-btn', text: t('colsReset'), onclick: function () {
         sh.overrides = {};

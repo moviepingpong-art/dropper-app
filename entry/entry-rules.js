@@ -258,14 +258,16 @@
           //   （出すと、どの申込書でも毎回「決められなかった列」の警告が出る）
           var prefilled = g.rows.every(function (r) { return !!textAt(r, c.col); });
           if (!prefilled && !/申込|記入/.test(near)) {
-            undecided.push({ col: numToCol(c.col), header: c.chain.slice().reverse().join(' / '), field: null });
+            undecided.push({ col: numToCol(c.col), header: c.chain.slice().reverse().join(' / '),
+                             near: near, field: null });
             if (!extraCols[c.col]) { extraCols[c.col] = true; extras.push({ col: numToCol(c.col), label: near }); }
           }
           return;
         }
         if (f === 'ageSum') { ageSum = c; return; }
         if (f === 'event') { event = c; return; }
-        fields.push({ field: f, col: numToCol(c.col), rowOffset: 0, chain: c.chain, header: c.chain.slice().reverse().join(' / ') });
+        fields.push({ field: f, col: numToCol(c.col), rowOffset: 0, chain: c.chain,
+                     header: c.chain.slice().reverse().join(' / '), near: near });
       });
 
       // 「生年月日」の見出しだけの列: 同じ見出しの下に年の列があれば元号の欄、無ければ1欄の生年月日
@@ -318,7 +320,7 @@
       }
 
       // ④の「申込書の列 → 書くもの」の一覧。見出しのある列をすべて、列の順に並べる（合計年齢の列は組の決まりで扱うので出さない）
-      var colList = fields.map(function (f) { return { col: f.col, header: f.header, field: f.field }; })
+      var colList = fields.map(function (f) { return { col: f.col, header: f.header, near: f.near, field: f.field }; })
         .concat(undecided)
         .sort(function (a, b) { return colToNum(a.col) - colToNum(b.col); });
 
