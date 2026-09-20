@@ -689,6 +689,7 @@
     if (!state.form || !state.roster) return;
     var book = state.form.book;
     state.sheets = [];
+    state.skipped = false;
     book.sheets.forEach(function (s, i) {
       if (s.state && s.state !== 'visible') return;   // 隠しシートは見ない
       var cells = X.cells(book, i);
@@ -698,10 +699,13 @@
       if (!found.names.length && !found.suspects.length) {
         // ★ 名前が1つも書かれていない申込書。見出しと空の記入欄から表を見つけ、名簿から選んでもらう
         var tables = BL.tables(X.grid(book, i));
-        if (!tables.length) return;
+        // ★ 読めないと分かった表（1人=2行）は諦める。黙って違う行に書くより、断るほうがよい
+        var usable = tables.filter(function (tb) { return !tb.skip; });
+        if (usable.length < tables.length) state.skipped = true;
+        if (!usable.length) return;
         sh.blank = true;
-        sh.tables = tables;
-        sh.picks = tables.map(function () { return []; });   // 表ごとに「入れる人」の並び
+        sh.tables = usable;
+        sh.picks = usable.map(function () { return []; });   // 表ごとに「入れる人」の並び
         state.sheets.push(sh);
         return;
       }
@@ -713,7 +717,7 @@
     show('stepNames');
     if (!state.sheets.length) {
       clear(el('namesBody'));
-      setMsg('namesMsg', t('noNamesFound'), 'ng');
+      setMsg('namesMsg', t(state.skipped ? 'twoRowForm' : 'noNamesFound'), 'ng');
       el('namesNext').disabled = true;
       return;
     }

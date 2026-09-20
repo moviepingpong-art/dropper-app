@@ -1395,6 +1395,56 @@ function blankSection(roster) {
   eq(shownOf(kanaTb), ['C:9-13'], '★ ふりがなの行を飛ばして、名前の行から数える');
   eq(kanaTb[0].rows, [9, 11, 13], '★ 書ける行にふりがなの行を入れない（そこへ名前を書かないため）');
 
+  // ★ 1人分を2行に分けて書く様式（2026-09-20、本物の青梅市少年軟式野球連盟「選手登録届」）。
+  //   上の行がふりがな、下の行が氏名。「フリガナ」と印刷していないので飛ばす手がかりが無く、
+  //   1行で行き止まりになる。そのまま書くと **1人だけ・しかも「ふりがなの行」に** 書いてしまう。
+  //   黙って違う行に書くほうが重いので、この形と分かったら表ごと諦める
+  function stripeGrid(pairs) {
+    var g = [cell(2, 3, '選手名')];
+    for (var i = 0; i < pairs; i++) {
+      var top = 4 + i * 2;
+      g.push(cell(1, top, String(i + 1)), cell(2, top, ''), cell(3, top, ''));   // 連番は上の行だけ
+      g.push(cell(2, top + 1, ''), cell(3, top + 1, ''));                        // 下の行は形が違う
+    }
+    return g;
+  }
+  var stripe = B_.tables(stripeGrid(5));
+  eq(stripe.length, 1, '1人=2行の様式でも、表そのものは見つかる');
+  eq(stripe[0].rows, [4], '★ そのままでは1行しか数えられない（しかもふりがなの行）');
+  eq(stripe[0].skip, 'two-rows', '★ 1人=2行と分かったら、諦める印を付ける（違う行に書かないため）');
+
+  // 見張り：本当に1行しか書けない表は諦めない（本物の様式にいくつもある）
+  var oneRow = B_.tables([cell(2, 3, '氏名'), cell(1, 4, '1'), cell(2, 4, ''), cell(3, 4, ''),
+    cell(2, 5, ''), cell(3, 5, ''), cell(2, 6, ''), cell(3, 6, ''), cell(2, 7, ''), cell(3, 7, '')]);
+  eq(oneRow[0].rows, [4], '本当に1行しか書けない表');
+  eq(oneRow[0].skip, undefined, '★ 2行ひと組がくり返していなければ諦めない');
+  eq(B_.tables(stripeGrid(2))[0].skip, undefined, '2組だけでは決めない（3組くり返して初めて決める）');
+
+  // 見張り：すぐ下の行に文字が印刷してあれば、それは「1人の2行目」ではなく別の欄
+  eq(B_.tables([cell(2, 3, '氏名'), cell(1, 4, '1'), cell(2, 4, ''), cell(3, 4, ''),
+    cell(2, 5, '監督'), cell(3, 5, ''),
+    cell(1, 6, '2'), cell(2, 6, ''), cell(3, 6, ''), cell(2, 7, ''), cell(3, 7, ''),
+    cell(1, 8, '3'), cell(2, 8, ''), cell(3, 8, ''), cell(2, 9, ''), cell(3, 9, '')
+  ])[0].skip, undefined, '★ 下の行に文字があるなら2行ひと組ではない（諦めない）');
+
+  // 見張り：上下の形が同じなら、ただ途中で止まっただけ（「合計」の行などで止まる）
+  eq(B_.tables([cell(2, 3, '氏名'),
+    cell(1, 4, '1'), cell(2, 4, ''), cell(3, 4, ''),
+    cell(1, 5, '合計12人'), cell(2, 5, ''), cell(3, 5, ''),
+    cell(1, 6, '2'), cell(2, 6, ''), cell(3, 6, ''),
+    cell(1, 7, '3'), cell(2, 7, ''), cell(3, 7, ''),
+    cell(1, 8, '4'), cell(2, 8, ''), cell(3, 8, ''),
+    cell(1, 9, '5'), cell(2, 9, ''), cell(3, 9, '')
+  ])[0].skip, undefined, '★ 上下の形が同じなら2行ひと組ではない（諦めない）');
+
+  // 画面の側：諦めた表は使わず、何の様式かを名指しで断る
+  var appSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  check(/usable\s*=\s*tables\.filter/.test(appSrc) && /!tb\.skip/.test(appSrc),
+    '★ 諦めた表は使わない（entry-app が印の付いた表を外す）');
+  check(/state\.skipped\s*\?\s*'twoRowForm'/.test(appSrc) &&
+    /twoRowForm:/.test(fs.readFileSync(path.join(__dirname, '..', 'entry-i18n.js'), 'utf8')),
+    '★ 断るときは「1人=2行の様式」と名指しで知らせる');
+
   // ★ 規則のほうでも、ふりがなの行を「表の切れ目」と見なさない。
   //   見なすと、1人ずつの表にばらばらに割れる（本物の武蔵野市で5つに割れていた）
   var kanaCells = [
@@ -1481,11 +1531,21 @@ function blankSection(roster) {
       jobs.push({ label: '本物のスポレク シート1', file: path.join(LOCAL, sporec), sheet: 0,
         names: ['B10', 'B13', 'B14', 'B15', 'B16', 'B17', 'B18'], want: ['B:10-10', 'B:13-18'] });
     }
+    // ★ 1人=2行の様式（本物の選手登録届）。表を全部諦めるのが正しい
+    var twoRow = files.filter(function (f) { return /選手登録届.*\.xlsx$/.test(f); })[0];
+    if (twoRow) jobs.push({ label: '本物の選手登録届（1人=2行）', file: path.join(LOCAL, twoRow),
+      sheet: 0, names: [], want: 'skip' });
     if (!jobs.length) { console.log('  --   本物の様式が entry/test/local/ に無いので飛ばします'); return; }
     return jobs.reduce(function (p, j) {
       return p.then(function () {
         return blankOf(j.file, j.sheet, j.names).then(function (book) {
-          eq(shown(B_.tables(X.grid(book, j.sheet))), j.want, j.label + ': 名前の列と書ける行');
+          var tb = B_.tables(X.grid(book, j.sheet));
+          if (j.want === 'skip') {
+            check(tb.length > 0 && tb.every(function (t) { return t.skip === 'two-rows'; }),
+              '★ ' + j.label + '：表を全部諦める（ふりがなの行に書かないため）');
+            return;
+          }
+          eq(shown(tb), j.want, j.label + ': 名前の列と書ける行');
         });
       });
     }, Promise.resolve());
