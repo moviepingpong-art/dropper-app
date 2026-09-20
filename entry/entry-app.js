@@ -317,6 +317,7 @@
           if (!addExtra(name)) return;
           state.extraOpen = false;
           rebuildRoster();
+          renderRoster();   // ★ markDirty() が先に描いているので、閉じたあともう一度描く
           setMsg('rosterMsg', t('extraAdded', { name: name }), 'ok');
         } }));
     });
@@ -329,6 +330,7 @@
           if (!addExtra(name)) return;
           state.extraOpen = false;
           rebuildRoster();
+          renderRoster();   // ★ markDirty() が先に描いているので、閉じたあともう一度描く
           setMsg('rosterMsg', t('extraAdded', { name: name.trim() }), 'ok');
         } }),
       h('button', { type: 'button', class: 'link-btn', text: t('extraCancel'),
@@ -339,7 +341,8 @@
 
   // いま足してある項目の並び（消せる）
   function extraRow() {
-    var row = h('p', { class: 'small extra-row' }, [h('span', { text: t('extraTitle') })]);
+    var row = h('p', { class: 'small extra-row' }, [h('span', { text: t('extraTitle') }),
+      h('span', { class: 'extra-base', text: t('extraBase') })]);
     extraNames().forEach(function (name, i) {
       row.appendChild(h('span', { class: 'extra-chip' }, [
         h('span', { text: name }),
@@ -350,8 +353,7 @@
             rebuildRoster();
           } })]));
     });
-    if (!extraNames().length) row.appendChild(h('span', { class: 'hint', text: t('extraNone') }));
-    row.appendChild(h('button', { type: 'button', class: 'link-btn', text: t('extraAdd'),
+    row.appendChild(h('button', { type: 'button', class: 'btn-sub extra-add', text: t('extraAdd'),
       onclick: function () { state.extraOpen = true; renderRoster(); } }));
     return row;
   }
