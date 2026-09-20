@@ -702,7 +702,14 @@
         // ★ 読めないと分かった表（1人=2行）は諦める。黙って違う行に書くより、断るほうがよい
         var usable = tables.filter(function (tb) { return !tb.skip; });
         if (usable.length < tables.length) state.skipped = true;
-        if (!usable.length) return;
+        if (!usable.length) {
+          // ★ 1人=2行と分かった様式は断る（行が飛ぶので、範囲では教えられない）。
+          //   何も見つからなかった様式は捨てずに、本人に教えてもらう
+          if (tables.length) return;
+          sh.teach = true;
+          state.sheets.push(sh);
+          return;
+        }
         sh.blank = true;
         sh.tables = usable;
         sh.picks = usable.map(function () { return []; });   // 表ごとに「入れる人」の並び
@@ -788,6 +795,36 @@
   function pagesOf(sh) {
     if (!sh.blank || !sh.tables) return 1;
     return sh.tables.reduce(function (n, tb, ti) { return Math.max(n, pagesOfTable(sh, ti)); }, 1);
+  }
+
+  // ★ 表が見つからなかったシート。名前の列と書く行を教えてもらう（2026-09-20）
+  function renderTeachSheet(sh, sec) {
+    sec.appendChild(h('p', { class: 'name-note ng', text: t('teachTitle') }));
+    sec.appendChild(h('p', { class: 'hint', text: t('teachHint') }));
+    var col = h('input', { type: 'text', class: 'row-num', value: sh.teachCol || '', maxlength: '3' });
+    var from = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
+    var to = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
+    sec.appendChild(h('p', { class: 'small pick-rows' }, [
+      h('span', { text: t('teachCol') }), col,
+      h('span', { text: t('teachRows') }), from, h('span', { text: '〜' }), to,
+      h('span', { text: t('pickRowsUnit') })
+    ]));
+    sec.appendChild(h('p', {}, [
+      h('button', { type: 'button', class: 'btn-sub', text: t('teachApply'), onclick: function () {
+        var tb = BL.manual(col.value, from.value, to.value);
+        if (!tb) { setMsg('namesMsg', t('teachBad'), 'ng'); return; }
+        sh.teach = false;
+        sh.blank = true;
+        sh.tables = [tb];
+        sh.picks = [[]];
+        renderNames();
+        setMsg('namesMsg', t('teachDone'), 'ok');
+      } }),
+      h('button', { type: 'button', class: 'link-btn', text: t('teachSkip'), onclick: function () {
+        state.sheets = state.sheets.filter(function (x) { return x !== sh; });
+        renderNames();
+      } })
+    ]));
   }
 
   function renderPickSheet(sh, sec) {
@@ -939,6 +976,11 @@
     el('stepNamesHint').textContent = anyBlank ? t('step3HintPick') : t('step3Hint');
     state.sheets.forEach(function (sh) {
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
+      if (sh.teach) {
+        renderTeachSheet(sh, sec);
+        body.appendChild(sec);
+        return;
+      }
       if (sh.blank) {
         renderPickSheet(sh, sec);
         body.appendChild(sec);
@@ -1015,6 +1057,13 @@
       return sum + (sh.blank ? sh.picks.reduce(function (s, p) { return s + p.length; }, 0) : 0);
     }, 0);
     var left = unresolvedCount();
+    // ★ 教えてもらう途中のシートがあるうちは進ませない（そのシートに何も書かないまま進むため）
+    if (state.sheets.some(function (sh) { return sh.teach; })) {
+      el('namesNext').disabled = true;
+      setMsg('namesMsg', t('teachWait'), 'wait');
+      hideFrom('stepReview');
+      return;
+    }
     if (anyBlank) {
       el('namesNext').disabled = left > 0 || picked === 0;
       setMsg('namesMsg', picked ? t('pickReady', { n: picked }) : t('pickNone'), picked ? 'ok' : 'wait');
