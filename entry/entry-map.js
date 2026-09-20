@@ -464,6 +464,25 @@
     });
   }
 
+  // ★ 同じ項目に複数の列が当たったら、名前の列に**いちばん近い1つ**だけを選ぶ（2026-09-20）。
+  //   左右に並ぶ表で、片方にしか人を入れないと左右の境が付かず、
+  //   シングルスの表がダブルス側の「所属」まで抱える。両方に書くと、
+  //   **誰も入れていないダブルスの行に所属だけ書く**という誤爆になる（本物の神奈川で確かめた）。
+  //   hits: [{ col, index }] → 戻り値: { 項目の番号: 列 }
+  function nearestCols(nameCol, hits) {
+    var base = colNum(String(nameCol || 'A').toUpperCase());
+    var best = {};
+    (hits || []).forEach(function (x) {
+      if (!x || !x.col) return;
+      var d = Math.abs(colNum(String(x.col).toUpperCase()) - base);
+      var k = String(x.index);
+      if (!best[k] || d < best[k].dist) best[k] = { col: x.col, dist: d };
+    });
+    var out = {};
+    Object.keys(best).forEach(function (k) { out[k] = best[k].col; });
+    return out;
+  }
+
   // ===== 覚え書きの受け渡し（2026-09-20） =====
   // ★ 団体の幹事が1回教えて、申込書と一緒に配れるようにする。受け取った人は教え直さずに使える。
   //   中身は**列と行の番号、欄の対応、書き方だけ**（名簿は入らない）。
@@ -503,6 +522,6 @@
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, layoutKey: layoutKey, prefs: prefs, memoOf: memoOf, memoIn: memoIn, sameLabel: sameLabel, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
+    formKey: formKey, layoutKey: layoutKey, prefs: prefs, memoOf: memoOf, memoIn: memoIn, sameLabel: sameLabel, nearestCols: nearestCols, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
   };
 })(typeof window !== 'undefined' ? window : this);
