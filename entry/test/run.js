@@ -1365,6 +1365,30 @@ function blankSection(roster) {
     ['A+B:2-3'], '「姓」と「名」が並んでいれば1つの表にする');
   eq(shownOf(B_.tables([cell(2, 1, '氏　名'), cell(1, 2, '監督'), cell(2, 2, ''), cell(1, 3, '1'), cell(2, 3, '')])),
     ['B:2-3'], '見出しの空白と、左の行の名札（監督）を越えて数える');
+  eq(shownOf(B_.tables([cell(3, 1, '氏名'), cell(1, 2, '監督'), cell(3, 2, ''), cell(1, 3, '1'), cell(3, 3, '')])),
+    ['C:2-3'], '名札が2つ左にあっても名札として数える（百万石の監督の行）');
+
+  // ★ 同じ形の表が左右に並ぶ様式（2026-09-20、本物の八王子市バレーボール連盟のエントリー用紙）。
+  //   名札とみなすのを「すぐ左」に限らないと、**左の表は右の表の「監督」で止まり、右の表は止まらない**。
+  //   同じ形の表なのに左15行・右17行になり、右だけ余計な2行に名前を書いていた
+  function sideBySide() {
+    var g = [cell(1, 4, '番号'), cell(2, 4, '氏名'), cell(4, 4, '番号'), cell(5, 4, '氏名')];
+    for (var r = 5; r <= 7; r++) {
+      g.push(cell(1, r, String(r - 4)), cell(2, r, ''), cell(4, r, String(r - 4)), cell(5, r, ''));
+    }
+    g.push(cell(1, 8, '監督'), cell(2, 8, ''), cell(4, 8, '監督'), cell(5, 8, ''));   // 名札の行
+    g.push(cell(1, 9, ''), cell(2, 9, ''), cell(4, 9, ''), cell(5, 9, ''));
+    return B_.tables(g);
+  }
+  eq(shownOf(sideBySide()), ['B:5-7', 'E:5-7'], '★ 左右に同じ表が並ぶとき、左と右を同じ行数に読む');
+
+  // ★ 遠くの短い文字は自分の名札ではない（隣の表のもの）。そこで自分の表は終わり
+  eq(shownOf(B_.tables([
+    cell(4, 1, '氏名'),
+    cell(1, 2, ''), cell(4, 2, ''),
+    cell(1, 3, ''), cell(4, 3, ''),
+    cell(1, 4, '監督'), cell(4, 4, '')
+  ])), ['D:2-3'], '★ 3つ左の短い文字は名札とみなさない（隣の表のものなので、そこで終わり）');
 
   // ★ 見出しのすぐ下に「記入例」を載せる様式がある（2026-09-20、本物の関東ラージボール大会）。
   //   そこで行き止まりになり、表を1つも見つけられずシートごと落ちていた。
@@ -1535,6 +1559,10 @@ function blankSection(roster) {
     var twoRow = files.filter(function (f) { return /選手登録届.*\.xlsx$/.test(f); })[0];
     if (twoRow) jobs.push({ label: '本物の選手登録届（1人=2行）', file: path.join(LOCAL, twoRow),
       sheet: 0, names: [], want: 'skip' });
+    // ★ 左右に同じ表が並ぶ様式（本物のエントリー用紙）。左右が同じ行数になること
+    var side = files.filter(function (f) { return /エントリー用紙.*\.xlsx$/.test(f); })[0];
+    if (side) jobs.push({ label: '本物のエントリー用紙（左右に同じ表）', file: path.join(LOCAL, side),
+      sheet: 0, names: [], want: ['B:5-19', 'E:5-19'] });
     if (!jobs.length) { console.log('  --   本物の様式が entry/test/local/ に無いので飛ばします'); return; }
     return jobs.reduce(function (p, j) {
       return p.then(function () {
