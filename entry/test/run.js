@@ -579,7 +579,7 @@ function mapSection(roster) {
       '一覧には見出しのある列がすべて並び、決められなかった列（「歳」だけの見出し）は種類なし');
     var r = M.applyOverrides(v.mapping, { 'B@6': { F: 'age' } });
     eq(firstRowItems(v, r.mapping), 'C:kana D:gender(kanji) E:birth(wareki) F:age G:postal H:address(plain) I:phone', '見落とした列（「歳」）を年齢に直すと、書くようになる');
-    eq(r.mapping.tables[0].cols.filter(function (x) { return x.col === 'F'; })[0], { col: 'F', header: '歳', field: 'age', overridden: true }, '直した列には印が付く（④で「選び直した列」と出す）');
+    eq(r.mapping.tables[0].cols.filter(function (x) { return x.col === 'F'; })[0], { col: 'F', header: '歳', near: '歳', field: 'age', overridden: true }, '直した列には印が付く（④で「選び直した列」と出す）');
     eq(r.duplicates, [], '重ならなければ警告は出ない');
     // 同じ種類を2列
     var d = M.applyOverrides(v.mapping, { 'B@6': { F: 'age', G: 'age' } });
@@ -740,21 +740,86 @@ function mapSection(roster) {
     X.setCell(book, '個人戦', 'C20', '小林さくら');
     var cells2 = X.cells(book, '個人戦');
     var found2 = R.findNames(cells2, roster);
+    // ★ 大会名と日付を書き換えた様式（協会の様式は毎年こうなる）。鍵は同じでなければならない
+    //   （2026-09-20。前は文字ぜんぶのハッシュだったので、ここで別の様式になり、
+    //    覚えた選び直しが毎年捨てられていた）
+    X.setCell(book, '個人戦', 'B1', '第〇〇回 テストオープン卓球大会（ラージ）参加申込書（来年ぶん）');
+    X.setCell(book, '個人戦', 'B22', '（年齢は、令和１０年４月１日現在をご記入下さい）');
+    var cells3 = X.cells(book, '個人戦');
+    var found3 = R.findNames(cells3, roster);
+    // ★ 見出しの語を変えた様式。こちらは別の鍵でなければならない（別の様式に前の直しを当てない）
+    X.setCell(book, '個人戦', 'F12', '学年');
+    var cells4 = X.cells(book, '個人戦');
+    var found4 = R.findNames(cells4, roster);
+    function keyOf(cells, bk, sheet, found) {
+      return M.formKey(M.normalize(RU.map(cells, X.merges(bk, sheet), found)));
+    }
     return Promise.all([
-      M.formKey('個人戦', HAND.B.cells, X.merges(HAND.B.book, '個人戦'), HAND.B.found),
-      M.formKey('個人戦', cells2, X.merges(book, '個人戦'), found2),
-      M.formKey('申込書', HAND.A.cells, X.merges(HAND.A.book, '申込書'), HAND.A.found)
+      keyOf(HAND.B.cells, HAND.B.book, '個人戦', HAND.B.found),
+      keyOf(cells2, book, '個人戦', found2),
+      keyOf(HAND.A.cells, HAND.A.book, '申込書', HAND.A.found),
+      keyOf(cells3, book, '個人戦', found3),
+      keyOf(cells4, book, '個人戦', found4)
     ]);
   }).then(function (keys) {
     check(keys[0] === keys[1], '同じ様式なら、書いた名前や人数が違っても同じ鍵');
     check(keys[0] !== keys[2], '別の様式なら別の鍵');
+    check(keys[0] === keys[3], '★ 大会名と日付が変わっても、表の形が同じなら同じ鍵');
+    check(keys[0] !== keys[4], '★ 見出しの語が変われば別の鍵（別の様式に前の直しを当てない）');
     var store = {};
     global.localStorage = { getItem: function (k) { return store[k] || null; }, setItem: function (k, v) { store[k] = String(v); } };
     M.prefs.put(keys[0], { fmt: { birthYear: 'seireki' } });
     eq(M.prefs.get(keys[1]), { fmt: { birthYear: 'seireki' } }, '選び直した書き方を、同じ様式の2回目に取り出せる');
     check(!/山田|伊藤|田中|渡辺|吉田|1950/.test(store.dropper_entry_form_prefs), '覚えた中身に名前も生年月日も入っていない');
     delete global.localStorage;
+    return tinyKeys();
   });
+
+  // ★ 鍵に何が入っているかを1つずつ確かめる（手で作った小さな様式）。
+  //   ゆるいと別の様式に前の直しを当ててしまい（誤爆）、きつすぎると毎年覚え直しになる
+  function tinyKeys() {
+    function cellsOf(o) {
+      var c = [], head = o.headerRow, nc = o.nameCol, sc = o.sexCol || (o.nameCol + 1);
+      function put(col, row, text) { c.push({ ref: X.toRef(col, row), row: row, col: col, text: text }); }
+      put(1, 1, o.title);
+      put(sc, head - 1, o.note);                 // 見出しの1つ上（上まで辿ると見出しに混じる行）
+      put(1, head, 'No');
+      put(nc, head, '氏名');
+      put(sc, head, o.sex);
+      for (var i = 1; i <= 3; i++) { put(1, head + i, String(i)); put(nc, head + i, '山田 太郎'); }
+      if (o.twice) {
+        var h2 = head + 6;
+        put(1, h2, 'No'); put(nc, h2, '氏名'); put(sc, h2, o.sex);
+        for (i = 1; i <= 3; i++) { put(1, h2 + i, String(i)); put(nc, h2 + i, '山田 花子'); }
+      }
+      return c;
+    }
+    function foundOf(o) {
+      var names = [], head = o.headerRow, nc = o.nameCol;
+      function add(row) { names.push({ refs: [X.toRef(nc, row)], row: row, col: nc, text: 'x', match: { status: 'exact', member: null } }); }
+      for (var i = 1; i <= 3; i++) add(head + i);
+      if (o.twice) for (i = 1; i <= 3; i++) add(head + 6 + i);
+      return { names: names, suspects: [] };
+    }
+    function keyOf(over) {
+      var o = { title: '第1回 テスト大会 参加申込書', note: '会場：テスト体育館', headerRow: 5, nameCol: 3, sex: '性別' };
+      Object.keys(over || {}).forEach(function (k) { o[k] = over[k]; });
+      return M.formKey(M.normalize(RU.map(cellsOf(o), [], foundOf(o))));
+    }
+    return Promise.all([keyOf(), keyOf({ title: '第2回 べつのテスト大会 参加申込書' }),
+      keyOf({ note: '会場：ちがう体育館' }), keyOf({ headerRow: 7 }), keyOf({ nameCol: 4 }),
+      keyOf({ sex: '学年' }), keyOf({ twice: true }),
+      keyOf({ nameCol: 3, sexCol: 5 }), keyOf({ nameCol: 4, sexCol: 5 })]).then(function (k) {
+      check(k[0] === k[1], '大会名が変わっても同じ鍵');
+      check(k[0] === k[2], '★ 見出しの上の行（会場など）が変わっても同じ鍵（いちばん近い見出しだけを見る）');
+      check(k[0] !== k[3], '★ 見出しの行が変われば別の鍵');
+      check(k[0] !== k[4], '★ 名前の列が変われば別の鍵');
+      check(k[0] !== k[5], '見出しの語が変われば別の鍵');
+      check(k[0] !== k[6], '★ 同じ表が2つある様式は、1つの様式と別の鍵');
+      // ★ ほかの列をそのままにして、名前の列だけを動かす（鍵に名前の列が入っているかを見る）
+      check(k[7] !== k[8], '★ ほかが同じで名前の列だけ違えば、別の鍵');
+    });
+  }
 }
 
 // ===== 縮小して全体を表示（2026-09-15、本人の要望） =====

@@ -173,7 +173,7 @@
         if (!c || colSeen[c] || NAME_FIELDS[str(x.field)]) return null;
         colSeen[c] = true;
         var field = FIELDS.hasOwnProperty(str(x.field)) ? str(x.field) : null;
-        return { col: c, header: str(x.header).slice(0, 40), field: field };
+        return { col: c, header: str(x.header).slice(0, 40), near: str(x.near).slice(0, 40), field: field };
       }).filter(Boolean);
       out.tables.push(tb);
     });
@@ -360,13 +360,28 @@
   function colNum(l) { var n = 0; for (var i = 0; i < l.length; i++) n = n * 26 + (l.charCodeAt(i) - 64); return n; }
 
   // ===== 同じ様式かどうか =====
-  // 名前のセルを除いた「見出しと結合の形」から鍵を作る。書いた人や人数が違っても、同じ様式なら同じ鍵になる。
-  function formKey(sheetName, cells, merges, found) {
-    var nameRefs = {};
-    found.names.concat(found.suspects).forEach(function (n) { n.refs.forEach(function (r) { nameRefs[r] = true; }); });
-    var text = sheetName + '\n' + merges.map(function (m) { return m.ref; }).sort().join(' ') + '\n' +
-      cells.filter(function (c) { return !nameRefs[c.ref] && !c.formula; })
-        .map(function (c) { return c.ref + '\t' + String(c.text).replace(/\s+/g, ' ').trim(); }).join('\n');
+  // ★ 2026-09-20 に作り直した。前は「名前のセルを除いたシート全部の文字」のハッシュだったので、
+  //   **大会名や開催日が変わるだけで別の様式になり、覚えた選び直しが毎年捨てられていた**
+  //   （本物の神奈川県ラージボール卓球オープン大会の様式で、日時の行を1か所変えただけで
+  //   鍵が変わることを確かめた。協会の様式は毎年同じ形で、回数と日付だけが変わる）。
+  //   いまは**表の形だけ**で作る: 名前の列・見出しの行・列ごとの見出しの語を、表ごとに並べたもの。
+  //   ★ シート名は入れない（「119回相模原」のように回数が入る）。大会名・日付・会場も入らない。
+  //   ★ 見出しの語は「いちばん近い1つ」だけ（near）。上まで辿った文字列（header）には
+  //     大会名が混じるので使わない。
+  //   ★ 見出しの行の番号は入れてある。上に行を足されると別の様式になるが、
+  //     **ゆるめて別の様式に前の直しを当てるほうが重い**（黙って違う欄に書く）ので、この形にした
+  function keyWord(s) {
+    s = String(s == null ? '' : s);
+    try { s = s.normalize('NFKC'); } catch (e) {}
+    return s.replace(/\s+/g, '');
+  }
+  function formKey(mapping) {
+    var tables = (mapping && mapping.tables) || [];
+    var text = 'v2\n' + tables.map(function (tb) {
+      var name = tb.nameCol || (tb.familyCol + '+' + tb.givenCol);
+      var cols = (tb.cols || []).map(function (c) { return c.col + '=' + keyWord(c.near || c.header); }).join(',');
+      return name + '@' + tb.headerRow + '|' + cols;
+    }).join('\n');
     return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
       return Array.from(new Uint8Array(buf)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
     });
