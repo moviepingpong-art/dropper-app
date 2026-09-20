@@ -431,6 +431,10 @@
     var box = h('div', { class: 'person-form' });
     box.appendChild(h('p', { class: 'sub-title',
       text: state.editing.index == null ? t('formAdd', { g: state.editing.gender }) : t('formEdit', { g: state.editing.gender }) }));
+    // ★ 主役は「申込書に反映させる項目を入力してください」（2026-09-20、本人の指摘）。
+    //   前は「入れるのは姓と名だけで構いません」を先に出していて、
+    //   **ほかは入れなくてよい**と読めてしまっていた。入れた項目だけが申込書に出る
+    box.appendChild(h('p', { class: 'pf-lead', text: t('pfLead') }));
     box.appendChild(h('p', { class: 'hint', text: t('pfAnyNote') }));
 
     var grid = h('div', { class: 'pf-grid' }, [
