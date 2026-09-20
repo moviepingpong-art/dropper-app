@@ -31,6 +31,9 @@
   'use strict';
 
   var HEADER_ROWS_ABOVE = 4;
+  // ★ 名前の列そのものに印刷される「ふりがな」の札。名前の行と交互に並ぶ様式がある
+  //   （2026-09-20、本物の武蔵野市の様式）。entry-blank.js にも同じものがある
+  var KANA_LABEL_RE = /^(フリガナ|ふりがな|カナ|かな|ヨミ|よみ|読み|読み方)$/;
 
   function nfkc(s) { s = s == null ? '' : String(s); try { s = s.normalize('NFKC'); } catch (e) {} return s; }
   function squash(s) { return nfkc(s).replace(/\s+/g, ''); }
@@ -77,7 +80,11 @@
       for (var i = 1; i < rows.length; i++) {
         var between = false;
         for (var r = rows[i - 1] + 1; r < rows[i]; r++) {
-          if (textAt(r, col) && !nameRefs[numToCol(col) + r]) { between = true; break; }
+          var tx = textAt(r, col);
+          // ★ 名前の列に「フリガナ」と印刷してある様式がある（2026-09-20、本物の武蔵野市）。
+          //   ふりがな欄を名前の上に置く作りで、名前の行と交互に並ぶ。表の切れ目と見なさない
+          if (tx && KANA_LABEL_RE.test(nfkc(tx).replace(/\s/g, ''))) continue;
+          if (tx && !nameRefs[numToCol(col) + r]) { between = true; break; }
         }
         if (between) {
           groups.push({ letters: g.letters, rows: cur, above: prevLast });
