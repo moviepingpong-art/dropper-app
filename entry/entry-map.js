@@ -33,6 +33,12 @@
     addressPref: [], addressRest: [],
     phone: []
   };
+  // ★ 名簿に足した項目（2026-09-20）。extra:0, extra:1 … の形で、番号は名簿の列の順。
+  //   値の中身はここでは見ない（名簿の側が持っている）
+  var EXTRA_RE = /^extra:(\d{1,2})$/;
+  function isField(f) { return FIELDS.hasOwnProperty(f) || EXTRA_RE.test(f); }
+  function fmtsOf(f) { return FIELDS.hasOwnProperty(f) ? FIELDS[f] : []; }
+
   // 名前そのものの欄は fields からは受け取らない（位置は名前の列から決まる）
   var NAME_FIELDS = { name: true, family: true, given: true };
 
@@ -144,11 +150,11 @@
         if (!f || typeof f !== 'object') return;
         var field = str(f.field);
         if (NAME_FIELDS[field]) return;
-        if (!FIELDS.hasOwnProperty(field)) { out.problems.push({ code: 'unknown-field', table: ti, field: field }); return; }
+        if (!isField(field)) { out.problems.push({ code: 'unknown-field', table: ti, field: field }); return; }
         var c = col(f.col);
         var off = int(f.rowOffset, -5, 5, null);
         if (!c || off === null) { out.problems.push({ code: 'bad-position', table: ti, field: field }); return; }
-        var fmts = FIELDS[field];
+        var fmts = fmtsOf(field);
         var fmt = str(f.fmt);
         if (fmts.length && fmts.indexOf(fmt) < 0) fmt = fmts[0];
         if (!fmts.length) fmt = '';
@@ -172,7 +178,7 @@
         var c = x && col(x.col);
         if (!c || colSeen[c] || NAME_FIELDS[str(x.field)]) return null;
         colSeen[c] = true;
-        var field = FIELDS.hasOwnProperty(str(x.field)) ? str(x.field) : null;
+        var field = isField(str(x.field)) ? str(x.field) : null;
         return { col: c, header: str(x.header).slice(0, 40), near: str(x.near).slice(0, 40), field: field };
       }).filter(Boolean);
       out.tables.push(tb);
@@ -431,6 +437,33 @@
     }
   };
 
+  // ===== 名簿に足した項目と、申込書の見出しの照合（2026-09-20） =====
+  // ★ 当てるのは**見出しがぴったり同じとき**だけ（本人の判断＝A案）。
+  //   「語を含んでいれば当てる」にはしない——本物のシニアフェスタで
+  //   「勤務先所在地／会社名」の列に**自宅住所**を書く誤爆が出ており、含み比べはその種を増やす。
+  //   ただし次の2つは同じものとして扱う:
+  //     - 見出しが**複数行**のとき（「勤務先所在地\r\n会社名」）は、行ごとに比べる
+  //     - **うしろの括弧書き**（「所属(混成でも可)」「氏名（ふりがな）」）は外して比べる
+  //   ★ 「勤務先所在地会社名」（1行につながっているもの）は当てない。これが含み比べとの境目
+  function labelKey(s) {
+    s = String(s == null ? '' : s);
+    try { s = s.normalize('NFKC'); } catch (e) {}
+    return s.replace(/\s+/g, '');
+  }
+  function labelBare(k) {
+    return k.replace(/[(（【〔][^)）】〕]*[)）】〕]$/, '').replace(/※.*$/, '');
+  }
+  function sameLabel(header, name) {
+    var want = labelKey(name);
+    if (!want) return false;
+    var parts = String(header == null ? '' : header).split(/[\r\n]+/);
+    parts.push(header);
+    return parts.some(function (p) {
+      var k = labelKey(p);
+      return k === want || labelBare(k) === want;
+    });
+  }
+
   // ===== 覚え書きの受け渡し（2026-09-20） =====
   // ★ 団体の幹事が1回教えて、申込書と一緒に配れるようにする。受け取った人は教え直さずに使える。
   //   中身は**列と行の番号、欄の対応、書き方だけ**（名簿は入らない）。
@@ -470,6 +503,6 @@
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, layoutKey: layoutKey, prefs: prefs, memoOf: memoOf, memoIn: memoIn, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
+    formKey: formKey, layoutKey: layoutKey, prefs: prefs, memoOf: memoOf, memoIn: memoIn, sameLabel: sameLabel, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
   };
 })(typeof window !== 'undefined' ? window : this);

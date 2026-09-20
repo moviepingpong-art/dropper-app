@@ -242,6 +242,8 @@
       box.appendChild(h('div', { class: 'table-wrap' }, [table]));
     }
 
+    box.appendChild(state.extraOpen ? extraBox() : extraRow());
+
     if (state.editing) box.appendChild(personForm());
     else {
       box.appendChild(h('div', { class: 'btns' }, [
@@ -257,6 +259,101 @@
     box.appendChild(h('p', { class: state.dirty ? 'dirty' : 'hint',
       text: state.dirty ? t('rosterDirty') : t('rosterSaveNote') }));
     box.appendChild(saveRow);
+  }
+
+  // ★ 名簿の項目を増やせるようにする（2026-09-20、本人の要望）。
+  //   競技や文化活動によって要る項目が違う。本物の様式15ファイルを機械で調べて、
+  //   いちばん多かったのが「所属」（3ファイル・12回）。ほかに学年・在住市町村・勤務先会社名・背番号。
+  //   調べた範囲では、バレー/バスケ＝背番号・身長・ポジション、吹奏楽＝学校名・学年・パート、
+  //   囲碁将棋＝段位級位・学校名、文化祭＝所属団体。
+  //   ★ 増やした項目は、申込書の**同じ見出し**の欄にだけ書く（見出しの語で当てにいかない）。
+  //     当てにいくと「勤務先所在地 → 自宅住所」のような誤爆が増える（本物のシニアフェスタで発覚）
+  var EXTRA_PRESETS = ['所属', '学校名', '会社名', '学年', '身長', '段位・級位', '背番号',
+    'パート・ポジション', '緊急連絡先'];
+
+  function extraNames() {
+    if (!state.book) return [];
+    var eh = state.book.extraHeaders || {};
+    return (eh[state.tab] || []).slice();
+  }
+
+  // ★ どの組にも同じ項目を足す（名簿ファイルの形をそろえる。p.extras は番号で並ぶため）
+  function addExtra(name) {
+    name = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
+    if (!name) { setMsg('rosterMsg', t('extraBad'), 'ng'); return false; }
+    if (name.length > 20) name = name.slice(0, 20);
+    var eh = state.book.extraHeaders = state.book.extraHeaders || {};
+    var dup = false;
+    GENDERS.forEach(function (g) {
+      eh[g] = eh[g] || [];
+      if (eh[g].indexOf(name) >= 0) dup = true;
+    });
+    if (dup) { setMsg('rosterMsg', t('extraDup'), 'ng'); return false; }
+    GENDERS.forEach(function (g) { eh[g].push(name); });
+    markDirty();
+    return true;
+  }
+
+  function removeExtra(i) {
+    var eh = state.book.extraHeaders || {};
+    GENDERS.forEach(function (g) {
+      if (!eh[g] || i >= eh[g].length) return;
+      eh[g].splice(i, 1);
+      (state.book.people[g] || []).forEach(function (p) {
+        if (p.extras && i < p.extras.length) p.extras.splice(i, 1);
+      });
+    });
+    markDirty();
+  }
+
+  // 「項目を足す」の一覧（一度に1つ足す。その他は自分で入力）
+  function extraBox() {
+    var box = h('div', { class: 'extra-box' });
+    box.appendChild(h('p', { class: 'sub-title', text: t('extraPick') }));
+    var list = h('div', { class: 'extra-list' });
+    EXTRA_PRESETS.forEach(function (name) {
+      list.appendChild(h('button', { type: 'button', class: 'btn-sub', text: name,
+        onclick: function () {
+          if (!addExtra(name)) return;
+          state.extraOpen = false;
+          rebuildRoster();
+          setMsg('rosterMsg', t('extraAdded', { name: name }), 'ok');
+        } }));
+    });
+    box.appendChild(list);
+    var other = h('input', { type: 'text', class: 'filter', placeholder: t('extraOtherPh'), maxlength: '20' });
+    box.appendChild(h('div', { class: 'list-head' }, [other,
+      h('button', { type: 'button', class: 'btn-sub', text: t('extraAddBtn'),
+        onclick: function () {
+          var name = other.value;
+          if (!addExtra(name)) return;
+          state.extraOpen = false;
+          rebuildRoster();
+          setMsg('rosterMsg', t('extraAdded', { name: name.trim() }), 'ok');
+        } }),
+      h('button', { type: 'button', class: 'link-btn', text: t('extraCancel'),
+        onclick: function () { state.extraOpen = false; renderRoster(); } })]));
+    box.appendChild(h('p', { class: 'hint', text: t('extraNote') }));
+    return box;
+  }
+
+  // いま足してある項目の並び（消せる）
+  function extraRow() {
+    var row = h('p', { class: 'small extra-row' }, [h('span', { text: t('extraTitle') })]);
+    extraNames().forEach(function (name, i) {
+      row.appendChild(h('span', { class: 'extra-chip' }, [
+        h('span', { text: name }),
+        h('button', { type: 'button', class: 'link-btn', text: '✕', title: t('extraRemove'),
+          onclick: function () {
+            if (!window.confirm(t('extraRemoveConfirm', { name: name }))) return;
+            removeExtra(i);
+            rebuildRoster();
+          } })]));
+    });
+    if (!extraNames().length) row.appendChild(h('span', { class: 'hint', text: t('extraNone') }));
+    row.appendChild(h('button', { type: 'button', class: 'link-btn', text: t('extraAdd'),
+      onclick: function () { state.extraOpen = true; renderRoster(); } }));
+    return row;
   }
 
   // ===== 1人ぶんの入力 =====
@@ -338,6 +435,10 @@
         hint: t('phAddress'), note: t('noteAddress') }),
       field('phone', t('colPhone'), p.phone, { mode: 'tel' })
     ]);
+    // ★ 足した項目（所属・学校名など）。番号で並ぶので、名簿ファイルの列と同じ順に出す
+    extraNames().forEach(function (name, i) {
+      grid.appendChild(field('extra' + i, name, (p.extras || [])[i] || ''));
+    });
     box.appendChild(grid);
     box.appendChild(h('p', { class: 'hint', text: t('formHint') }));
     box.appendChild(h('p', { class: 'msg', id: 'pfBirthMsg' }));
@@ -482,7 +583,8 @@
   }
 
   function onPersonSave() {
-    var p = { extras: editingPerson().extras };
+    var p = { extras: (editingPerson().extras || []).slice() };
+    extraNames().forEach(function (name, i) { p.extras[i] = pfVal('extra' + i); });
     PF.forEach(function (k) { p[k] = pfVal(k).trim(); });
     p.kanaFamily = toKatakana(p.kanaFamily);
     p.kanaGiven = toKatakana(p.kanaGiven);
@@ -977,7 +1079,9 @@
         if (!(f >= 1 && t2 >= f && t2 - f < 200)) { setMsg('namesMsg', t('pickRowsBad'), 'ng'); return; }
         tb.firstRow = f; tb.lastRow = t2;
         tb.rows = [];
-        for (var r = f; r <= t2; r++) tb.rows.push(r);
+        // ★ 上の行がふりがなの様式は、1つ飛ばしで数える（ふりがなの行に名前を書かないため）
+        var st = tb.kanaAbove ? 2 : 1;
+        for (var r = f; r <= t2; r += st) tb.rows.push(r);
         // 2枚目を足すなら、行数を超えていても切らない（何枚に分けるかが変わるだけ）
         if (!(sh.more && sh.more[ti])) sh.picks[ti] = picks.slice(0, tb.rows.length);
         saveRows(sh);
@@ -1136,6 +1240,8 @@
         sh.rules = null;
       }
       sh.mapping = sh.rules || M.normalize(window.EntryRules.map(sh.cells, sh.merges, sh.found));
+      addKanaAbove(sh);
+      addExtraFields(sh);
       return M.formKey(sh.mapping).then(function (k) {
         sh.key = k;
         var saved = M.prefs.get(k);
@@ -1159,6 +1265,71 @@
       renderReview();
       el('stepReview').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }).catch(function (e) { setMsg('namesMsg', errText(e), 'ng'); });
+  }
+
+  // 足した項目の名前（どの組も同じ並び。④や⑤で名前を出すのに使う）
+  function extraNamesOf() {
+    var eh = (state.book && state.book.extraHeaders) || {};
+    for (var i = 0; i < GENDERS.length; i++) {
+      if ((eh[GENDERS[i]] || []).length) return eh[GENDERS[i]];
+    }
+    return [];
+  }
+  function fieldLabel(f) {
+    var m = /^extra:(\d{1,2})$/.exec(String(f));
+    if (!m) return t('field.' + f);
+    return extraNamesOf()[Number(m[1])] || t('extraOtherName');
+  }
+
+  // ★ 足した項目は、申込書の**同じ見出し**の欄にだけ書く（2026-09-20、本人の判断＝A案）。
+  //   見出しは改行を含むことがある（「勤務先所在地／会社名」で1つのセル）。**行ごとに分けて
+  //   ぴったり同じ**なら当てる。語を含んでいれば当てる、にはしない——
+  //   本物のシニアフェスタで「勤務先所在地・会社名」の列に**自宅住所**を書く誤爆が出ており、
+  //   当てにいく規則はその種の誤爆を増やす
+
+  // 見出しがぴったり合う列に、足した項目を割り当てる
+  // ★ 見るのは**セルの生の文字**（2026-09-20）。規則が作る見出し（near）は空白と改行を
+  //   取ってつなげてあり、「勤務先所在地\r\n会社名」が「勤務先所在地会社名」になって
+  //   行ごとの照合ができない。cells から引き直す
+  function addExtraFields(sh) {
+    var names = extraNamesOf();
+    if (!names.length || !sh.mapping) return;
+    var textAt = {};
+    (sh.cells || []).forEach(function (x) { textAt[x.ref] = x.text; });
+    (sh.mapping.tables || []).forEach(function (tb) {
+      (tb.cols || []).forEach(function (c) {
+        var hit = -1;
+        var top = Math.max(1, (tb.headerRow || 1) - 3);
+        for (var r = tb.headerRow || 1; r >= top && hit < 0; r--) {
+          var raw = textAt[c.col + r];
+          if (!raw) continue;
+          for (var i = 0; i < names.length; i++) {
+            if (M.sameLabel(raw, names[i])) { hit = i; break; }
+          }
+        }
+        if (hit < 0) return;
+        // ★ 見出しがぴったり同じなら、見出しの規則より名簿の項目を優先する。
+        //   本物のシニアフェスタの「勤務先所在地／会社名」に**自宅住所**を書く誤爆を、これで止める
+        tb.fields = tb.fields.filter(function (f) { return !(f.col === c.col && f.rowOffset === 0); });
+        tb.fields.push({ field: 'extra:' + hit, col: c.col, rowOffset: 0, header: c.header });
+        c.field = 'extra:' + hit;
+      });
+    });
+  }
+
+  // ★ 実線の枠の中が点線で区切られた様式では、上の行がふりがな欄（2026-09-20、本人の判断）。
+  //   名前の列の**1つ上の行**にフリガナを書く。見出しの規則はこの形を見つけられない
+  //   （「フリガナ」と印刷されていないため）ので、表を見つけた側の知識をここで足す
+  function addKanaAbove(sh) {
+    if (!sh.blank || !sh.tables || !sh.mapping) return;
+    var cols = {};
+    sh.tables.forEach(function (tb) { if (tb.kanaAbove && tb.nameCol) cols[tb.nameCol] = true; });
+    if (!Object.keys(cols).length) return;
+    (sh.mapping.tables || []).forEach(function (tb) {
+      if (!tb.nameCol || !cols[tb.nameCol]) return;
+      if (tb.fields.some(function (f) { return f.field === 'kana'; })) return;   // 別に欄があるなら足さない
+      tb.fields.push({ field: 'kana', col: tb.nameCol, rowOffset: -1 });
+    });
   }
 
   /* ===== ④ 書き込む内容の確認 ===== */
@@ -1306,6 +1477,10 @@
         } });
         sel.appendChild(h('option', { value: 'none', text: t('colsNone') }));
         PICKABLE.forEach(function (f) { sel.appendChild(h('option', { value: f, text: t('field.' + f) })); });
+        // 足した項目（名簿の列）も選べるようにする
+        extraNamesOf().forEach(function (name, i) {
+          sel.appendChild(h('option', { value: 'extra:' + i, text: name }));
+        });
         sel.value = x.field || 'none';
         var mark = x.overridden ? h('span', { class: 'cols-mark edited', text: t('colsOverridden') })
           : x.field == null ? h('span', { class: 'cols-mark undecided', text: t('colsUndecided') }) : null;
@@ -1542,7 +1717,7 @@
       var table = h('table', { class: 'review' });
       table.appendChild(h('thead', {}, [h('tr', {}, cols.map(function (f) {
         return h('th', {}, [
-          h('span', { text: t('field.' + f) }),
+          h('span', { text: fieldLabel(f) }),
           headersOf[f] ? h('span', { class: 'form-header', text: t('formHeader', { text: headersOf[f].join('／') }) }) : null
         ]);
       }))]));
@@ -1703,7 +1878,7 @@
       });
       order.forEach(function (k) {
         var parts = k.split('|');
-        notes.push(t('field.' + parts[0]) + ' ' + t('note.' + parts[1]) + t('noteWho', { list: grouped[k].join('、'), n: grouped[k].length }));
+        notes.push(fieldLabel(parts[0]) + ' ' + t('note.' + parts[1]) + t('noteWho', { list: grouped[k].join('、'), n: grouped[k].length }));
       });
       // 書かない欄も、理由ごとに1行にまとめる（1行ずれた答えだと、人数×4欄が並ぶ）
       var skipBy = {}, skipOrder = [];
@@ -1716,7 +1891,7 @@
       skipOrder.forEach(function (code) {
         var s = skipBy[code];
         notes.push(t('skipGroup.' + code, {
-          fields: s.fields.map(function (f) { return t('field.' + f); }).join('・'),
+          fields: s.fields.map(fieldLabel).join('・'),
           refs: s.refs.length > 6 ? s.refs.slice(0, 6).join('、') + ' ' + t('andMore', { n: s.refs.length - 6 }) : s.refs.join('、'),
           n: s.refs.length
         }));
