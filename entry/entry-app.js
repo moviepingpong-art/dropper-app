@@ -146,6 +146,24 @@
     openRoster(B.blank(), t('rosterNewMsg'));
   }
 
+  // ★ 名簿づくりをやめて、①の選び直しに戻る（2026-09-20、本人の指摘）。
+  //   出欠システムの箱には「やめる」があるのに、名簿編集には閉じる手段が無かった。
+  //   ★ 名簿を閉じたら③以降も畳む。名簿が無いまま名前の確認だけ残ると、辻褄が合わない
+  function onCloseRoster() {
+    if (state.dirty && !window.confirm(t('rosterCloseConfirm'))) return;
+    state.book = null;
+    state.editing = null;
+    state.dirty = false;
+    el('rosterEditor').hidden = true;
+    el('attendBox').hidden = true;
+    state.attend = null;
+    el('orgInput').value = '';
+    rebuildRoster();                       // state.roster を消し、③以降を作り直す
+    hideFrom('stepNames');
+    setMsg('rosterMsg', t('rosterClosed'), 'ok');
+    el('rosterDrop').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   // ===== 一覧 =====
   function personName(p) { return [p.family, p.given].filter(Boolean).join(' '); }
   function personKana(p) { return [p.kanaFamily, p.kanaGiven].filter(Boolean).join(' '); }
@@ -1705,6 +1723,7 @@
   wireDrop('formDrop', 'formInput', 'formPick', onForm);
   wireDrop('rosterDrop', 'rosterInput', 'rosterPick', onRosterFile);
   el('rosterNew').addEventListener('click', function (ev) { ev.stopPropagation(); onNewRoster(); });
+  el('rosterClose').addEventListener('click', onCloseRoster);
   el('attendOpen').addEventListener('click', function (ev) { ev.stopPropagation(); onAttendOpen(); });
   el('orgInput').addEventListener('input', function () { if (state.book) { state.book.org = el('orgInput').value; markDirty(); } });
   // ★ 名簿はブラウザに覚えないので、保存しないまま閉じると消える
