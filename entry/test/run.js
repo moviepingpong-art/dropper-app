@@ -1374,6 +1374,37 @@ function blankSection(roster) {
   eq(B_.tables([cell(2, 1, '氏名'), cell(1, 2, '記入例'), cell(2, 2, '取手太郎')]), [],
     '記入例だけで書ける行が無ければ、表は作らない');
 
+  // ★ 名前の列そのものに「フリガナ」と印刷してある様式がある（2026-09-20、本物の武蔵野市）。
+  //   ふりがな欄を名前の上に置く作りで、名前の行と**交互**に並ぶ。飛ばさないと1行目で行き止まり。
+  //   ★ 飛ばした行は「書ける行」に入れない。入れると、ふりがなの欄に名前を書いてしまう
+  var kanaTb = B_.tables([
+    cell(3, 7, '選　手　名'),
+    cell(3, 8, 'フリガナ'), cell(4, 8, ''),      // ふりがなの行
+    cell(3, 9, ''), cell(4, 9, ''),              // 名前の行
+    cell(3, 10, 'フリガナ'), cell(4, 10, ''),
+    cell(3, 11, ''), cell(4, 11, ''),
+    cell(3, 12, 'フリガナ'), cell(4, 12, ''),
+    cell(3, 13, ''), cell(4, 13, '')
+  ]);
+  eq(shownOf(kanaTb), ['C:9-13'], '★ ふりがなの行を飛ばして、名前の行から数える');
+  eq(kanaTb[0].rows, [9, 11, 13], '★ 書ける行にふりがなの行を入れない（そこへ名前を書かないため）');
+
+  // ★ 規則のほうでも、ふりがなの行を「表の切れ目」と見なさない。
+  //   見なすと、1人ずつの表にばらばらに割れる（本物の武蔵野市で5つに割れていた）
+  var kanaCells = [
+    { ref: 'C7', row: 7, col: 3, text: '選　手　名' }, { ref: 'G7', row: 7, col: 7, text: '所属' },
+    { ref: 'C8', row: 8, col: 3, text: 'フリガナ' },
+    { ref: 'C9', row: 9, col: 3, text: '山田 太郎' },
+    { ref: 'C10', row: 10, col: 3, text: 'フリガナ' },
+    { ref: 'C11', row: 11, col: 3, text: '山田 花子' }
+  ];
+  var kanaNames = [[9], [11]].map(function (a) {
+    return { refs: ['C' + a[0]], row: a[0], col: 3, text: 'x', match: { status: 'exact', member: null } };
+  });
+  var kanaMap = M.normalize(RU.map(kanaCells, [], { names: kanaNames, suspects: [] }));
+  eq(kanaMap.tables.length, 1, '★ ふりがなの行で表を割らない（1人ずつにばらけさせない）');
+  eq([kanaMap.tables[0].firstRow, kanaMap.tables[0].lastRow], [9, 11], 'その表は9〜11行');
+
   // ★ 表が始まったあとの記入例は飛ばさない。飛ばすと、その先の行まで1つの表に飲み込む
   eq(shownOf(B_.tables([
     cell(2, 1, '氏名'),

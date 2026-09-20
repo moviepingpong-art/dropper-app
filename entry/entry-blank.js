@@ -68,7 +68,8 @@
       if (!kind) return;
       var span = rowsBelow(g, c.row, c.col);
       if (!span) return;
-      found.push({ kind: kind, col: c.col, headerRow: c.row, firstRow: span.from, lastRow: span.to });
+      found.push({ kind: kind, col: c.col, headerRow: c.row, firstRow: span.from, lastRow: span.to,
+                   rows: span.rows });
     });
 
     // 「姓」と「名」が同じ行に並んでいたら、1つの表にまとめる
@@ -90,8 +91,9 @@
   }
 
   function make(f, cols, g) {
-    var rows = [];
-    for (var r = f.firstRow; r <= f.lastRow; r++) rows.push(r);
+    // ★ 飛ばした行（ふりがなの行）は書ける行に入れない。rows が無いときだけ、上から下まで並べる
+    var rows = f.rows && f.rows.length ? f.rows.slice() : [];
+    if (!rows.length) for (var r = f.firstRow; r <= f.lastRow; r++) rows.push(r);
     var t = { headerRow: f.headerRow, firstRow: f.firstRow, lastRow: f.lastRow, rows: rows, label: labelOf(g, f) };
     Object.keys(cols).forEach(function (k) { t[k] = cols[k]; });
     return t;
@@ -119,9 +121,15 @@
     return false;
   }
 
-  // 見出しの下に続く「書ける行」を数える
+  // ★ 名前の列そのものに「フリガナ」と印刷してある様式がある（2026-09-20、本物の武蔵野市の様式）。
+  //   ふりがな欄を名前の上に置く作りで、「フリガナ」の行と名前の行が**交互**に並ぶ。
+  //   飛ばさないと1行目で行き止まりになり、表が見つからない。
+  //   ★ 飛ばした行は「書ける行」に入れない。入れると、ふりがなの欄に名前を書いてしまう
+  var KANA_LABEL_RE = /^(フリガナ|ふりがな|カナ|かな|ヨミ|よみ|読み|読み方)$/;
+
+  // 見出しの下に続く「書ける行」を数える。rows は実際に書ける行の並び（飛ばした行は入らない）
   function rowsBelow(g, headerRow, col) {
-    var from = null, to = null, shape = null, inExample = false;
+    var from = null, to = null, shape = null, inExample = false, rows = [];
     for (var r = headerRow + 1; r <= headerRow + LOOK_DOWN; r++) {
       var cell = g.at(r, col);
       var own = cell ? nfkc(cell.text) : '';
@@ -131,17 +139,19 @@
         if (isExampleRow(g, r, col)) inExample = true;
         if (inExample) { if (own) continue; inExample = false; }
       }
+      if (own && KANA_LABEL_RE.test(own.replace(/\s/g, ''))) continue;   // ふりがなの行は飛ばす
       if (own && !/^\d+$/.test(own)) break;              // 名前の欄に文字（別の表の見出し）
       if (otherText(g, r, col)) {
         if (from == null) continue;                     // 見出しの2行目（「年」「月」「日」）は読み飛ばす
         break;
       }
       if (!cell) { if (from != null) break; else continue; }
-      if (from == null) { from = r; to = r; shape = shapeOf(g, r, col); continue; }
+      if (from == null) { from = r; to = r; shape = shapeOf(g, r, col); rows.push(r); continue; }
       if (shapeOf(g, r, col) !== shape) break;          // セルの並びが変わった（空けてある行・次の表の枠）
       to = r;
+      rows.push(r);
     }
-    return from == null ? null : { from: from, to: to };
+    return from == null ? null : { from: from, to: to, rows: rows };
   }
 
   // 行のどこかにある「数字でない文字」。★ 名前の列より左の短い文字は、行の名札（「監督」「選手」）
