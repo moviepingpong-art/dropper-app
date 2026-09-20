@@ -25,6 +25,7 @@
 
   var LOOK_DOWN = 60;          // 見出しの下を、これだけの行まで見る
   var LABEL_MAX = 4;           // 名前の列より左にある「行の名札」とみなす文字の長さ
+  var LABEL_NEAR = 2;          // 名札とみなすのは、名前の列からこれだけ左まで
 
   var NAME_RE = /^(氏名|名前|選手名|会員名|フルネーム|参加者名|選手氏名)$/;
   var FAMILY_RE = /^(姓|苗字|名字)$/;
@@ -177,12 +178,16 @@
     return from == null ? null : { from: from, to: to, rows: rows };
   }
 
-  // 行のどこかにある「数字でない文字」。★ 名前の列より左の短い文字は、行の名札（「監督」「選手」）
+  // 行のどこかにある「数字でない文字」。★ 名前の列のすぐ左の短い文字は、行の名札（「監督」「選手」）
+  // ★ 名札とみなすのは「すぐ左」だけ（2026-09-20、本物の八王子市バレーボール連盟のエントリー用紙）。
+  //   同じ形の表が左右に並ぶ様式で、**左の表は右の表の「監督」で止まり、右の表は止まらない**という
+  //   食い違いが出ていた（左15行・右17行）。遠くの短い文字は自分の名札ではなく、隣の表のもの。
+  //   隣の表の文字が出てきたら、そこで自分の表は終わりでよい
   function otherText(g, r, col) {
     for (var c = 1; c <= Math.min(g.maxCol, col + 15); c++) {
       var t = g.text(r, c);
       if (!t || /^\d+$/.test(t)) continue;
-      if (c < col && t.length <= LABEL_MAX) continue;
+      if (c < col && c >= col - LABEL_NEAR && t.length <= LABEL_MAX) continue;
       return t;
     }
     return '';
