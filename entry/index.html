@@ -131,6 +131,10 @@
     /* ===== ① 名簿（作る・直す） ===== */
     .drop-btns { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:12px; }
     .drop-btns button { margin-top:0; }
+    /* ★ 枠の中は「落とす」操作だけにする。名簿の別の作り方は枠の外へ出す（2026-09-20、本人の指示）。
+       枠はドロップ先だと見せたいので、関係ない選び方を並べない */
+    .other-ways { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:12px; }
+    .other-ways button { margin-top:0; }
     input[type=text] { font-family:inherit; font-size:16px; padding:9px 10px; border:2px solid var(--line);
       border-radius:10px; background:#fff; color:var(--ink); width:100%; max-width:100%; }
     input[type=text]:focus { outline:none; border-color:var(--teal); }
@@ -275,12 +279,15 @@
         <div class="ds" data-i18n="rosterDropSub">ここにドラッグ、またはタップして選ぶ</div>
         <div class="drop-btns">
           <button type="button" id="rosterPick" class="btn-sub" data-i18n="rosterPick">ファイルを選ぶ</button>
-          <button type="button" id="rosterNew" class="btn-sub" data-i18n="rosterNew">新しく作る</button>
-          <button type="button" id="attendOpen" class="btn-sub" data-i18n="attendOpen">出欠システムから取り込む</button>
         </div>
       </div>
       <input type="file" id="rosterInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
-      <p class="hint" data-i18n="rosterNote">このツールで作った名簿ファイルだけ読めます。</p>
+      <!-- 名簿がまだ無いときの入口。枠の中はドロップ専用にしたので、こちらは枠の外に置く -->
+      <div class="other-ways">
+        <button type="button" id="rosterNew" class="btn-sub" data-i18n="rosterNew">新しく作る</button>
+        <button type="button" id="attendOpen" class="btn-sub" data-i18n="attendOpen">出欠システムの名簿</button>
+      </div>
+      <p class="hint" data-i18n="rosterNote">読めるのは、このツールで作った名簿ファイル（.xlsx）だけです。</p>
       <p class="msg" id="rosterMsg"></p>
       <div id="attendBox" hidden></div>
       <div id="rosterEditor" hidden>
