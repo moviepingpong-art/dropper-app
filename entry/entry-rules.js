@@ -34,6 +34,8 @@
   // ★ 名前の列そのものに印刷される「ふりがな」の札。名前の行と交互に並ぶ様式がある
   //   （2026-09-20、本物の武蔵野市の様式）。entry-blank.js にも同じものがある
   var KANA_LABEL_RE = /^(フリガナ|ふりがな|カナ|かな|ヨミ|よみ|読み|読み方)$/;
+  // ★ 見出しのすぐ下に書き方の見本を置く様式がある（entry-blank.js にも同じものがある）
+  var EXAMPLE_RE = /記入例|記載例|見本|例示/;
 
   function nfkc(s) { s = s == null ? '' : String(s); try { s = s.normalize('NFKC'); } catch (e) {} return s; }
   function squash(s) { return nfkc(s).replace(/\s+/g, ''); }
@@ -59,6 +61,16 @@
     }
 
     var maxCol = cells.reduce(function (n, c) { return Math.max(n, c.col); }, 1);
+
+    // その行が書き方の見本の行か（名前の列より左にある札を見る。entry-blank.js と同じ見方）
+    function isExampleRow(row, nameCol) {
+      for (var c = 1; c < nameCol; c++) {
+        var t = textAt(row, c);
+        if (t && EXAMPLE_RE.test(nfkc(t))) return true;
+      }
+      return false;
+    }
+
     var people = found.names.concat(found.suspects);
     var nameRefs = {};
     people.forEach(function (n) { n.refs.forEach(function (r) { nameRefs[r] = true; }); });
@@ -183,6 +195,10 @@
       function chain(col) {
         var out = [];
         for (var r = dataTop - 1; r >= top; r--) {
+          // ★ 見出しのすぐ下に「入力見本」を置く様式がある（2026-09-20、本物の東京都卓球連盟）。
+          //   見本の行を飛ばさないと、**見本の値（「トウキョウタロウ」など）が見出しとして読まれ**、
+          //   その列の種類が決まらなくなる。entry-blank.js の表さがしと同じ知識がここにも要る
+          if (isExampleRow(r, nameCols[0])) continue;
           var t = textAt(r, col);
           if (t && isNumberOnly(t)) continue;
           if (t && out[out.length - 1] !== t) {
@@ -207,7 +223,9 @@
       cols.forEach(function (c) {
         var near = c.chain[0], all = c.chain.join('|');
         var f = null;
-        if (/フリガナ|ふりがな|カナ|よみ/.test(near)) f = 'kana';
+        // ★ 「チーム名(カナ)」を人のフリガナと読んではいけない（2026-09-20、本物の東京都卓球連盟）。
+        //   団体の名前の読みを書く欄に、人のセイ・メイを書いてしまう（誤爆）
+        if (/フリガナ|ふりがな|カナ|よみ/.test(near) && !/チーム|団体|学校|所属|クラブ|会社|部名/.test(near)) f = 'kana';
         else if (/^男(性)?$/.test(near)) f = 'genderMale';
         else if (/^女(性)?$/.test(near)) f = 'genderFemale';
         else if (/性別|男女/.test(near)) f = 'gender';

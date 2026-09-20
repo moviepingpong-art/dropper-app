@@ -1405,6 +1405,28 @@ function blankSection(roster) {
   eq(kanaMap.tables.length, 1, '★ ふりがなの行で表を割らない（1人ずつにばらけさせない）');
   eq([kanaMap.tables[0].firstRow, kanaMap.tables[0].lastRow], [9, 11], 'その表は9〜11行');
 
+  // ★ 見出しのすぐ下に「入力見本」を置く様式がある（2026-09-20、本物の東京都卓球連盟）。
+  //   見本の行を飛ばさないと、**見本の値が見出しとして読まれ**、その列の種類が決まらない
+  var exCells = [
+    { ref: 'A5', row: 5, col: 1, text: '種目番号' }, { ref: 'C5', row: 5, col: 3, text: 'チーム名(カナ)' },
+    { ref: 'E5', row: 5, col: 5, text: '氏　名' }, { ref: 'F5', row: 5, col: 6, text: '氏名(カナ)' },
+    { ref: 'G5', row: 5, col: 7, text: '生年月日' },
+    { ref: 'A6', row: 6, col: 1, text: '入力見本' }, { ref: 'C6', row: 6, col: 3, text: 'トウタククラブ' },
+    { ref: 'E6', row: 6, col: 5, text: '東京 太郎' }, { ref: 'F6', row: 6, col: 6, text: 'トウキョウ タロウ' },
+    { ref: 'G6', row: 6, col: 7, text: '1965/1/23' },
+    { ref: 'E7', row: 7, col: 5, text: '山田 太郎' }, { ref: 'E8', row: 8, col: 5, text: '山田 花子' }
+  ];
+  var exNames = [7, 8].map(function (r) {
+    return { refs: ['E' + r], row: r, col: 5, text: 'x', match: { status: 'exact', member: null } };
+  });
+  var exTb = M.normalize(RU.map(exCells, [], { names: exNames, suspects: [] })).tables[0];
+  var exGot = {};
+  (exTb.cols || []).forEach(function (c) { exGot[c.col] = c.field || null; });
+  eq(exGot.F, 'kana', '★ 入力見本の行を飛ばし、その上の本当の見出し（氏名(カナ)）を読む');
+  // ★ 「チーム名(カナ)」を人のフリガナと読まない。団体名の読みの欄に、人のセイ・メイを書いてしまう
+  eq(exGot.C, null, '★ 「チーム名(カナ)」を人のフリガナと読まない（誤爆を防ぐ）');
+  eq(exGot.G, 'birth', '生年月日は今までどおり読む');
+
   // ★ 表が始まったあとの記入例は飛ばさない。飛ばすと、その先の行まで1つの表に飲み込む
   eq(shownOf(B_.tables([
     cell(2, 1, '氏名'),
