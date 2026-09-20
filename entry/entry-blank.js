@@ -200,5 +200,22 @@
     return cols.join(',');
   }
 
-  global.EntryBlank = { tables: tables };
+  // ★ 表が見つからなかった様式で、本人が「名前の列と書く行」を教える道（2026-09-20）。
+  //   様式は競技ごと団体ごとに無数にあり、見出しの規則で網羅はできないと決めた。
+  //   規則が外れても、指してもらえば書ける。tables() と同じ形を返す（taught の印つき）。
+  //   ★ 受け取れない指定は null を返す。呼び手が画面で知らせること
+  function manual(col, from, to) {
+    var c = String(col == null ? '' : col);
+    try { c = c.normalize('NFKC'); } catch (e) {}
+    c = c.replace(/\s+/g, '').replace(/列$/, '').toUpperCase();
+    if (!/^[A-Z]{1,3}$/.test(c)) return null;
+    var f = Math.floor(Number(from)), t = Math.floor(Number(to));
+    if (!(f >= 1 && t >= f && t - f < 200)) return null;
+    var rows = [];
+    for (var r = f; r <= t; r++) rows.push(r);
+    return { headerRow: Math.max(1, f - 1), firstRow: f, lastRow: t, rows: rows,
+             label: '', nameCol: c, taught: true };
+  }
+
+  global.EntryBlank = { tables: tables, manual: manual };
 })(typeof window !== 'undefined' ? window : this);

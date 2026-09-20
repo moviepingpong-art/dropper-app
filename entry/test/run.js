@@ -1502,6 +1502,34 @@ function blankSection(roster) {
   eq(stripe[0].rows, [4], '★ そのままでは1行しか数えられない（しかもふりがなの行）');
   eq(stripe[0].skip, 'two-rows', '★ 1人=2行と分かったら、諦める印を付ける（違う行に書かないため）');
 
+  // ★ 表が見つからない様式は、名前の列と書く行を本人に教えてもらう（2026-09-20）。
+  //   様式は競技ごと団体ごとに無数にあり、見出しの規則で網羅はできないと決めた
+  eq(B_.manual('C', 5, 8),
+    { headerRow: 4, firstRow: 5, lastRow: 8, rows: [5, 6, 7, 8], label: '', nameCol: 'C', taught: true },
+    '★ 教わった列と行から、見つけたときと同じ形の表を作る');
+  eq(B_.manual('ｃ列', '5', '8').nameCol, 'C', '全角・小文字・「列」つきでも受け取る');
+  eq(B_.manual('C', 5, 5).rows, [5], '1行だけでも受け取る');
+  eq(B_.manual('C', 1, 3).headerRow, 1, '1行目から書く様式でも作れる');
+  eq(B_.manual('', 5, 8), null, '列が無ければ受け取らない');
+  eq(B_.manual('C1', 5, 8), null, '列に数字が混じれば受け取らない');
+  eq(B_.manual('C', 8, 5), null, '終わりが始まりより前なら受け取らない');
+  eq(B_.manual('C', 0, 8), null, '0行目は受け取らない');
+  eq(B_.manual('C', 1, 300), null, '200行を超える指定は受け取らない');
+  eq(B_.manual('C', 'あ', 8), null, '数でない行は受け取らない');
+
+  var teachSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  check(/sh\.teach = true;/.test(teachSrc) && /if \(tables\.length\) return;/.test(teachSrc),
+    '★ 何も見つからなかったシートは捨てずに教える道へ（1人=2行と分かったものは断ったまま）');
+  // ★ 文言があるかだけを見ない（2026-09-20）。条件を消しても文言は残るので素通りする
+  check(teachSrc.indexOf('state.sheets.some(function (sh) { return sh.teach; })') >= 0 &&
+    /teachWait/.test(teachSrc), '★ 教えてもらう途中のシートがあるうちは「次へ」を止める');
+  check(/state\.sheets\.filter\(function \(x\) \{ return x !== sh; \}\)/.test(teachSrc),
+    '教えずに「このシートは使わない」も選べる');
+  var teachI18n = fs.readFileSync(path.join(__dirname, '..', 'entry-i18n.js'), 'utf8');
+  check(['teachTitle', 'teachHint', 'teachCol', 'teachRows', 'teachApply', 'teachSkip', 'teachBad',
+    'teachDone', 'teachWait'].every(function (k) { return new RegExp(k + ':').test(teachI18n); }),
+    '教える画面の文言がそろっている');
+
   // 見張り：本当に1行しか書けない表は諦めない（本物の様式にいくつもある）
   var oneRow = B_.tables([cell(2, 3, '氏名'), cell(1, 4, '1'), cell(2, 4, ''), cell(3, 4, ''),
     cell(2, 5, ''), cell(3, 5, ''), cell(2, 6, ''), cell(3, 6, ''), cell(2, 7, ''), cell(3, 7, '')]);
