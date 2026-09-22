@@ -18,7 +18,6 @@
       toolSchedule: '📅 予定表',
       toolDecide: '✅ 決めごと',
       toolEntry: '📝 申込書',
-      toolHint: 'イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと ／ 申込書＝大会の申込書に、名簿から記入',
       // --- 「何ができる？」ポップアップ（#tools-modal）---
       // 3本の違いは「1枚から何が、いくつ出てくるか」に尽きる。図のラベルもそこだけを言う。
       tmBtn: '🔍 何ができる？',
@@ -179,7 +178,6 @@
       toolSchedule: '📅 Schedule',
       toolDecide: '✅ Decide',
       toolEntry: '📝 Entry forms',
-      toolHint: 'Event = one flyer, one entry / Schedule = one sheet, many entries / Decide = what was settled, from chats and notes',
       tmBtn: '🔍 What can these do?',
       tmTitle: '🎁 Three droppers — what does each one do?',
       tmIntro: 'All three work the same way: drop a file. What differs is what comes out.',
@@ -329,7 +327,6 @@
       toolSchedule: '📅 Schedule',
       toolDecide: '✅ Decide',
       toolEntry: '📝 Entry forms',
-      toolHint: 'Event = ek flyer se ek entry / Schedule = ek sheet se kai entries / Decide = chat ya notes se jo tay hua',
       tmBtn: '🔍 Ye kya kar sakte hain?',
       tmTitle: '🎁 Teen dropper — kaunsa kya karta hai?',
       tmIntro: 'Teeno mein bas file drop karni hai. Farq sirf itna hai ki bahar kya aata hai.',
