@@ -115,6 +115,11 @@
     button:disabled { opacity:.5; cursor:default; box-shadow:none; }
     .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
     .btn-sub { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
+    /* ★ 文字だけのボタン。entry-app.js が11か所で使う（編集・消す・↑↓・このシートは使わない…）。
+       2026-09-22 に「覚え書きでしか使っていない」と誤って消し、本番を崩した。
+       index.html だけを見て確かめたのが誤り。JS が使う組も数えること（run.js が機械で見張っている） */
+    .link-btn { background:none !important; box-shadow:none !important; color:var(--teal-d) !important;
+      padding:0; font-size:12.5px; text-decoration:underline; border-radius:0; }
 
     .msg { margin:12px 0 0; font-size:13.5px; font-weight:700; min-height:1.4em; }
     .msg.wait { color:var(--sub); }
@@ -134,6 +139,12 @@
        枠はドロップ先だと見せたいので、関係ない選び方を並べない */
     .other-ways { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:12px; }
     .other-ways button { margin-top:0; }
+    /* 名簿づくりの中の「名前の入れかた」。手で入れるのが基本で、出欠システムは近道 */
+    .name-from { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      border:1px solid #cfe6dd; border-radius:10px; padding:10px 12px; margin:0 0 12px; background:#f7fbf9; }
+    .name-from-label { font-size:13px; font-weight:700; color:var(--teal-d); }
+    .name-from .hint { margin:0; flex:1 1 auto; }
+    .name-from button { margin-top:0; font-size:13px; padding:8px 14px; }
     input[type=text] { font-family:inherit; font-size:16px; padding:9px 10px; border:2px solid var(--line);
       border-radius:10px; background:#fff; color:var(--ink); width:100%; max-width:100%; }
     input[type=text]:focus { outline:none; border-color:var(--teal); }
@@ -281,20 +292,29 @@
         </div>
       </div>
       <input type="file" id="rosterInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
-      <!-- 名簿がまだ無いときの入口。枠の中はドロップ専用にしたので、こちらは枠の外に置く -->
+      <!-- 名簿がまだ無いときの入口。枠の中はドロップ専用にしたので、こちらは枠の外に置く。
+           ★ 枠の外は「新しく作る」だけにする（2026-09-22、本人の指示）。
+           出欠システムは白山の仕組みを使っている人にしか意味がなく、
+           初めて来た人には押してよいか分からないボタンが2つ並んでいた。
+           取り込み口は名簿づくりの中へ移した（あれは名簿の作り方ではなく、名前の入れ方） -->
       <div class="other-ways">
         <button type="button" id="rosterNew" class="btn-sub" data-i18n="rosterNew">新しく作る</button>
-        <button type="button" id="attendOpen" class="btn-sub" data-i18n="attendOpen">出欠システムの名簿</button>
       </div>
       <p class="hint" data-i18n="rosterNote">読めるのは、このツールで作った名簿ファイル（.xlsx）だけです。</p>
       <p class="msg" id="rosterMsg"></p>
-      <div id="attendBox" hidden></div>
       <div id="rosterEditor" hidden>
         <div class="field">
           <label for="orgInput" data-i18n="orgLabel">団体名</label>
           <input type="text" id="orgInput" autocomplete="off">
           <p class="hint" data-i18n="orgHint">保存するファイルの名前になります。</p>
         </div>
+        <!-- 名前をどこから入れるか。手で入れるのが基本で、出欠システムは近道 -->
+        <div class="name-from">
+          <span class="name-from-label" data-i18n="nameFromLabel">名前の入れかた</span>
+          <span class="hint" data-i18n="nameFromHint">下の欄に1人ずつ入れます。</span>
+          <button type="button" id="attendOpen" class="btn-sub" data-i18n="attendOpen">出欠システムから取り込む</button>
+        </div>
+        <div id="attendBox" hidden></div>
         <div id="rosterBody"></div>
         <!-- ★ 名簿づくりをやめて、①の選び直しに戻る（2026-09-20、本人の指摘）。
              出欠システムの箱には「やめる」があるのに、こちらには閉じる手段が無かった -->
