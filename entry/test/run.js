@@ -502,6 +502,22 @@ function mapSection(roster) {
   eq(Object.keys(usedClasses).filter(function (c) { return !NO_STYLE[c] && style.indexOf('.' + c) < 0; }), [],
     '★ entry-app.js が使う組は、すべて index.html に見た目がある');
 
+  // ★ 画面が呼ぶ文言（data-i18n）が、すべて辞書にあるか。
+  //   無いと、その場に鍵の名前がそのまま出る（「whatCan6」のような字が画面に残る）
+  var i18nSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-i18n.js'), 'utf8');
+  var wantKeys = {}, keyRe = /data-i18n="([^"]+)"/g, km;
+  while ((km = keyRe.exec(html))) wantKeys[km[1]] = 1;
+  check(Object.keys(wantKeys).length > 40, '画面が呼ぶ文言を集められている（集め方が壊れたら気づく）');
+  eq(Object.keys(wantKeys).filter(function (k) { return i18nSrc.indexOf('\n      ' + k + ':') < 0; }), [],
+    '★ 画面が呼ぶ文言は、すべて entry-i18n.js にある');
+
+  // ★ 「何ができる？」は申込書ドロッパーのことだけを書く（2026-09-22）。
+  //   ほかの3本の「4つのドロッパー」（#tools-modal・tm* の鍵）をここへ写すと、
+  //   向こうを直したとき黙ってずれる。写しが紛れ込んだら落とす
+  check(/id="what-modal"/.test(html) && /id="whatBtn"/.test(html), '「何ができる？」が画面にある');
+  check(!/tools-modal|tm-card|\btmTitle\b/.test(html) && !/\btm[A-Z]/.test(i18nSrc),
+    '★ ほかの3本の「4つのドロッパー」を写していない');
+
   // ★ 日本語のみと決めたので、他言語版への指示は書かない（CLAUDE.md「申込書ドロッパーは日本語のみ」）
   // ★ 「hreflang」の語ではなく、実際の属性を見る。説明のコメントに反応してはいけない（2026-09-19 に踏んだ）
   check(!/<link\b[^>]*\bhreflang=/.test(html), 'index.html に hreflang の link が無い（日本語のみなので、他言語版への指示は嘘になる）');

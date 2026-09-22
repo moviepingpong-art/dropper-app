@@ -73,6 +73,41 @@
       border-color:transparent; color:#fff; cursor:default; transform:none;
       background:linear-gradient(100deg,var(--teal),var(--teal-d));
     }
+    /* タブ列の右端。押すと申込書ドロッパーの説明が出る（ほかの3本と同じ位置・同じ見た目） */
+    .what-btn {
+      font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px;
+      padding:7px 15px; border-radius:999px; color:var(--teal-d);
+      background:#fff; border:2px dashed var(--teal);
+      transition:background .15s, transform .12s;
+    }
+    .what-btn:hover { background:#f0fffb; transform:translateY(-1px); }
+
+    /* ===== 「何ができる？」ポップアップ（#what-modal） ===== */
+    #what-modal { position:fixed; inset:0; z-index:1080; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); padding:18px; }
+    #what-modal.show { display:flex; }
+    .wm-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
+      padding:24px 22px; box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
+    .wm-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:20px;
+      margin:0 0 5px; color:var(--teal-d); line-height:1.35; }
+    .wm-lead { color:var(--sub); font-size:13.5px; margin:0 0 16px; }
+    /* 入れるもの → 出てくるもの。SVG ではなく箱で組む（文字が折り返せるように） */
+    .wm-fig { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:0 0 6px; }
+    .wm-box { border:2px solid var(--teal); border-radius:12px; background:#f7fffd;
+      padding:10px 12px; font-size:12.5px; font-weight:700; color:var(--teal-d); text-align:center; min-width:96px; }
+    .wm-box.out { background:linear-gradient(100deg,var(--yellow),var(--lime)); border-color:transparent; color:var(--ink); }
+    .wm-op { font-size:16px; font-weight:700; color:var(--sub); }
+    .wm-cap { text-align:center; font-size:11.5px; color:var(--sub); margin:0 0 16px; }
+    .wm-card h3 { font-size:14px; margin:0 0 8px; color:var(--teal-d); }
+    .wm-list { margin:0 0 16px; padding-left:0; list-style:none; font-size:13px; color:var(--ink); line-height:1.8; }
+    .wm-list li { padding-left:17px; position:relative; }
+    .wm-list li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
+    .wm-safe { border:2px solid var(--teal); border-radius:12px; background:#f0fffb;
+      padding:10px 12px; font-size:12.5px; color:var(--sub); margin:0 0 16px; line-height:1.8; }
+    .wm-btns { display:flex; justify-content:flex-end; }
+    @media (max-width:640px) { .wm-fig { flex-direction:column; } }
+
     .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
     /* 狭い画面ではラベルを独立した行にして、タブが並んで入るようにする */
     @media (max-width:640px){ .tool-tabs-label { flex-basis:100%; } }
@@ -277,6 +312,11 @@
       <a class="tool-tab" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
       <a class="tool-tab" href="/decide/" data-i18n="toolDecide">✅ 決めごと</a>
       <span class="tool-tab on" data-i18n="toolEntry">📝 申込書</span>
+      <!-- ★ 申込書ドロッパー専用の説明（2026-09-22、本人の要望）。
+           ほかの3本にある「4つのドロッパー」のポップアップは、ここへ写さない。
+           あれは3本で同じ中身を保つ決まりの下にあり、4つ目の写しを作ると
+           向こうを直したとき黙ってずれる。ここは申込書のことだけを書く -->
+      <button type="button" id="whatBtn" class="what-btn" data-i18n="whatBtn">🔍 何ができる？</button>
     </nav>
     <p class="tool-hint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと ／ 申込書＝大会の申込書に、名簿から記入</p>
 
@@ -376,6 +416,40 @@
         <li data-i18n="priv4">郵便番号から住所を出すときだけ、このサイトの郵便番号データを読み込みます。</li>
         <li data-i18n="priv5">出欠システムから名前を取り込むときだけ、団体IDを送って名前を受け取ります。</li>
       </ul>
+    </div>
+  </div>
+
+  <!-- 「何ができる？」ポップアップ。申込書ドロッパーのことだけを書く。
+       ★ ほかの3本の「4つのドロッパー」を写さないこと（写すと向こうを直したときにずれる） -->
+  <div id="what-modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+    <div class="wm-card">
+      <h2 id="wmTitle" data-i18n="whatTitle">📝 申込書ドロッパー、何ができる？</h2>
+      <p class="wm-lead" data-i18n="whatLead">大会の参加申込書（Excel）と名簿を入れると、記入済みにして返します。</p>
+
+      <div class="wm-fig">
+        <span class="wm-box" data-i18n="whatFigRoster">名簿</span>
+        <span class="wm-op">＋</span>
+        <span class="wm-box" data-i18n="whatFigForm">大会の申込書（Excel）</span>
+        <span class="wm-op">→</span>
+        <span class="wm-box out" data-i18n="whatFigFilled">記入済みの申込書</span>
+      </div>
+      <p class="wm-cap" data-i18n="whatFigCap">左の2つを入れると、右が出てきます。</p>
+
+      <h3 data-i18n="whatCanTitle">できること</h3>
+      <ul class="wm-list">
+        <li data-i18n="whatCan1">名簿から、氏名・フリガナ・性別・生年月日・年齢・住所・電話番号を書き込みます。</li>
+        <li data-i18n="whatCan2">年齢は、申込書に書いてある基準日で計算します。4月2日生まれの1歳のずれも間違えません。</li>
+        <li data-i18n="whatCan3">西暦か和暦かは、申込書に指示が無ければ聞きます。勝手に決めません。</li>
+        <li data-i18n="whatCan4">罫線も列の幅も印刷の設定も、もらった様式のままです。書いた場所以外は一文字も変えません。</li>
+        <li data-i18n="whatCan5">どの欄に何を書くかは、書く前に一覧で見えます。違っていれば選び直せます。</li>
+        <li data-i18n="whatCan6">名簿もこのツールで作れます。競技によって要る項目（所属・学校名・身長など）は足せます。</li>
+      </ul>
+
+      <p class="wm-safe" data-i18n="whatSafe">申込書も名簿も、この端末の中（ブラウザ）だけで扱います。どこにも送りません。AI も使いません。無料で、登録も要りません。</p>
+
+      <div class="wm-btns">
+        <button type="button" class="btn-sub" data-wm-close data-i18n="whatClose">閉じる</button>
+      </div>
     </div>
   </div>
 
