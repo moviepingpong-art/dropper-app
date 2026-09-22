@@ -1988,6 +1988,25 @@
     STEPS.slice(i).forEach(function (s) { el(s).hidden = true; });
   }
 
+  /* ===== 「何ができる？」ポップアップ（#what-modal） =====
+     ★ 初回の自動表示はしない。ほかの3本で一度入れて外した（2026-09-03、利用者の判断）。
+       何も押していないのに説明が出るのは、初めての人ほど戸惑う。知りたい人が押す。
+     ★ 中身は申込書ドロッパーのことだけ。ほかの3本の「4つのドロッパー」を写さない */
+  function wireWhatModal() {
+    var m = el('what-modal');
+    if (!m) return;
+    function close() { m.classList.remove('show'); }
+    el('whatBtn').addEventListener('click', function () { m.classList.add('show'); });
+    // 背景を押す・「閉じる」を押す・Esc、のどれでも閉じる
+    m.addEventListener('click', function (ev) {
+      if (ev.target === m || (ev.target.hasAttribute && ev.target.hasAttribute('data-wm-close'))) close();
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && m.classList.contains('show')) close();
+    });
+  }
+  wireWhatModal();
+
   /* ===== 配線 ===== */
   function wireDrop(zoneId, inputId, pickId, handler) {
     var zone = el(zoneId), input = el(inputId);
