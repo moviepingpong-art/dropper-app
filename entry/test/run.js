@@ -1554,54 +1554,14 @@ function blankSection(roster) {
   check(!B_.isExampleName('提出用') && !B_.isExampleName('申込書') && !B_.isExampleName('９人制'),
     '書く紙のシートは記入例とみなさない');
 
-  // ★ 覚え書きの受け渡し（2026-09-20）。団体の幹事が1回教えて、申込書と一緒に配る
-  (function () {
-    var store = {};
-    global.localStorage = { getItem: function (k) { return store[k] || null; },
-      setItem: function (k, v) { store[k] = String(v); } };
-    M.prefs.put('L1111111122222222', { rows: { B: [5, 19] }, taught: [] });
-    M.prefs.put('abcdef0123456789', { fmt: { birthYear: 'seireki' }, fields: { 'B@6': { F: 'age' } } });
-    M.prefs.put('cccccccc11112222', { rows: { C: [1, 2] }, taught: ['C'] });
-
-    var memo = M.memoOf(['L1111111122222222', 'abcdef0123456789', 'L1111111122222222', '']);
-    eq(memo.kind, 'dropper-entry-memo', '覚え書きの目印');
-    eq(memo.items.length, 2, '★ 渡した鍵の分だけ入れる（同じ鍵は1回。端末のほかの様式の覚えは配らない）');
-    check(!/山田|伊藤|1950/.test(JSON.stringify(memo)), '★ 覚え書きに名簿は入らない');
-
-    store = {};
-    eq(M.memoIn(memo), 2, '読み込むと、その数だけ入る');
-    eq(M.prefs.get('L1111111122222222'), { rows: { B: [5, 19] }, taught: [] }, '中身が戻る');
-
-    store = {};
-    eq(M.memoIn(null), -1, '覚え書きでないものは断る（空）');
-    eq(M.memoIn({ kind: 'other', items: [] }), -1, '覚え書きでないものは断る（目印ちがい）');
-    eq(M.memoIn({ kind: 'dropper-entry-memo', version: 1 }), -1, '中身が並びでなければ断る');
-    eq(M.memoIn({ kind: 'dropper-entry-memo', items: [] }), 0, '空の覚え書きは0件');
-
-    // ★ 外から来るファイル。知らない名前の中身は捨てる
-    store = {};
-    var got = M.memoIn({ kind: 'dropper-entry-memo', items: [
-      { key: 'L1111111122222222', prefs: { rows: { B: [5, 9] }, people: [{ name: '山田 太郎' }], script: 'alert(1)' } },
-      { key: '../../evil', prefs: { rows: {} } },
-      { key: 'L3333333344444444', prefs: 'ただの文字' },
-      { key: 'L5555555566666666', prefs: { people: [{ name: '伊藤 美穂' }] } }
-    ] });
-    eq(got, 1, '★ 受け取れるものだけを数える');
-    eq(M.prefs.get('L1111111122222222'), { rows: { B: [5, 9] } },
-      '★ 知らない名前の中身（人の名前や script）は捨てる');
-    eq(M.prefs.get('L5555555566666666'), null, '知らない名前だけの覚えは入れない');
-    delete global.localStorage;
-  })();
-
+  // ★ 覚えたことを配る仕組み（覚え書き）は 2026-09-22 に外した。
+  //   申込書は大会事務局から必ずもらえるので、会員どうしで配る必要がなかった。
+  //   外に出す口が無いことを、ここで確かめる（戻すときは PR #106）
+  check(!M.memoOf && !M.memoIn, '★ 覚えたことを外へ出す口は無い');
   var memoSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
-  check(memoSrc.indexOf('M.memoOf(memoKeys())') >= 0 && memoSrc.indexOf('M.memoIn(data)') >= 0,
-    '画面から覚え書きを書き出し・読み込みできる');
-  check(memoSrc.indexOf('if (f.size > 200000)') >= 0, '大きすぎるファイルは読まない');
-  check(memoSrc.indexOf('if (state.form && state.roster) analyze();') >= 0,
-    '★ 読み込んだら、その場で読み直す（申込書を入れ直さなくてよい）');
   var memoHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  check(/id="memoImport"/.test(memoHtml) && /id="memoExport"/.test(memoHtml) && /id="memoInput"/.test(memoHtml),
-    '覚え書きのボタンが画面にある');
+  check(memoSrc.indexOf('memo') < 0 && memoHtml.indexOf('memo') < 0,
+    '★ 画面にも覚え書きの残りかすが無い');
 
   // ★ ③で使う鍵は、シートの形（どこにセルがあるか・結合）だけで作る。文字は見ない
   var gA = [{ ref: 'A1', row: 1, col: 1, text: '第1回 テスト大会' }, { ref: 'B5', row: 5, col: 2, text: '' }];

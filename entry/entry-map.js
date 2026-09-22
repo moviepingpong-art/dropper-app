@@ -483,45 +483,13 @@
     return out;
   }
 
-  // ===== 覚え書きの受け渡し（2026-09-20） =====
-  // ★ 団体の幹事が1回教えて、申込書と一緒に配れるようにする。受け取った人は教え直さずに使える。
-  //   中身は**列と行の番号、欄の対応、書き方だけ**（名簿は入らない）。
-  //   ★ 外から来るファイルなので、**知っている名前の中身だけを残す**。
-  //     中の値そのものは、使う所（EntryBlank.manual・applyOverrides・normalize）が検めている
-  var MEMO_KIND = 'dropper-entry-memo';
-  var MEMO_FIELDS = { rows: 1, taught: 1, fmt: 1, fields: 1, ageClasses: 1,
-    eventWrite: 1, eventFmt: 1, feeCount: 1, feeManual: 1 };
-
-  function memoOf(keys) {
-    var items = [], seen = {};
-    (keys || []).forEach(function (k) {
-      if (!k || seen[k]) return;
-      seen[k] = true;
-      var p = prefs.get(k);
-      if (p) items.push({ key: String(k), prefs: p });
-    });
-    return { kind: MEMO_KIND, version: 1, items: items };
-  }
-
-  // 覚え書きを取り込む。戻り値は入れた数（-1 = 覚え書きではない）
-  function memoIn(data) {
-    if (!data || data.kind !== MEMO_KIND || !Array.isArray(data.items)) return -1;
-    var n = 0;
-    data.items.forEach(function (it) {
-      if (!it || typeof it.key !== 'string' || !/^[A-Za-z0-9]{8,80}$/.test(it.key)) return;
-      var src = it.prefs;
-      if (!src || typeof src !== 'object') return;
-      var clean = {};
-      Object.keys(src).forEach(function (f) { if (MEMO_FIELDS[f]) clean[f] = src[f]; });
-      if (!Object.keys(clean).length) return;
-      prefs.put(it.key, clean);
-      n++;
-    });
-    return n;
-  }
+  // ★ 覚えたことをファイルにして配る仕組み（memoOf / memoIn）は、
+  //   2026-09-22 に本人の指示で外した。申込書は大会事務局から必ずもらえるので、
+  //   会員どうしで配る必要がなかった。戻すときは PR #106 を見ること。
+  //   教える・覚える（prefs）はそのまま残っている
 
   global.EntryMap = {
     FIELDS: FIELDS, normalize: normalize, slotsFor: slotsFor, tableKey: tableKey, applyOverrides: applyOverrides,
-    formKey: formKey, layoutKey: layoutKey, prefs: prefs, memoOf: memoOf, memoIn: memoIn, sameLabel: sameLabel, nearestCols: nearestCols, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
+    formKey: formKey, layoutKey: layoutKey, prefs: prefs, sameLabel: sameLabel, nearestCols: nearestCols, ageClassesIn: ageClassesIn, ageClassOf: ageClassOf, feeIn: feeIn
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -115,8 +115,6 @@
     button:disabled { opacity:.5; cursor:default; box-shadow:none; }
     .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
     .btn-sub { background:#fff !important; color:var(--teal-d) !important; border:2px solid var(--teal) !important; box-shadow:none !important; }
-    .link-btn { background:none !important; box-shadow:none !important; color:var(--teal-d) !important;
-      padding:0; font-size:12.5px; text-decoration:underline; border-radius:0; }
 
     .msg { margin:12px 0 0; font-size:13.5px; font-weight:700; min-height:1.4em; }
     .msg.wait { color:var(--sub); }
@@ -315,12 +313,6 @@
       </div>
       <input type="file" id="formInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       <p class="hint" data-i18n="formNote">名前だけを書いてから入れてください。</p>
-      <!-- ★ 覚え書き（2026-09-20）。団体で1回教えれば、みんなが教え直さずに使える -->
-      <p class="small">
-        <button type="button" id="memoImport" class="link-btn" data-i18n="memoImport">覚え書きを読み込む</button>
-      </p>
-      <p class="hint" data-i18n="memoNote">同じ大会の申込書を使う人から覚え書きをもらったら、ここで読み込みます。</p>
-      <input type="file" id="memoInput" accept=".json,application/json" hidden>
       <p class="msg" id="formMsg"></p>
     </section>
 
@@ -347,9 +339,6 @@
       <p class="hint" data-i18n="shrinkNote">Excel の「縮小して全体を表示」を付けます。</p>
       <div class="btns"><button type="button" id="saveBtn" data-i18n="saveBtn">記入済みの申込書を保存</button></div>
       <p class="hint" data-i18n="saveNote">元の申込書は変わりません。</p>
-      <p class="small">
-        <button type="button" id="memoExport" class="link-btn" data-i18n="memoExport">この申込書の覚え書きを保存（ほかの人に配る用）</button>
-      </p>
       <p class="msg" id="saveMsg"></p>
     </section>
 

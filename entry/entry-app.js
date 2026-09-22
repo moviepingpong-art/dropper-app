@@ -800,26 +800,6 @@
     setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
   }
 
-  // ★ 覚え書き（2026-09-20）。団体の幹事が1回教えて、申込書と一緒に配る
-  function downloadText(text, name, type) {
-    var blob = new Blob([text], { type: type || 'application/json' });
-    var url = URL.createObjectURL(blob);
-    var a = h('a', { href: url, download: name });
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
-  }
-
-  // いま入れてある申込書に関わる覚えだけを渡す（端末のほかの様式の覚えは配らない）
-  function memoKeys() {
-    var keys = [];
-    (state.sheets || []).forEach(function (sh) {
-      if (sh.layoutKey) keys.push(sh.layoutKey);
-      if (sh.key) keys.push(sh.key);
-    });
-    return keys;
-  }
-
   /* ===== ③ 名前の確認 ===== */
   function analyze() {
     if (!state.form || !state.roster) return;
@@ -2028,33 +2008,6 @@
   }
 
   wireDrop('formDrop', 'formInput', 'formPick', onForm);
-  el('memoExport').addEventListener('click', function () {
-    var memo = M.memoOf(memoKeys());
-    if (!memo.items.length) { setMsg('saveMsg', t('memoNone'), 'wait'); return; }
-    downloadText(JSON.stringify(memo, null, 1), t('memoFile'));
-    setMsg('saveMsg', t('memoSaved', { n: memo.items.length }), 'ok');
-  });
-  el('memoImport').addEventListener('click', function () {
-    var inp = el('memoInput');
-    inp.value = '';
-    inp.click();
-  });
-  el('memoInput').addEventListener('change', function () {
-    var f = this.files && this.files[0];
-    if (!f) return;
-    if (f.size > 200000) { setMsg('formMsg', t('memoTooBig'), 'ng'); return; }
-    var fr = new FileReader();
-    fr.onload = function () {
-      var data = null;
-      try { data = JSON.parse(String(fr.result)); } catch (e) {}
-      var n = M.memoIn(data);
-      if (n < 0) { setMsg('formMsg', t('memoBad'), 'ng'); return; }
-      setMsg('formMsg', t('memoLoaded', { n: n }), n ? 'ok' : 'wait');
-      // 読み込んだ覚えで読み直す（もう申込書が入っていれば）
-      if (state.form && state.roster) analyze();
-    };
-    fr.readAsText(f);
-  });
   wireDrop('rosterDrop', 'rosterInput', 'rosterPick', onRosterFile);
   el('rosterNew').addEventListener('click', function (ev) { ev.stopPropagation(); onNewRoster(); });
   el('rosterClose').addEventListener('click', onCloseRoster);
