@@ -245,6 +245,73 @@ else {
   }
 }
 
+/* ---------- 8. 「何ができる？」ポップアップ ---------- */
+/* ★ 2026-09-22、本人の指示で entry にも同じものを置いた。
+ *   置かなかった唯一の理由が「写しが黙ってずれる」ことだったので、ここで見張る。
+ *   本ごとに違ってよいのは3つだけ。それを同じ印に直してから比べる。
+ *     - data-home（開いたとき、どのパネルから見せるか）
+ *     - 最初に開いているタブとパネル（aria-selected / .tm-panel.on）
+ *     - 「いま使っています」の印と、ほかへの入口（tm-here / tm-go）
+ *   calendar は末尾に出欠の案内がもう1段あるので、この比べには入れない。
+ */
+section('8. 「何ができる？」ポップアップ（schedule・decide・entry で同じ中身）');
+{
+  const pickModal = (rel) => {
+    const p = path.join(ROOT, rel);
+    if (!exists(p)) return null;
+    const s = fs.readFileSync(p, 'utf8');
+    const i = s.indexOf('<div id="tools-modal"');
+    if (i < 0) return null;
+    const j = s.indexOf('\n  </div>', i);
+    return j < 0 ? null : s.slice(i, j + 9);
+  };
+  const norm = (b) => b
+    .replace(/data-home="[a-z]+"/, 'data-home="X"')
+    .replace(/<span class="tm-here"[^>]*>[^<]*<\/span>/g, '[LINK]')
+    .replace(/<a class="tm-go"[^>]*>[^<]*<\/a>/g, '[LINK]')
+    .replace(/aria-selected="(true|false)"/g, 'aria-selected="X"')
+    .replace(/class="tm-panel on"/g, 'class="tm-panel"')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const base = pickModal('decide/index.html');
+  if (!base) skipped('decide/index.html にポップアップが無い');
+  else {
+    for (const rel of ['schedule/index.html', 'entry/index.html']) {
+      const b = pickModal(rel);
+      if (!b) { bad(rel + ' にポップアップが無い'); continue; }
+      if (norm(b) === norm(base)) { ok(rel + ' は decide と同じ中身'); continue; }
+      // どこから食い違うかを出す。直す手がかりになる
+      const a = norm(base), c = norm(b);
+      let k = 0;
+      while (k < Math.min(a.length, c.length) && a[k] === c[k]) k++;
+      bad(rel + ' が decide とずれている（' + k + '字目から）\n'
+        + '       decide: ' + JSON.stringify(a.slice(k, k + 90)) + '\n'
+        + '       こちら: ' + JSON.stringify(c.slice(k, k + 90)));
+    }
+    // 文言の鍵も、増減していないか見る（中身の訳は本ごとに同じ日本語のはず）
+    const tmKeys = (file) => {
+      const p = path.join(ROOT, file);
+      if (!exists(p)) return null;
+      const s = fs.readFileSync(p, 'utf8');
+      const ja = s.slice(0, s.indexOf('\n    en: {') > 0 ? s.indexOf('\n    en: {') : s.length);
+      return (ja.match(/^      (tm[A-Z]\w*):/gm) || []).map((x) => x.trim().slice(0, -1)).sort();
+    };
+    const kd = tmKeys('decide/decide-i18n.js');
+    const ke = tmKeys('entry/entry-i18n.js');
+    if (!kd || !ke) skipped('文言の辞書が読めない');
+    else {
+      // entry は自分なので tmGoEntry を持たず、代わりに tmGoDecide を持つ
+      const want = kd.filter((k) => k !== 'tmGoEntry').concat(['tmGoDecide']).sort();
+      const lack = want.filter((k) => !ke.includes(k));
+      const extra = ke.filter((k) => !want.includes(k));
+      if (lack.length) bad('entry の文言に足りない鍵: ' + lack.join(', '));
+      if (extra.length) bad('entry の文言に余分な鍵: ' + extra.join(', '));
+      if (!lack.length && !extra.length) ok('文言の鍵が decide と揃っている（' + ke.length + '件）');
+    }
+  }
+}
+
 /* ---------- まとめ ---------- */
 console.log('\n' + '='.repeat(56));
 if (ng === 0) {

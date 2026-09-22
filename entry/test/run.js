@@ -511,12 +511,26 @@ function mapSection(roster) {
   eq(Object.keys(wantKeys).filter(function (k) { return i18nSrc.indexOf('\n      ' + k + ':') < 0; }), [],
     '★ 画面が呼ぶ文言は、すべて entry-i18n.js にある');
 
-  // ★ 「何ができる？」は申込書ドロッパーのことだけを書く（2026-09-22）。
-  //   ほかの3本の「4つのドロッパー」（#tools-modal・tm* の鍵）をここへ写すと、
-  //   向こうを直したとき黙ってずれる。写しが紛れ込んだら落とす
-  check(/id="what-modal"/.test(html) && /id="whatBtn"/.test(html), '「何ができる？」が画面にある');
-  check(!/tools-modal|tm-card|\btmTitle\b/.test(html) && !/\btm[A-Z]/.test(i18nSrc),
-    '★ ほかの3本の「4つのドロッパー」を写していない');
+  // ★ 「何ができる？」はほかの3本と同じもの（2026-09-22、本人の指示で写した）。
+  //   ずれていないかは tools/sync-check.js の 8 が見る。ここでは、この画面の側だけを見る
+  check(/id="tools-modal"/.test(html) && /id="whatBtn"/.test(html), '「何ができる？」が画面にある');
+  check(/data-home="entry"/.test(html), '★ 開いたとき申込書のパネルから見せる（data-home）');
+  check(/aria-selected="true"\s+id="tmTabEntry"/.test(html) &&
+        /<div class="tm-panel on" data-panel="entry"/.test(html) &&
+        (html.match(/class="tm-panel on"/g) || []).length === 1,
+    '★ 最初に開いているタブとパネルが申込書（1つだけ）');
+  check(/<span class="tm-here"[\s\S]{0,400}?data-panel="entry"/.test(html) === false &&
+        /data-panel="entry"[\s\S]*?<span class="tm-here"/.test(html),
+    '★ 「いま使っています」の印は申込書のパネルにある');
+  check(!/id="tmGoEntry"/.test(html) && /id="tmGoDecide"/.test(html),
+    '★ 自分への入口は出さず、決めごとへの入口は出す');
+  // ★ 図の組（.sheet .bar .fig）は短い名前。申込書ドロッパーの .sheet は「Excelのシート」で
+  //   ③④が使っている。囲いの外に置くと、シートの見出しが78pxの白い箱に化ける（2026-09-22）
+  check(!/\n    \.(bar|fig|tbl|chk|cal|bub|sheet\.wide)[ .{]/.test(html),
+    '★ ポップアップの図の組は #tools-modal の中だけに効かせてある');
+  // .sheet だけは申込書ドロッパー自身も使う（Excel のシート）。図のほうが外に出ていないか見る
+  check(/\n    \.sheet \{ margin:0 0 18px; \}/.test(html) && !/\n    \.sheet \{ width:/.test(html),
+    '★ 申込書ドロッパー自身の .sheet（Excelのシート）が、図の .sheet に潰されていない');
 
   // ★ 日本語のみと決めたので、他言語版への指示は書かない（CLAUDE.md「申込書ドロッパーは日本語のみ」）
   // ★ 「hreflang」の語ではなく、実際の属性を見る。説明のコメントに反応してはいけない（2026-09-19 に踏んだ）

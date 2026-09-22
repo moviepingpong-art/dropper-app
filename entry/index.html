@@ -73,7 +73,8 @@
       border-color:transparent; color:#fff; cursor:default; transform:none;
       background:linear-gradient(100deg,var(--teal),var(--teal-d));
     }
-    /* タブ列の右端。押すと申込書ドロッパーの説明が出る（ほかの3本と同じ位置・同じ見た目） */
+    /* タブ列の右端。3本それぞれで何ができるかのポップアップを開く。
+       タブ自体は今までどおり直行させ、説明はこのボタンに分ける（毎回1クリック増やさないため）。 */
     .what-btn {
       font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; cursor:pointer;
       display:inline-flex; align-items:center; gap:6px;
@@ -83,30 +84,115 @@
     }
     .what-btn:hover { background:#f0fffb; transform:translateY(-1px); }
 
-    /* ===== 「何ができる？」ポップアップ（#what-modal） ===== */
-    #what-modal { position:fixed; inset:0; z-index:1080; display:none; align-items:center; justify-content:center;
-      background:rgba(15,61,58,.45); padding:18px; }
-    #what-modal.show { display:flex; }
-    .wm-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
+    /* ===== 「何ができる？」ポップアップ（#tools-modal） =====
+       中で3本を選び直せる。図は SVG ではなく HTML+CSS で組んである。
+       ラベルが普通のテキストなので data-i18n がそのまま効き、英語で文字幅が伸びても折り返せるため。 */
+    #tools-modal { position:fixed; inset:0; z-index:1080; display:none; align-items:center; justify-content:center;
+      background:rgba(15,61,58,.45); backdrop-filter:blur(3px); padding:18px; }
+    #tools-modal.show { display:flex; }
+    #tools-modal .tm-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%;
       padding:24px 22px; box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
-    .wm-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:20px;
-      margin:0 0 5px; color:var(--teal-d); line-height:1.35; }
-    .wm-lead { color:var(--sub); font-size:13.5px; margin:0 0 16px; }
-    /* 入れるもの → 出てくるもの。SVG ではなく箱で組む（文字が折り返せるように） */
-    .wm-fig { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; margin:0 0 6px; }
-    .wm-box { border:2px solid var(--teal); border-radius:12px; background:#f7fffd;
-      padding:10px 12px; font-size:12.5px; font-weight:700; color:var(--teal-d); text-align:center; min-width:96px; }
-    .wm-box.out { background:linear-gradient(100deg,var(--yellow),var(--lime)); border-color:transparent; color:var(--ink); }
-    .wm-op { font-size:16px; font-weight:700; color:var(--sub); }
-    .wm-cap { text-align:center; font-size:11.5px; color:var(--sub); margin:0 0 16px; }
-    .wm-card h3 { font-size:14px; margin:0 0 8px; color:var(--teal-d); }
-    .wm-list { margin:0 0 16px; padding-left:0; list-style:none; font-size:13px; color:var(--ink); line-height:1.8; }
-    .wm-list li { padding-left:17px; position:relative; }
-    .wm-list li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
-    .wm-safe { border:2px solid var(--teal); border-radius:12px; background:#f0fffb;
-      padding:10px 12px; font-size:12.5px; color:var(--sub); margin:0 0 16px; line-height:1.8; }
-    .wm-btns { display:flex; justify-content:flex-end; }
-    @media (max-width:640px) { .wm-fig { flex-direction:column; } }
+    #tools-modal .tm-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px;
+      margin:0 0 5px; color:var(--teal-d); line-height:1.3; }
+    #tools-modal .tm-intro { color:var(--sub); font-size:13.5px; margin:0 0 15px; }
+    #tools-modal .tm-tabs { display:flex; flex-wrap:wrap; gap:7px; margin:0 0 15px; }
+    #tools-modal .tm-tab {
+      flex:1; font-family:'Zen Maru Gothic',sans-serif; font-size:13.5px; font-weight:700; cursor:pointer;
+      padding:9px 6px; border-radius:13px; color:var(--teal-d);
+      background:#fff; border:2px solid var(--line); white-space:nowrap;
+      transition:border-color .15s, background .15s;
+    }
+    #tools-modal .tm-tab:hover { border-color:var(--teal); background:#f0fffb; }
+    #tools-modal .tm-tab[aria-selected="true"] {
+      border-color:transparent; color:var(--ink);
+      background:linear-gradient(100deg,var(--yellow),var(--lime));
+      box-shadow:0 6px 16px rgba(163,230,53,.3);
+    }
+    #tools-modal .tm-panel { display:none; }
+    #tools-modal .tm-panel.on { display:block; animation:tmIn .28s ease both; }
+    @keyframes tmIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    #tools-modal .tm-name { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:17px; margin:0 0 3px; color:var(--ink); }
+    #tools-modal .tm-one { font-size:13.5px; color:var(--sub); margin:0 0 13px; }
+
+    /* --- 図。横に入りきらない画面では図だけが横スクロールする（本文は折り返さない） --- */
+    #tools-modal .fig { display:flex; align-items:center; gap:9px; flex-wrap:nowrap;
+      padding:15px 12px; border-radius:16px; overflow-x:auto;
+      background:linear-gradient(135deg,#f0fffb,#f8ffe9); border:2px solid var(--line); }
+    #tools-modal .fig-col { display:flex; flex-direction:column; align-items:center; gap:6px; flex:none; }
+    #tools-modal .fig-cap { font-size:11px; font-weight:700; color:var(--teal-d); white-space:nowrap; }
+    #tools-modal .fig-arrow { flex:none; font-size:17px; font-weight:700; color:var(--lime-d); }
+    #tools-modal .sheet { width:78px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
+    #tools-modal .sheet.wide { width:92px; }
+    #tools-modal .bar { height:4px; border-radius:2px; background:var(--line); }
+    #tools-modal .bar.t { height:6px; background:var(--lime); width:80%; }
+    #tools-modal .bar.hi { background:var(--yellow); }
+    #tools-modal .bar.tl { background:#9fdcd5; }
+    #tools-modal .bar.s { width:60%; }
+    #tools-modal .tbl { display:grid; grid-template-columns:14px 1fr; gap:2.5px 4px; }
+    #tools-modal .tbl i { display:block; height:4px; border-radius:2px; background:var(--yellow); }
+    #tools-modal .tbl b { display:block; height:4px; border-radius:2px; background:var(--line); }
+    #tools-modal .cal { width:82px; background:#fff; border:2px solid var(--teal); border-radius:8px; overflow:hidden; }
+    #tools-modal .cal-top { height:9px; background:linear-gradient(100deg,var(--teal),var(--teal-d)); }
+    #tools-modal .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; padding:5px; }
+    #tools-modal .cal-grid s { display:block; height:6px; border-radius:1.5px; background:#eef6f4; }
+    #tools-modal .cal-grid s.f { background:var(--lime); }
+    #tools-modal .cal-grid s.f1 { background:var(--yellow); box-shadow:0 0 0 1.5px var(--lime-d); }
+    #tools-modal .bub { position:relative; width:82px; background:#fff; border:2px solid var(--teal);
+      border-radius:9px; padding:7px 6px; display:flex; flex-direction:column; gap:3.5px; }
+    #tools-modal .bub::after { content:''; position:absolute; left:12px; bottom:-8px; width:0; height:0;
+      border:6px solid transparent; border-top-color:var(--teal); border-bottom:0; }
+    /* ★必ず .fig で囲うこと。裸の .chk にすると、カード見出しの
+       <label class="chk">（ファイル名のチェックボックス）にも当たってしまい、
+       width:86px と flex-direction:column が効いてファイル名が1文字ずつ縦に並ぶ。 */
+    #tools-modal .fig .chk { width:86px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 6px; display:flex; flex-direction:column; gap:4.5px; }
+    #tools-modal .fig .chk div { display:flex; align-items:center; gap:4px; }
+    #tools-modal .fig .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
+    #tools-modal .fig .chk .bar { flex:1; }
+    #tools-modal .chat { width:80px; background:#fff; border:2px solid var(--teal); border-radius:8px;
+      padding:7px 5px; display:flex; flex-direction:column; gap:4px; }
+    #tools-modal .chat u { display:block; height:9px; border-radius:5px; background:var(--line); width:74%; }
+    #tools-modal .chat u.r { margin-left:auto; background:#c8f0a8; width:62%; }
+    #tools-modal .bins { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    #tools-modal .bin { background:#fff; border:2px solid var(--line); border-radius:8px;
+      padding:5px 6px; font-size:10px; font-weight:700; color:var(--teal-d); white-space:nowrap; }
+    #tools-modal .bin.a { border-color:var(--lime-d); }
+    #tools-modal .bin.b { border-color:var(--yellow); }
+
+    #tools-modal .tm-tags { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 0; }
+    #tools-modal .tm-tag { font-size:11.5px; font-weight:700; color:var(--teal-d);
+      background:rgba(6,182,164,.13); border-radius:999px; padding:4px 11px; }
+    #tools-modal .tm-btns { display:flex; gap:9px; flex-wrap:wrap; margin-top:16px; align-items:center; }
+    #tools-modal .tm-go { font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700; color:#fff;
+      border:none; border-radius:999px; padding:11px 22px; cursor:pointer; text-decoration:none;
+      display:inline-block;
+      background:linear-gradient(100deg,var(--teal),var(--lime-d)); box-shadow:0 6px 16px rgba(6,182,164,.32); }
+    #tools-modal .tm-go:hover { transform:translateY(-2px); box-shadow:0 9px 22px rgba(6,182,164,.4); }
+    /* いま開いているドロッパーはリンクにしない（タブの .on と同じ考え方） */
+    #tools-modal .tm-here { font-size:13px; font-weight:700; color:var(--sub);
+      border:2px solid var(--line); border-radius:999px; padding:9px 18px; background:#fff; }
+    #tools-modal .tm-close { font-family:'Zen Maru Gothic',sans-serif; font-size:13px; font-weight:700; color:var(--sub);
+      background:none; border:none; cursor:pointer; text-decoration:underline; padding:9px 4px; }
+    #tools-modal .tm-foot { font-size:11px; color:var(--sub); margin:13px 0 0; }
+    /* LINE公式アカウントへの導線（日本語のときだけ表示。出し分けは i18n.js の applyDom）。
+       ツール本体の画面は汚さず、この説明ポップアップの中だけに置く。 */
+    #tools-modal .tm-line { display:flex; align-items:center; gap:14px; margin:16px 0 0; padding:13px 15px;
+      background:#f2fbf5; border:1px solid rgba(6,199,85,.35); border-radius:12px; }
+    #tools-modal .tm-line-body { flex:1; min-width:0; }
+    #tools-modal .tm-line-title { font-size:13px; font-weight:700; color:#06843a; margin:0 0 3px; }
+    #tools-modal .tm-line-text { font-size:12px; color:var(--sub); line-height:1.7; margin:0 0 9px; }
+    #tools-modal .tm-line-btn { display:inline-block; font-family:'Zen Maru Gothic',sans-serif; font-size:13px;
+      font-weight:700; color:#fff; background:#06C755; text-decoration:none; padding:8px 16px;
+      border-radius:8px; box-shadow:0 5px 14px rgba(6,199,85,.32); transition:transform .2s,box-shadow .2s; }
+    #tools-modal .tm-line-btn:hover { transform:translateY(-2px); box-shadow:0 8px 18px rgba(6,199,85,.42); }
+    #tools-modal .tm-line-qr { flex-shrink:0; text-align:center; }
+    #tools-modal .tm-line-qr img { display:block; width:84px; height:84px; border:1px solid var(--line);
+      border-radius:8px; background:#fff; padding:4px; }
+    #tools-modal .tm-line-cap { font-size:9.5px; color:var(--sub); line-height:1.5; margin:4px 0 0; max-width:92px; }
+    /* 画面が狭いときはQRを隠す（ボタンから直行できるので困らない） */
+    @media (max-width:520px){ #tools-modal .tm-line-qr { display:none; } }
+    @media (prefers-reduced-motion: reduce){ #tools-modal .tm-panel.on { animation:none; } }
 
     .tool-hint { font-size:12px; color:var(--sub); margin:0 0 10px; }
     /* 狭い画面ではラベルを独立した行にして、タブが並んで入るようにする */
@@ -313,10 +399,9 @@
       <a class="tool-tab" href="/decide/" data-i18n="toolDecide">✅ 決めごと</a>
       <span class="tool-tab on" data-i18n="toolEntry">📝 申込書</span>
       <!-- ★ 申込書ドロッパー専用の説明（2026-09-22、本人の要望）。
-           ほかの3本にある「4つのドロッパー」のポップアップは、ここへ写さない。
-           あれは3本で同じ中身を保つ決まりの下にあり、4つ目の写しを作ると
-           向こうを直したとき黙ってずれる。ここは申込書のことだけを書く -->
-      <button type="button" id="whatBtn" class="what-btn" data-i18n="whatBtn">🔍 何ができる？</button>
+           ★ 中身は decide/index.html の写し。直すときは4本ぶん直すこと。
+           ずれたら tools/sync-check.js の 8 が落ちる -->
+      <button type="button" id="whatBtn" class="what-btn" data-i18n="tmBtn">🔍 何ができる？</button>
     </nav>
     <p class="tool-hint" data-i18n="toolHint">イベント＝チラシ1枚から1件 ／ 予定表＝1枚からまとめて何件も ／ 決めごと＝会話やメモから決まったこと ／ 申込書＝大会の申込書に、名簿から記入</p>
 
@@ -419,37 +504,225 @@
     </div>
   </div>
 
-  <!-- 「何ができる？」ポップアップ。申込書ドロッパーのことだけを書く。
-       ★ ほかの3本の「4つのドロッパー」を写さないこと（写すと向こうを直したときにずれる） -->
-  <div id="what-modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
-    <div class="wm-card">
-      <h2 id="wmTitle" data-i18n="whatTitle">📝 申込書ドロッパー、何ができる？</h2>
-      <p class="wm-lead" data-i18n="whatLead">大会の参加申込書（Excel）と名簿を入れると、記入済みにして返します。</p>
+  <!-- ★ これは decide/index.html の写し（2026-09-22）。直すときは4本ぶん直すこと。
+       ずれたら tools/sync-check.js の 8 が落ちる。
+       写すときに変えたのは3つだけ: data-home ／ 最初に開くタブ ／「いま使っています」の場所。
+       CSS は #tools-modal の中だけに効かせてある（.sheet が Excel のシートと衝突するため）。
+  「何ができる？」ポップアップ。3本それぞれの入力と出力を図で見せる。
+       いま開いているのは決めごとなので、決めごとのパネルだけ .tm-here（リンクにしない）。
+       移動先の href は i18n.js の applyDom が window.LANG を見て張り替える（直書きは ja 用の既定値）。 -->
+  <div id="tools-modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" data-home="entry">
+    <div class="tm-card">
+      <h2 id="tmTitle" data-i18n="tmTitle">🎁 3つのドロッパー、何ができる？</h2>
+      <p class="tm-intro" data-i18n="tmIntro">どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。</p>
 
-      <div class="wm-fig">
-        <span class="wm-box" data-i18n="whatFigRoster">名簿</span>
-        <span class="wm-op">＋</span>
-        <span class="wm-box" data-i18n="whatFigForm">大会の申込書（Excel）</span>
-        <span class="wm-op">→</span>
-        <span class="wm-box out" data-i18n="whatFigFilled">記入済みの申込書</span>
+      <div class="tm-tabs" role="tablist">
+        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="event" data-i18n="toolEvent">🎪 イベント</button>
+        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="schedule" data-i18n="toolSchedule">📅 予定表</button>
+        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="decide" data-i18n="toolDecide">✅ 決めごと</button>
+        <button class="tm-tab" type="button" role="tab" aria-selected="true"  id="tmTabEntry" data-tab="entry" data-i18n="toolEntry">📝 申込書</button>
       </div>
-      <p class="wm-cap" data-i18n="whatFigCap">左の2つを入れると、右が出てきます。</p>
 
-      <h3 data-i18n="whatCanTitle">できること</h3>
-      <ul class="wm-list">
-        <li data-i18n="whatCan1">名簿から、氏名・フリガナ・性別・生年月日・年齢・住所・電話番号を書き込みます。</li>
-        <li data-i18n="whatCan2">年齢は、申込書に書いてある基準日で計算します。4月2日生まれの1歳のずれも間違えません。</li>
-        <li data-i18n="whatCan3">西暦か和暦かは、申込書に指示が無ければ聞きます。勝手に決めません。</li>
-        <li data-i18n="whatCan4">罫線も列の幅も印刷の設定も、もらった様式のままです。書いた場所以外は一文字も変えません。</li>
-        <li data-i18n="whatCan5">どの欄に何を書くかは、書く前に一覧で見えます。違っていれば選び直せます。</li>
-        <li data-i18n="whatCan6">名簿もこのツールで作れます。競技によって要る項目（所属・学校名・身長など）は足せます。</li>
-      </ul>
-
-      <p class="wm-safe" data-i18n="whatSafe">申込書も名簿も、この端末の中（ブラウザ）だけで扱います。どこにも送りません。AI も使いません。無料で、登録も要りません。</p>
-
-      <div class="wm-btns">
-        <button type="button" class="btn-sub" data-wm-close data-i18n="whatClose">閉じる</button>
+      <!-- イベント：1枚 → 1件（＋案内文）。カレンダーのマスが1つだけ光るのが要点。 -->
+      <div class="tm-panel" data-panel="event" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameEvent">🎪 イベントドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneEvent">チラシ1枚から、予定1件と、そのまま配れる案内文。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="sheet" aria-hidden="true">
+              <span class="bar t"></span><span class="bar hi"></span><span class="bar tl s"></span>
+              <span class="bar"></span><span class="bar s"></span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigFlyer">チラシ1枚</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s></s><s></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s class="f1"></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s></s><s></s><s></s><s></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigOneEntry">カレンダーに1件</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">＋</span>
+          <div class="fig-col">
+            <div class="bub" aria-hidden="true">
+              <span class="bar t"></span><span class="bar"></span><span class="bar s"></span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigAnnounce">LINE/SNS案内文</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagEvent1">どんなイベントにも</span>
+          <span class="tm-tag" data-i18n="tmTagEvent2">日付・会場を自動で</span>
+          <span class="tm-tag" data-i18n="tmTagEvent3">案内文もワンタップ</span>
+        </div>
+        <div class="tm-btns">
+          <a class="tm-go" id="tmGoEvent" href="/calendar/" data-i18n="tmGoEvent">🎪 イベントドロッパーを使ってみる</a>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
       </div>
+
+      <!-- 予定表：1枚 → 何件も。マスが多数光ることと、間に「一覧で確認」が挟まるのが要点。 -->
+      <div class="tm-panel" data-panel="schedule" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameSchedule">📅 予定表ドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneSchedule">予定表1枚から、中の予定を全部。確認してからまとめて登録。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="sheet wide" aria-hidden="true">
+              <span class="bar t"></span>
+              <div class="tbl">
+                <i></i><b></b><i></i><b></b><i></i><b></b>
+                <i></i><b></b><i></i><b></b><i></i><b></b>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigSheet">予定表1枚</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="chk" aria-hidden="true">
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigReview">一覧で確認</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s class="f"></s><s></s><s class="f"></s><s></s><s></s><s class="f"></s>
+                <s class="f"></s><s></s><s class="f"></s><s></s><s class="f"></s><s></s><s></s>
+                <s></s><s class="f"></s><s></s><s></s><s class="f"></s><s class="f"></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigBulk">まとめて登録</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagSchedule1">1枚からまとめて</span>
+          <span class="tm-tag" data-i18n="tmTagSchedule2">マス目の予定表もOK</span>
+          <span class="tm-tag" data-i18n="tmTagSchedule3">二重登録を防ぐ</span>
+        </div>
+        <div class="tm-btns">
+          <a class="tm-go" id="tmGoSchedule" href="/schedule/" data-i18n="tmGoSchedule">📅 予定表ドロッパーを使ってみる</a>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <!-- 決めごと：会話・メモ → 4つに仕分け。カレンダーではなく仕分け箱が主役なのが要点。 -->
+      <div class="tm-panel" data-panel="decide" role="tabpanel">
+        <p class="tm-name" data-i18n="tmNameDecide">✅ 決めごとドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneDecide">会話やメモから、決まったこと・未決・やること・記録に仕分け。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="chat" aria-hidden="true">
+              <u></u><u class="r"></u><u></u><u class="r"></u>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigChat">会話・手書きメモ</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="bins">
+              <span class="bin a" data-i18n="tmBinDecided">✅ 決まった</span>
+              <span class="bin b" data-i18n="tmBinOpen">❓ 未決</span>
+              <span class="bin a" data-i18n="tmBinTodo">📌 やること</span>
+              <span class="bin" data-i18n="tmBinRecord">🗒 記録</span>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigSort">4つに仕分け</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="cal" aria-hidden="true">
+              <div class="cal-top"></div>
+              <div class="cal-grid">
+                <s></s><s></s><s></s><s class="f1"></s><s></s><s></s><s></s>
+                <s></s><s class="f1"></s><s></s><s></s><s></s><s></s><s></s>
+                <s></s><s></s><s></s><s></s><s></s><s class="f1"></s><s></s>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigDeadline">期限だけ登録</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagDecide1">ログイン不要で試せる</span>
+          <span class="tm-tag" data-i18n="tmTagDecide2">会話のスクショから</span>
+          <span class="tm-tag" data-i18n="tmTagDecide3">手書き・議事録もOK</span>
+        </div>
+        <div class="tm-btns">
+          <a class="tm-go" id="tmGoDecide" href="/decide/" data-i18n="tmGoDecide">✅ 決めごとドロッパーを使ってみる</a>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <!-- 申込書：申込書＋名簿 → 記入済み。空いていた欄が全部うまるのが要点。
+           日本語のみのツールなので、en/in では i18n.js がタブごと隠す。 -->
+      <div class="tm-panel on" data-panel="entry" role="tabpanel" id="tmPanelEntry">
+        <p class="tm-name" data-i18n="tmNameEntry">📝 申込書ドロッパー</p>
+        <p class="tm-one" data-i18n="tmOneEntry">大会の申込書に、名簿から生年月日・年齢・住所を埋めて返します。</p>
+        <div class="fig">
+          <div class="fig-col">
+            <div class="sheet wide" aria-hidden="true">
+              <span class="bar t"></span>
+              <div class="tbl">
+                <i></i><b></b><i></i><b></b><i></i><b></b>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigForm">申込書（空でも可）</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="chk" aria-hidden="true">
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+              <div><em></em><span class="bar"></span></div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigRoster">名簿から選ぶ</span>
+          </div>
+          <span class="fig-arrow" aria-hidden="true">→</span>
+          <div class="fig-col">
+            <div class="sheet wide" aria-hidden="true">
+              <span class="bar t"></span>
+              <div class="tbl">
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+            <span class="fig-cap" data-i18n="tmFigFilled">記入済みで保存</span>
+          </div>
+        </div>
+        <div class="tm-tags">
+          <span class="tm-tag" data-i18n="tmTagEntry1">ログイン不要で試せる</span>
+          <span class="tm-tag" data-i18n="tmTagEntry2">生年月日・年齢・住所を自動</span>
+          <span class="tm-tag" data-i18n="tmTagEntry3">名簿もこのツールで作れる</span>
+        </div>
+        <div class="tm-btns">
+          <span class="tm-here" data-i18n="tmHere">いま使っています</span>
+          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
+        </div>
+      </div>
+
+      <!-- LINE公式アカウントへの導線。日本語のときだけ出す（applyDom が制御）。
+           QRは /assets/line-qr.png（9フォルダ共通の絶対パス。index.html を同一に保つため）。
+           友だち追加URLはベーシックID @937eheeb から導出した標準形で、
+           LIFFランチャー（liff.line.me/...）とは別物。混同しないこと。 -->
+      <div class="tm-line" id="tmLine">
+        <div class="tm-line-body">
+          <p class="tm-line-title" data-i18n="tmLineTitle">LINEでも使えます</p>
+          <p class="tm-line-text" data-i18n="tmLineText">公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。</p>
+          <a class="tm-line-btn" href="https://line.me/R/ti/p/@937eheeb" target="_blank" rel="noopener" data-i18n="tmLineBtn">友だち追加して試す</a>
+        </div>
+        <div class="tm-line-qr">
+          <img src="/assets/line-qr.png" width="84" height="84" alt="">
+          <p class="tm-line-cap" data-i18n="tmLineQr">パソコンの方はスマホのLINEで読み取り</p>
+        </div>
+      </div>
+      <p class="tm-foot" data-i18n="tmFoot">※ 初回だけ自動で開きます。あとは「何ができる？」からいつでも見られます。</p>
     </div>
   </div>
 
