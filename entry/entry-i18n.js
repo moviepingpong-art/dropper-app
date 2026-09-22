@@ -96,7 +96,9 @@
       rosterSaved: '「{name}」を保存しました（{n}人）。次に使うときは、このファイルを入れてください。',
       rosterNewMsg: '新しい名簿を作り始めました。',
 
-      attendOpen: '出欠システムの名簿',
+      nameFromLabel: '名前の入れかた',
+      nameFromHint: '下の欄に1人ずつ入れます。出欠システムを使っている団体は、名前だけまとめて取り込めます。',
+      attendOpen: '出欠システムから取り込む',
       attendTitle: '出欠システムから名前を取り込む',
       attendHint: '出欠の回答URL（?s= を含むもの）か、団体IDを入れてください。取り込めるのは団体名・名前・性別だけです（生年月日・住所・電話は出欠システムにありません）。送るのは団体IDだけで、名簿の中身は送りません。',
       attendPlaceholder: 'https://app.dropper-tools.com/attend/?s=…',

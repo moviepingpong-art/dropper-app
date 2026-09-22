@@ -668,8 +668,9 @@
   /* ===== 出欠システムから名前を取り込む ===== */
   // ★ 取れるのは 団体名・氏名・性別 だけ（生年月日・住所・電話は向こうに無い）。
   //   送るのは団体IDだけで、名簿の中身は送らない。
+  // ★ 入口は名簿づくりの中だけ（2026-09-22）。①の枠の外は「新しく作る」だけにした。
+  //   ここへ来られる時点で名簿は開いているので、先に作る手当ては要らない
   function onAttendOpen() {
-    if (!state.book) openRoster(B.blank(), t('rosterNewMsg'));
     state.attend = null;
     renderAttendBox();
     el('attendBox').hidden = false;

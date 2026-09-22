@@ -487,6 +487,21 @@ function mapSection(roster) {
   var atLang = html.indexOf('window.LANG =');
   var atHits = html.indexOf('hits.sh/app.dropper-tools.com/entry.svg');
   check(atLang >= 0 && atHits >= 0 && atLang < atHits, '訪問者カウンターは window.LANG を設定したあとに走る');
+  // ★ entry-app.js が使う組（class）の見た目が、index.html にあるか（2026-09-22 に踏んだ）。
+  //   `.link-btn` を「覚え書きでしか使っていない」と思って消し、本番で「編集」「消す」「↑」「↓」
+  //   などが大きなボタンに化けた。index.html だけを検めたのが誤りで、使っていたのは JS のほう。
+  //   ★ 見た目の無い組は、増えたときに気づけるよう名前で許す（増やすときは、それでよいか考えること）
+  var NO_STYLE = { 'ok-text': 1, 'col-grid': 1, 'col-item': 1, 'val': 1 };
+  var appSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  var style = (html.match(/<style>[\s\S]*?<\/style>/) || [''])[0];
+  var usedClasses = {}, clsRe = /class:\s*'([^']*)'/g, cm;
+  while ((cm = clsRe.exec(appSrc))) {
+    cm[1].split(/\s+/).forEach(function (c) { if (/^[a-z][a-z0-9-]*$/.test(c)) usedClasses[c] = 1; });
+  }
+  check(Object.keys(usedClasses).length > 50, '組の名前を集められている（集め方が壊れたら気づく）');
+  eq(Object.keys(usedClasses).filter(function (c) { return !NO_STYLE[c] && style.indexOf('.' + c) < 0; }), [],
+    '★ entry-app.js が使う組は、すべて index.html に見た目がある');
+
   // ★ 日本語のみと決めたので、他言語版への指示は書かない（CLAUDE.md「申込書ドロッパーは日本語のみ」）
   // ★ 「hreflang」の語ではなく、実際の属性を見る。説明のコメントに反応してはいけない（2026-09-19 に踏んだ）
   check(!/<link\b[^>]*\bhreflang=/.test(html), 'index.html に hreflang の link が無い（日本語のみなので、他言語版への指示は嘘になる）');
