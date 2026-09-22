@@ -1988,24 +1988,64 @@
     STEPS.slice(i).forEach(function (s) { el(s).hidden = true; });
   }
 
-  /* ===== 「何ができる？」ポップアップ（#what-modal） =====
-     ★ 初回の自動表示はしない。ほかの3本で一度入れて外した（2026-09-03、利用者の判断）。
-       何も押していないのに説明が出るのは、初めての人ほど戸惑う。知りたい人が押す。
-     ★ 中身は申込書ドロッパーのことだけ。ほかの3本の「4つのドロッパー」を写さない */
-  function wireWhatModal() {
-    var m = el('what-modal');
+  /* ===== 「何ができる？」ポップアップ（#tools-modal） =====
+     ★ ほかの3本（decide-app.js）の写し。直すときは4本ぶん直すこと。
+     ずれたら tools/sync-check.js の 8 が落ちる */
+  // 「何ができる？」ポップアップ（#tools-modal）。3本それぞれの入力と出力を図で見せる。
+  // タブ（.tool-tab）は今までどおり直行させ、説明はこのポップアップに分けてある。
+  // タブを押すたびに説明を挟むと、行き来する人に毎回1クリック増えるため。
+  /* ★ 初回の自動表示はやめた（2026-09-03、利用者の判断）。**戻さないこと。**
+     何も押していないのに説明が出るのは、初めての人ほど戸惑う。
+     知りたい人は「何ができる？」を押す。押さない人には要らなかった、というだけ。
+     「見た印」（dropper_tools_seen）も一緒に消した——出し分ける必要がもう無い。 */
+
+  // 開くときは必ず「いま開いているドロッパー」のタブから見せる。
+  // どれが自分かは #tools-modal の data-home が持つ（3本でこのJSを同一に保つため）。
+  function openToolsModal_() {
+    var m = document.getElementById('tools-modal');
     if (!m) return;
-    function close() { m.classList.remove('show'); }
-    el('whatBtn').addEventListener('click', function () { m.classList.add('show'); });
-    // 背景を押す・「閉じる」を押す・Esc、のどれでも閉じる
-    m.addEventListener('click', function (ev) {
-      if (ev.target === m || (ev.target.hasAttribute && ev.target.hasAttribute('data-wm-close'))) close();
-    });
-    document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && m.classList.contains('show')) close();
-    });
+    selectToolsTab_(m.getAttribute('data-home') || 'event');
+    m.classList.add('show');
   }
-  wireWhatModal();
+  function closeToolsModal_() {
+    var m = document.getElementById('tools-modal');
+    if (m) m.classList.remove('show');
+  }
+
+  // 中のタブを切り替える（ポップアップを閉じずに3本を見比べられるようにする）
+  function selectToolsTab_(name) {
+    var m = document.getElementById('tools-modal');
+    if (!m) return;
+    var tabs = m.querySelectorAll('.tm-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].setAttribute('aria-selected', tabs[i].getAttribute('data-tab') === name ? 'true' : 'false');
+    }
+    var panels = m.querySelectorAll('.tm-panel');
+    for (var j = 0; j < panels.length; j++) {
+      var on = (panels[j].getAttribute('data-panel') === name);
+      if (on) { panels[j].classList.add('on'); } else { panels[j].classList.remove('on'); }
+    }
+  }
+
+  (function wireToolsModal_() {
+    var m = document.getElementById('tools-modal');
+    if (!m) return;
+
+    var btn = document.getElementById('whatBtn');
+    if (btn) btn.addEventListener('click', function () { openToolsModal_(); });
+
+    var tabs = m.querySelectorAll('.tm-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].addEventListener('click', function () { selectToolsTab_(this.getAttribute('data-tab')); });
+    }
+    // 背景をクリック、または「閉じる」で閉じる（「使ってみる」はそのまま移動する）
+    m.addEventListener('click', function (e) {
+      if (e.target === m || (e.target.hasAttribute && e.target.hasAttribute('data-tm-close'))) closeToolsModal_();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && m.classList.contains('show')) closeToolsModal_();
+    });
+  })();
 
   /* ===== 配線 ===== */
   function wireDrop(zoneId, inputId, pickId, handler) {
