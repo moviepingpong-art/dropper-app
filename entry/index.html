@@ -402,6 +402,14 @@
     .tbl-name { display:flex; gap:6px; align-items:center; flex-wrap:wrap; color:var(--sub); }
     input.tbl-name-in { flex:1 1 14em; min-width:0; font-family:inherit; font-size:13px; padding:5px 8px;
       border:1px solid var(--line); border-radius:8px; }
+    /* ===== シートを1枚ずつ（2026-09-24）。上にシートの札、下に前後のボタン ===== */
+    .sh-steps { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px; }
+    button.sh-step { font-family:inherit; font-size:13px; font-weight:700; padding:6px 12px; margin:0;
+      border-radius:999px; border:2px solid var(--line) !important; background:#fff !important;
+      color:var(--sub) !important; box-shadow:none !important; }
+    button.sh-step.on { border-color:var(--teal) !important; background:#eefaf7 !important; color:var(--teal-d) !important; }
+    button.sh-step.done { color:var(--teal-d) !important; }
+    .sh-nav { justify-content:space-between; }
     /* 教える画面：押せるマスと、押して選んだ範囲 */
     table.sv.sv-click td.sv-c { cursor:pointer; }
     table.sv.sv-click td.sv-c:hover { background:#fff7cc; }

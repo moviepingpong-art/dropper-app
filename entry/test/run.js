@@ -1978,6 +1978,23 @@ function viewSection() {
   eq(V.activeTable(two, [[], []], 1), 1, '開いた表が「いま入れている表」');
   eq(V.marks([tb5], [[]]).B6.g, 0, '印には表の番号が付く（表ごとに色を分けるため）');
 
+  // ★ 本物のスポレク（2026-09-24）：連絡責任者（1人）の表と選手（6人）の表が同じB列に上下、それが3シート
+  var chief = { nameCol: 'B', headerRow: 9, firstRow: 10, lastRow: 10, rows: [10], label: '連絡責任者' };
+  eq(V.titleOf(mk({ B8: '連絡責任者', B9: '氏名', A5: '参加チーム名: 白山クラブ' }), [], chief, [chief]), '連絡責任者',
+    '★ 名前の列の見出しのすぐ上の語（連絡責任者）を先に使う。札の語でも、表の真上に1つなら題');
+  eq(V.titleOf(mk({ B9: '氏名', A8: '参加チーム名: 白山クラブ' }),
+    [], { nameCol: 'B', headerRow: 9, firstRow: 10, lastRow: 10, rows: [10] }, []), '',
+    '★ 「札: 中身」を1つのセルに書いたものは題にしない（チーム名を表の名前にしていた）');
+  eq(V.titleOf(mk({ B9: '氏名' }), [], { nameCol: 'B', headerRow: 9, firstRow: 10, lastRow: 10, rows: [10],
+    label: '電話: 090-1234' }, []), '', 'すぐ上の語でも、書き込まれた中身なら使わない');
+
+  // シートの表がぜんぶ埋まったか（埋まったら次のシートへ）
+  var sp = [{ rows: [10] }, { rows: [13, 14, 15] }];
+  eq(V.sheetDone(sp, [[1], [1, 2, 3]], null), true, '★ シートの表がぜんぶ埋まったら「そろった」');
+  eq(V.sheetDone(sp, [[1], [1, 2]], null), false, '★ 連絡責任者だけ入れても、選手の表に空きがあれば「そろった」ではない');
+  eq(V.sheetDone(sp, [[1], [1, 2, 3]], { 1: true }), false, '2枚目を足す表はいくらでも入るので「そろった」にならない');
+  eq(V.sheetDone([], [], null), false, '表の無いシートは「そろった」にならない（教える途中など）');
+
   // 本人が付けた名前は覚える（同じ形の申込書で次から付いた状態になる）
   var named = [{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [6, 7, 8, 9], userName: '女子の部' }];
   var memo = B_.remember(named);
@@ -2003,6 +2020,16 @@ function viewSection() {
     '表がちょうど埋まったら、次の表へ移る');
   check(appSrc.indexOf("tb.headerRow) ? V.titleOf(") >= 0,
     '★ 教えた表（見出しが無い）では、すぐ上の見出しの行を題として拾わない');
+  // シートを1枚ずつ（2026-09-24、本人の要望。本物のスポレクは3シートが一気に並んでいた）
+  check(appSrc.indexOf('if (multi && si !== state.sheetAt) return;') >= 0, '★ ③はシートを1枚ずつ見せる');
+  check(/var lastSheet = [^\n]*\n[\s\S]{0,200}if \(!lastSheet\) \{\s*el\('namesNext'\)\.disabled = true;/.test(appSrc),
+    '★ 最後のシートまで来るまで、④へは進ませない');
+  check(appSrc.indexOf('afterPick(sh);') >= 0 && /function afterPick[\s\S]{0,300}V\.sheetDone\(sh\.tables, sh\.picks, sh\.more\)[\s\S]{0,80}state\.sheetAt = si \+ 1;/.test(appSrc),
+    '★ シートの表がぜんぶ埋まったら、次のシートへ移る');
+  check(/t\('shMoved'[^\n]*\n\s*\}/.test(appSrc),
+    '「次のシートに移りました」は描き直しで消さない（toggle の描き直しですぐ消えていた）');
+  check(appSrc.indexOf("act >= 0 ? t('pickMoreRoom'") >= 0,
+    '★ いまのシートにまだ空きのある表があれば「次へ進んでください」と言わない（連絡責任者だけで終わったように見えた）');
   var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   check(appSrc.indexOf('V.marks(sh.tables, sh.picks)') >= 0 && appSrc.indexOf('V.focusOf(sh.tables)') >= 0,
     '③の見取り図は、表と選んだ人から印を付ける');
