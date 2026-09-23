@@ -342,6 +342,69 @@
     return out;
   }
 
+  // ===== 見取り図のための形（2026-09-24） =====
+  // ★ ③で申込書の「見取り図」を描くために読む。書き込みには使わない。
+  //   申込書を Excel で開いて見比べなくても、どこに書くかが画面で分かるようにするため（本人の要望）。
+  //   読むのは 列の幅・行の高さ・隠れた行と列・四辺の罫線 だけ。書体・色・図形は読まない。
+
+  // 書式の番号ごとに、四辺の罫線の種類を並べる。{ t, b, l, r }（無い辺は空）
+  function borderSides(book) {
+    var styles = book.parts['xl/styles.xml'];
+    if (!styles) return [];
+    var xfs = (/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(styles) || ['', ''])[1]
+      .match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g) || [];
+    var borders = (/<borders\b[^>]*>([\s\S]*?)<\/borders>/.exec(styles) || ['', ''])[1]
+      .match(/<border\b[^>]*?(?:\/>|>[\s\S]*?<\/border>)/g) || [];
+    var SIDE = { t: /<top\b([^>]*)/, b: /<bottom\b([^>]*)/, l: /<left\b([^>]*)/, r: /<right\b([^>]*)/ };
+    return xfs.map(function (xf) {
+      var id = (/borderId="(\d+)"/.exec(xf) || [])[1];
+      var b = borders[Number(id)] || '';
+      var out = {};
+      Object.keys(SIDE).forEach(function (k) {
+        var mm = SIDE[k].exec(b);
+        out[k] = mm ? ((/style="([^"]+)"/.exec(mm[1]) || [])[1] || '') : '';
+      });
+      return out;
+    });
+  }
+
+  // シートの形。{ cols: {列番号: {width, hidden}}, rows: {行番号: {height, hidden}},
+  //              borders: {ref: {t,b,l,r}}, defColW, defRowH }
+  // 幅は Excel の「文字数」、高さは「ポイント」のまま返す（画面の大きさへの直しは見取り図の側で）
+  var LAYOUT_MAX_COL = 256;   // <col min="1" max="16384"> を全部ほどかない
+  function layout(book, sheet) {
+    var s = sheetOf(book, sheet);
+    var xml = book.parts[s.path] || '';
+    var fmt = attrs((/<sheetFormatPr\b[^>]*>/.exec(xml) || ['<x>'])[0]);
+    var out = { cols: {}, rows: {}, borders: {},
+      defColW: Number(fmt.defaultColWidth) || (Number(fmt.baseColWidth) ? Number(fmt.baseColWidth) + 0.71 : 8.43),
+      defRowH: Number(fmt.defaultRowHeight) || 15 };
+    var yes = function (v) { return v === '1' || v === 'true'; };
+    xml.replace(/<col\b[^>]*>/g, function (tag) {
+      var a = attrs(tag);
+      var lo = Number(a.min), hi = Math.min(Number(a.max), LAYOUT_MAX_COL);
+      for (var c = lo; c <= hi; c++) {
+        out.cols[c] = { width: a.width !== undefined ? Number(a.width) : null, hidden: yes(a.hidden) };
+      }
+      return tag;
+    });
+    var data = sheetData(xml);
+    data.replace(/<row\b[^>]*>/g, function (tag) {
+      var a = attrs(tag);
+      if (a.r) out.rows[Number(a.r)] = { height: a.ht !== undefined ? Number(a.ht) : null, hidden: yes(a.hidden) };
+      return tag;
+    });
+    var sides = borderSides(book);
+    var re = new RegExp(CELL_RE.source, 'g'), m;
+    while ((m = re.exec(data))) {
+      var ca = attrs('<c ' + m[1] + '>');
+      if (!ca.r || ca.s === undefined) continue;
+      var bs = sides[Number(ca.s)];
+      if (bs && (bs.t || bs.b || bs.l || bs.r)) out.borders[ca.r] = bs;
+    }
+    return out;
+  }
+
   // ★ 斜線（×印）が引かれた欄かどうか（2026-09-19、本物の百万石で分かった）。
   //   事務局の様式は「ここは書かなくてよい」を斜線で示すことがある（監督の行の生年月日・年齢）。
   //   セルの書式 →（セルが無ければ）行や列の書式をたどり、その罫線に斜線があるかを見る。
@@ -719,7 +782,7 @@
 
   global.EntryXlsx = {
     open: open, sheetNames: sheetNames, cells: cells, grid: grid, merges: merges, anchorOf: anchorOf,
-    crossedOut: crossedOut, copySheet: copySheet, copyBlocker: copyBlocker,
+    crossedOut: crossedOut, copySheet: copySheet, copyBlocker: copyBlocker, layout: layout,
     setCell: setCell, save: save, parseRef: parseRef, toRef: toRef, shrinkStyle: shrinkStyle,
     // 試験用データを作るときにだけ使う
     zip: { read: readZip, write: writeZip, inflate: inflate, deflate: deflate, crc32: crc32 }

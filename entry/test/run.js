@@ -25,6 +25,7 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-postal.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-blank.js'), 'utf8'));
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-view.js'), 'utf8'));
 var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap,
     P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend, B_ = window.EntryBlank;
 var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
@@ -231,6 +232,7 @@ function main() {
     .then(function () { return attendSection(); })
     .then(function () { return bookSection(); })
     .then(function () { return blankSection(roster); })
+    .then(function () { return viewSection(); })
     .then(function () { return eventSection(); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
@@ -1826,6 +1828,116 @@ function blankSection(roster) {
 
 // ===== 名簿ファイル =====
 // 人・団体・住所・電話番号はすべて架空
+// ===== 申込書の見取り図（2026-09-24） =====
+// ★ 申込書を Excel で開いて見比べなくても、③でどこに書くかが画面で分かるようにした（本人の要望）。
+//   本物の Excel を映すのではなく、もう読んでいる中身から描く（entry-view.js が形、entry-app.js が画面）
+function viewSection() {
+  section('見取り図（③で申込書の形を描く）');
+  var V = window.EntryView;
+
+  // --- 形：結合・隠れた行と列・列の幅・行の高さ・罫線 ---
+  var g = [];
+  for (var r = 1; r <= 12; r++) {
+    for (var c = 1; c <= 5; c++) g.push({ ref: V.letter(c) + r, row: r, col: c, text: '', styled: true, bottom: '' });
+  }
+  var put = function (ref, t) { g.filter(function (x) { return x.ref === ref; })[0].text = t; };
+  put('A1', '第1回 テスト大会'); put('B4', '氏名'); put('C4', 'フリガナ');
+  var mg = [{ ref: 'A1:E1', top: 1, left: 1, bottom: 1, right: 5 },    // 大会名の横長の結合
+            { ref: 'D5:D6', top: 5, left: 4, bottom: 6, right: 4 }];   // 縦の結合
+  var L = { cols: { 3: { width: 20, hidden: false }, 5: { width: 9, hidden: true } },
+            rows: { 8: { height: 30, hidden: false }, 9: { height: null, hidden: true } },
+            borders: { A1: { t: 'thin', b: '', l: 'thin', r: '' }, E1: { t: '', b: '', l: '', r: 'thick' } },
+            defColW: 8.43, defRowH: 15 };
+  var f = V.frame(g, mg, L, null);
+  eq(f.cols.map(function (x) { return x.letter; }), ['A', 'B', 'C', 'D'], '★ 隠れた列は描かない（Excel でも見えない）');
+  check(f.rows.every(function (x) { return x.row !== 9; }) && f.rows.length === 11, '★ 隠れた行は描かない');
+  var r1 = f.rows[0].cells;
+  eq([r1.length, r1[0].ref, r1[0].colspan, r1[0].text], [1, 'A1', 4, '第1回 テスト大会'],
+    '★ 横長の結合は1マスにまとめ、見えている列だけ数える（E は隠れているので 4）');
+  eq([r1[0].border.t, r1[0].border.l, r1[0].border.r], ['thin', 'thin', 'thick'],
+    '結合の罫線：上と左は左上のマス、右は右上のマスから取る');
+  var row5 = f.rows.filter(function (x) { return x.row === 5; })[0].cells;
+  var row6 = f.rows.filter(function (x) { return x.row === 6; })[0].cells;
+  check(row5.some(function (x) { return x.ref === 'D5' && x.rowspan === 2; }) &&
+        !row6.some(function (x) { return x.col === 4; }), '★ 縦の結合も1マス。下の段は描かない');
+  eq([f.cols[0].px, f.cols[2].px], [V.colPx(8.43), V.colPx(20)], '列の幅は様式のとおり（無ければ Excel の既定）');
+  eq([f.rows[0].px, f.rows.filter(function (x) { return x.row === 8; })[0].px], [V.rowPx(15), V.rowPx(30)],
+    '行の高さも様式のとおり');
+  eq(V.frame([], [], L, null), null, '描くものが無いシートは描かない（空のシート）');
+
+  // --- 範囲：長い表・広い様式は切る。ただし表の列は切らない ---
+  var big = [];
+  for (var rr = 1; rr <= 100; rr++) {
+    for (var cc = 1; cc <= 40; cc++) big.push({ ref: V.letter(cc) + rr, row: rr, col: cc, text: '', styled: true, bottom: '' });
+  }
+  var fb = V.frame(big, [], null, [{ top: 10, bottom: 90, left: 30, right: 30 }]);
+  eq([fb.r0, fb.rows.length, fb.cut.rows], [10 - V.ABOVE, V.MAX_ROWS, true],
+    '★ 表の見出しの上を少し見せ、長い表は決まった行数で切る');
+  eq([fb.cols[0].col, fb.cols[fb.cols.length - 1].col, fb.cut.cols], [28, 40, true],
+    '★ 広い様式は、名前の列の2つ左から描く（表の列が切れない）。使っていない右の列は描かない');
+  var fs2 = V.frame(big, [], null, [{ top: 10, bottom: 20, left: 2, right: 2 }]);
+  eq([fs2.cols[0].col, fs2.cols.length], [1, V.MAX_COLS], '左端の表なら、左から決まった列数');
+
+  // --- 印：③で選んだ人・次に入る行・書く欄 ---
+  var tables = [{ nameCol: 'B', headerRow: 4, firstRow: 5, lastRow: 8, rows: [5, 6, 7, 8] }];
+  var m = V.marks(tables, [[{ name: '山田 太郎' }, { name: '伊藤 美穂' }]]);
+  eq([m.B5.cls, m.B5.text, m.B6.cls, m.B6.text], ['sv-put', '山田 太郎', 'sv-put', '伊藤 美穂'],
+    '★ 選んだ人は、上の行から順にその欄に入って見える');
+  eq([m.B7.cls, m.B8.cls, m.B4.cls], ['sv-next', 'sv-slot', 'sv-head'], '次に入る行・空いている欄・見出しに印');
+  eq(Object.keys(m).filter(function (k) { return m[k].cls === 'sv-next'; }).length, 1, '★ 次に入る行は表ごとに1つだけ');
+  var full = V.marks(tables, [[1, 2, 3, 4, 5, 6].map(function (i) { return { name: 'N' + i }; })]);
+  eq([full.B8.text, Object.keys(full).filter(function (k) { return full[k].cls === 'sv-next'; }).length,
+      Object.keys(full).some(function (k) { return full[k].text === 'N5'; })], ['N4', 0, false],
+    '★ いっぱいなら次の行は無く、2枚目に回る人は描かない（見取り図は1枚目の姿）');
+  var kana = V.marks([{ nameCol: 'C', kanaAbove: true, headerRow: 4, firstRow: 6, lastRow: 8, rows: [6, 8] }], [[]]);
+  eq([kana.C5.cls, kana.C7.cls, kana.C6.cls], ['sv-kana', 'sv-kana', 'sv-next'], '上の行がふりがなの様式は、その行も薄く塗る');
+  var split = [{ familyCol: 'B', givenCol: 'C', firstRow: 5, lastRow: 6, rows: [5, 6] }];
+  var sm = V.marks(split, [[{ name: '山田 太郎', family: '山田', given: '太郎' }, { name: '伊藤美穂' }]]);
+  eq([sm.B5.text, sm.C5.text, sm.B6.text, sm.C6.text], ['山田', '太郎', '伊藤美穂', ''],
+    '姓と名が別の欄の様式：分かれていれば姓と名に、分かれていなければ姓の欄にまとめる');
+  eq(V.focusOf(tables), [{ top: 4, bottom: 8, left: 2, right: 2 }], '見せる範囲は、見出しの行〜最後の行と名前の列');
+
+  // --- 教える：マスを押して、名前の列と行を指す ---
+  var s1 = V.point(null, 2, 10);
+  eq(s1, { col: 'B', from: 10, to: null }, '★ 1回目に押したマスが、名前の列と始めの行');
+  var s2 = V.point(s1, 5, 19);
+  eq(s2, { col: 'B', from: 10, to: 19 }, '★ 2回目で終わりの行。別の列を押しても列は1回目のまま');
+  eq(V.point({ col: 'B', from: 19, to: null }, 2, 10), { col: 'B', from: 10, to: 19 }, '上へ向かって押しても受け取る');
+  eq(V.point(s2, 3, 4), { col: 'C', from: 4, to: null }, '3回目は選び直し');
+  var pm = V.pointMarks(s2);
+  eq([Object.keys(pm).length, pm.B10.cls, pm.B19.cls], [10, 'sv-sel sv-sel-start', 'sv-sel'], '選んだ範囲に印');
+  eq(Object.keys(V.pointMarks({ col: 'A', from: 1, to: 900 })).length, 200, '印は200行まで（教えられる上限と同じ）');
+  var taught = B_.manual(s2.col, s2.from, s2.to);
+  eq([taught && taught.nameCol, taught && taught.rows.length], ['B', 10],
+    '★ 押して選んだ範囲は、打ち込んだときと同じ表になる（EntryBlank.manual に渡す）');
+
+  // --- 画面の配線 ---
+  var appSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  check(appSrc.indexOf('V.marks(sh.tables, sh.picks)') >= 0 && appSrc.indexOf('V.focusOf(sh.tables)') >= 0,
+    '③の見取り図は、表と選んだ人から印を付ける');
+  check(appSrc.indexOf('sh.teachSel = V.point(sh.teachSel, c, r)') >= 0 && appSrc.indexOf('marks: V.pointMarks(s)') >= 0,
+    '★ 教える画面で押したマスが、列と行になる');
+  check(/value: s \? s\.col/.test(appSrc), '押して選んだ列と行が、下の入力欄にも入る（打ち込みでも直せる）');
+  var atView = html.indexOf('<script src="entry-view.js">'), atApp = html.indexOf('<script src="entry-app.js">');
+  check(atView > 0 && atView < atApp, 'entry-view.js は entry-app.js より前に読む');
+  check(!/officeapps|docs\.google\.com\/viewer|sheet\.zoho/i.test(appSrc + html),
+    '★ 外の表示サービスを使わない（使うとファイルを送ることになり「どこにも送らない」と食い違う）');
+
+  // --- 本物の読み：試験用の様式から、列の幅と罫線を読んで描く ---
+  return read(path.join(FIX, 'form-d-blank.xlsx')).then(function (book) {
+    var lay = X.layout(book, 0);
+    eq([lay.cols[1].width, lay.cols[2].width], [6, 18], '列の幅を読む（様式の <col>）');
+    eq(lay.borders.A3, { t: 'thin', b: 'thin', l: 'thin', r: 'thin' }, '★ 四辺の罫線を読む（いままでは下だけだった）');
+    var grid = X.grid(book, 0);
+    var tbs = B_.tables(grid).filter(function (t) { return !t.skip; });
+    var fr = V.frame(grid, X.merges(book, 0), lay, V.focusOf(tbs));
+    check(!!fr && fr.r0 === 1 && fr.rows.some(function (x) {
+      return x.cells.some(function (c) { return c.text.replace(/\s/g, '') === '氏名'; });
+    }), '様式の見出し（氏名）が見取り図に出る');
+  });
+}
+
 function bookSection() {
   section('10. 名簿ファイル（作る・読む・申込書に書く形にする）');
 

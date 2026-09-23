@@ -12,7 +12,8 @@
   'use strict';
 
   var X = window.EntryXlsx, R = window.EntryRoster, M = window.EntryMap,
-      B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend, BL = window.EntryBlank;
+      B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend, BL = window.EntryBlank,
+      V = window.EntryView;
 
   function t(k, v) { return window.I18N.t(k, v); }
   function has(k) { return Object.prototype.hasOwnProperty.call(window.I18N.dict(), k); }
@@ -935,14 +936,93 @@
     M.prefs.put(sh.layoutKey, BL.remember(sh.tables));
   }
 
+  /* ===== 申込書の見取り図（2026-09-24） =====
+     ★ 申込書を Excel で開いて見比べなくても、どこに書くかが画面で分かるようにする（本人の要望）。
+       本物の Excel を映すのではなく、もう読んでいる中身（文字・結合・罫線・列の幅）から描く
+       （形は entry-view.js）。外の表示サービスは使わない（使うとファイルを送ることになる）。
+     ★ 利用者は見取り図を操作しない。見るだけ。教える画面でだけ「ここ」を押せる */
+  var SV_FIT = 700;     // ③の枠の幅が測れないときの目安
+  var SV_MIN = 0.55;    // これ以上は縮めない。字が読めなくなるので、あとは横に動かして見る
+  var SV_ROWHEAD = 30;  // 左の行番号の幅
+  var SV_LINE = {       // Excel の罫線の種類 → 画面の線
+    thin: '1px solid #3d4f4c', hair: '1px solid #7a8a88', medium: '2px solid #2b3a38', thick: '3px solid #1d2826',
+    double: '3px double #2b3a38', dotted: '1px dotted #3d4f4c', dashed: '1px dashed #3d4f4c',
+    mediumDashed: '2px dashed #2b3a38', dashDot: '1px dashed #3d4f4c', dashDotDot: '1px dashed #3d4f4c',
+    mediumDashDot: '2px dashed #2b3a38', mediumDashDotDot: '2px dashed #2b3a38', slantDashDot: '2px dashed #2b3a38'
+  };
+  var SV_GRID = '1px solid #e6ecea';   // 罫線の無い辺は、Excel の枠線くらいの薄さで
+
+  function sheetView(sh, opts) {
+    var book = state.form && state.form.book;
+    if (!book || !V) return null;
+    try {
+      if (!sh.grid) sh.grid = X.grid(book, sh.index);
+      if (!sh.layout) sh.layout = X.layout(book, sh.index);
+    } catch (e) { return null; }
+    var f = V.frame(sh.grid, sh.merges, sh.layout, opts.focus);
+    if (!f) return null;
+    var marks = opts.marks || {};
+    var total = f.cols.reduce(function (s, c) { return s + c.px; }, 0);
+    // ★ ③の枠の実際の幅に合わせて縮める（決め打ちの幅だと、広い画面でも横に動かすことになった）
+    var body = el('namesBody');
+    var avail = (body && body.clientWidth) ? body.clientWidth - SV_ROWHEAD - 12 : SV_FIT;
+    var k = Math.max(SV_MIN, Math.min(1, avail / Math.max(1, total)));
+    var font = Math.max(9, Math.round(11 * Math.max(k, 0.8)));
+
+    var table = h('table', { class: 'sv' + (opts.onCell ? ' sv-click' : ''), style: 'font-size:' + font + 'px' });
+    var cg = h('colgroup', {}, [h('col', { style: 'width:' + SV_ROWHEAD + 'px' })]);
+    f.cols.forEach(function (c) { cg.appendChild(h('col', { style: 'width:' + Math.max(8, Math.round(c.px * k)) + 'px' })); });
+    table.appendChild(cg);
+    var headRow = h('tr', {}, [h('th', { class: 'sv-corner' })]);
+    f.cols.forEach(function (c) { headRow.appendChild(h('th', { class: 'sv-colh', text: c.letter })); });
+    table.appendChild(h('thead', {}, [headRow]));
+
+    var side = function (s) { return (s && SV_LINE[s]) || (s ? SV_LINE.thin : SV_GRID); };
+    var tbody = h('tbody');
+    f.rows.forEach(function (r) {
+      var tr = h('tr', { style: 'height:' + Math.max(18, Math.round(r.px * k)) + 'px' });
+      tr.appendChild(h('th', { class: 'sv-rowh', text: String(r.row) }));
+      r.cells.forEach(function (c) {
+        var mk = marks[c.ref];
+        var td = h('td', {
+          class: 'sv-c' + (mk && mk.cls ? ' ' + mk.cls : ''),
+          colspan: c.colspan > 1 ? String(c.colspan) : null,
+          rowspan: c.rowspan > 1 ? String(c.rowspan) : null,
+          title: c.ref,
+          style: 'border-top:' + side(c.border.t) + ';border-bottom:' + side(c.border.b) +
+            ';border-left:' + side(c.border.l) + ';border-right:' + side(c.border.r)
+        }, [h('div', { class: 'sv-t', text: (mk && mk.text != null) ? mk.text : c.text })]);
+        if (opts.onCell) td.addEventListener('click', function () { opts.onCell(c.col, c.row); });
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    var box = h('div', { class: 'sv-box' });
+    if (opts.hint) box.appendChild(h('p', { class: 'hint', text: opts.hint }));
+    box.appendChild(h('div', { class: 'sv-wrap' }, [table]));
+    if (f.cut.rows || f.cut.cols) box.appendChild(h('p', { class: 'hint', text: t('svCut', {
+      from: V.letter(f.c0) + f.r0, to: V.letter(f.c1) + f.r1 }) }));
+    return box;
+  }
+
   // ★ 表が見つからなかったシート。名前の列と書く行を教えてもらう（2026-09-20）
   function renderTeachSheet(sh, sec, canSkip) {
     sec.appendChild(h('p', { class: 'name-note ng', text: t('teachTitle') }));
     sec.appendChild(h('p', { class: 'hint', text: t('teachHint') }));
     if (canSkip) sec.appendChild(h('p', { class: 'hint', text: t('teachSkipNote') }));
-    var col = h('input', { type: 'text', class: 'row-num', value: sh.teachCol || '', maxlength: '3' });
-    var from = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
-    var to = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000' });
+    // ★ 見取り図のマスを押して教える（2026-09-24）。列の英字と行の番号を打たなくてよい
+    var s = sh.teachSel;
+    var view = sheetView(sh, { focus: null, marks: V.pointMarks(s),
+      hint: !s ? t('svTeachStart') : s.to === null ? t('svTeachEnd', { col: s.col, from: s.from })
+        : t('svTeachDone', { col: s.col, from: s.from, to: s.to }),
+      onCell: function (c, r) { sh.teachSel = V.point(sh.teachSel, c, r); renderNames(); } });
+    if (view) sec.appendChild(view);
+    var col = h('input', { type: 'text', class: 'row-num', value: s ? s.col : (sh.teachCol || ''), maxlength: '3' });
+    var from = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000', value: s ? String(s.from) : null });
+    var to = h('input', { type: 'number', class: 'row-num', min: '1', max: '2000',
+      value: s ? String(s.to === null ? s.from : s.to) : null });
     sec.appendChild(h('p', { class: 'small pick-rows' }, [
       h('span', { text: t('teachCol') }), col,
       h('span', { text: t('teachRows') }), from, h('span', { text: '〜' }), to,
@@ -952,6 +1032,7 @@
       h('button', { type: 'button', class: 'btn-sub', text: t('teachApply'), onclick: function () {
         var tb = BL.manual(col.value, from.value, to.value);
         if (!tb) { setMsg('namesMsg', t('teachBad'), 'ng'); return; }
+        sh.teachSel = null;
         sh.teach = false;
         sh.blank = true;
         sh.tables = [tb];
@@ -968,6 +1049,9 @@
   }
 
   function renderPickSheet(sh, sec) {
+    // ★ 見取り図（2026-09-24）。選んだ人がその行に入って見える。↑↓で並べ替えればすぐ動く
+    var view = sheetView(sh, { focus: V.focusOf(sh.tables), marks: V.marks(sh.tables, sh.picks), hint: t('svPickHint') });
+    if (view) sec.appendChild(view);
     sh.tables.forEach(function (tb, ti) {
       var picks = sh.picks[ti];
       var box = h('div', { class: 'pick-table' });
