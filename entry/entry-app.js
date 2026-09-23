@@ -842,7 +842,9 @@
           sh.restored = 'rows';
         }
         sh.blank = true;
+        sh.grid = grid;
         sh.tables = usable;
+        nameTables(sh);
         sh.picks = usable.map(function () { return []; });   // 表ごとに「入れる人」の並び
         state.sheets.push(sh);
         return;
@@ -984,8 +986,11 @@
       tr.appendChild(h('th', { class: 'sv-rowh', text: String(r.row) }));
       r.cells.forEach(function (c) {
         var mk = marks[c.ref];
+        // 表ごとに色を分け、いま入れている表のほかは薄くする
+        var grp = (mk && typeof mk.g === 'number') ? ' sv-g' + (mk.g % TBL_COLORS) +
+          (typeof opts.active === 'number' && opts.active >= 0 && mk.g !== opts.active ? ' sv-dim' : '') : '';
         var td = h('td', {
-          class: 'sv-c' + (mk && mk.cls ? ' ' + mk.cls : ''),
+          class: 'sv-c' + (mk && mk.cls ? ' ' + mk.cls : '') + grp,
           colspan: c.colspan > 1 ? String(c.colspan) : null,
           rowspan: c.rowspan > 1 ? String(c.rowspan) : null,
           title: c.ref,
@@ -1000,12 +1005,33 @@
     table.appendChild(tbody);
 
     var box = h('div', { class: 'sv-box' });
+    if (opts.top) box.appendChild(opts.top);
     if (opts.hint) box.appendChild(h('p', { class: 'hint', text: opts.hint }));
     box.appendChild(h('div', { class: 'sv-wrap' }, [table]));
     if (f.cut.rows || f.cut.cols) box.appendChild(h('p', { class: 'hint', text: t('svCut', {
       from: V.letter(f.c0) + f.r0, to: V.letter(f.c1) + f.r1 }) }));
     return box;
   }
+
+  /* ===== 表の名前と「いま入れている表」（2026-09-24、本人の要望） =====
+     ★ 作業中に「いま何の欄に入れているか」が分かればよい。申込書には書かない。
+     ★ 申込書に書いてあれば、そのまま使う（EntryView.titleOf）。無ければ本人が付ける（覚える）。
+       語の一覧は持たない（卓球の種目に限らず、競技やスポーツ以外の申込書でも同じに扱うため） */
+  function nameTables(sh) {
+    (sh.tables || []).forEach(function (tb) {
+      // ★ 教えた表には見出しが無い。すぐ上の行は見出しそのもの（「No 氏名 フリガナ…」）なので、
+      //   題として拾わない
+      tb.formTitle = (sh.grid && tb.headerRow) ? V.titleOf(sh.grid, sh.merges, tb, sh.tables) : '';
+      tb.heads = (sh.grid && tb.headerRow) ? V.headersOf(sh.grid, sh.merges, tb) : '';
+    });
+  }
+  function tableName(tb) { return tb.userName || tb.formTitle || ''; }
+  function tableTag(tb, ti) {
+    var name = tableName(tb);
+    if (name) return t('tblNamed', { n: ti + 1, name: name });
+    return tb.heads ? t('tblHeads', { n: ti + 1, heads: tb.heads }) : t('tblPlain', { n: ti + 1 });
+  }
+  var TBL_COLORS = 5;   // 表の色の数（index.html の .sv-g0〜.sv-g4）
 
   // ★ 表が見つからなかったシート。名前の列と書く行を教えてもらう（2026-09-20）
   function renderTeachSheet(sh, sec, canSkip) {
@@ -1050,12 +1076,50 @@
 
   function renderPickSheet(sh, sec) {
     // ★ 見取り図（2026-09-24）。選んだ人がその行に入って見える。↑↓で並べ替えればすぐ動く
-    var view = sheetView(sh, { focus: V.focusOf(sh.tables), marks: V.marks(sh.tables, sh.picks), hint: t('svPickHint') });
-    if (view) sec.appendChild(view);
+    // ★ いま入れている表（2026-09-24）。開いている表、無ければ最初のまだ空きのある表
+    var active = V.activeTable(sh.tables, sh.picks, sh.pickOpen);
+    var top = h('div', { class: 'tbl-top' });
+    if (active >= 0) {
+      var atb = sh.tables[active];
+      top.appendChild(h('p', { class: 'tbl-now sv-g' + (active % TBL_COLORS) }, [
+        h('span', { class: 'tbl-now-label', text: t('tblNow') }),
+        h('b', { text: tableTag(atb, active) }),
+        h('span', { class: 'tbl-now-count', text: t('tblCount', {
+          n: Math.min((sh.picks[active] || []).length, atb.rows.length), cap: atb.rows.length }) })
+      ]));
+    } else {
+      top.appendChild(h('p', { class: 'tbl-now done', text: t('tblAllDone') }));
+    }
+    // 表が2つ以上なら、色と名前の一覧（見取り図の色と、下の枠の色がそろう）
+    if (sh.tables.length > 1) {
+      var legend = h('p', { class: 'sv-legend' });
+      sh.tables.forEach(function (tb, ti) {
+        legend.appendChild(h('span', { class: 'sv-chip sv-g' + (ti % TBL_COLORS) + (ti === active ? ' on' : ''),
+          text: tableTag(tb, ti) }));
+      });
+      top.appendChild(legend);
+    }
+    var view = sheetView(sh, { focus: V.focusOf(sh.tables), marks: V.marks(sh.tables, sh.picks),
+      hint: t('svPickHint'), active: active, top: top });
+    sec.appendChild(view || top);
     sh.tables.forEach(function (tb, ti) {
       var picks = sh.picks[ti];
-      var box = h('div', { class: 'pick-table' });
+      var box = h('div', { class: 'pick-table sv-g' + (ti % TBL_COLORS) + (ti === active ? ' on' : '') });
+      box.appendChild(h('p', { class: 'tbl-title', text: tableTag(tb, ti) }));
       box.appendChild(h('p', { class: 'sub-title', text: tableLabel(tb) }));
+      // この表の名前。申込書に書いてあればそれが入っている。直せる（覚える）
+      var nameIn = h('input', { type: 'text', class: 'tbl-name-in', maxlength: '40',
+        value: tableName(tb), placeholder: t('tblNamePh') });
+      nameIn.addEventListener('change', function () {
+        var v = nameIn.value.trim();
+        tb.userName = (v && v !== tb.formTitle) ? v : '';
+        saveRows(sh);
+        renderNames();
+      });
+      box.appendChild(h('p', { class: 'small tbl-name' }, [
+        h('span', { text: t('tblNameLabel') }), nameIn,
+        (tb.formTitle && !tb.userName) ? h('span', { class: 'hint', text: t('tblFromForm') }) : null
+      ]));
 
       // ★ 2枚目を足すかどうか。足すなら、表の行数を超えて選べる（2026-09-20）
       var cap = tb.rows.length;
@@ -1092,8 +1156,14 @@
       // ★ ちょうど入りきったときは「いっぱいです」と出さない（入れすぎたと勘違いする。2026-09-19、本人の指摘）。
       //   「ちょうどそろいました」と伝え、入れ替えは上の一覧の「外す」でできることを添える
       var full = !more && picks.length >= cap;
-      var details = h('details', { class: 'cols-box' + (full ? ' done' : ''), open: !picks.length || sh.pickOpen === ti });
-      details.addEventListener('toggle', function () { sh.pickOpen = details.open ? ti : null; });
+      // ★ 開いておくのは「いま入れている表」だけ（2026-09-24）。開いた表が「いま入れている表」になる。
+      //   ★ 空の表をぜんぶ開いたままにすると、開いたときの知らせ（toggle）で表どうしが取り合い、
+      //     描き直しが止まらなくなる。1つだけ開き、変わったときだけ描き直す
+      var details = h('details', { class: 'cols-box' + (full ? ' done' : ''), open: ti === active && !full });
+      details.addEventListener('toggle', function () {
+        if (details.open && sh.pickOpen !== ti) { sh.pickOpen = ti; renderNames(); }
+        else if (!details.open && sh.pickOpen === ti) sh.pickOpen = null;
+      });
       details.appendChild(h('summary', { class: full ? 'done' : null,
         text: full ? t('pickComplete', { n: cap }) : t('pickFrom') }));
       if (!full) {
@@ -1114,7 +1184,8 @@
               onclick: function () {
                 if (!more && picks.length >= cap) return;
                 picks.push(m);
-                sh.pickOpen = ti;
+                // ★ 表がちょうど埋まったら、次のまだ空きのある表を「いま入れている表」にする
+                sh.pickOpen = (!more && picks.length >= cap) ? null : ti;
                 renderNames();
               } }));
           });
