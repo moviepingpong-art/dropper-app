@@ -49,8 +49,10 @@
       <p class="note">マネージャーの「テンプレート」で<b>6分割（大）</b>を選び、下の順にアクション＝リンクを設定します。</p>
       <table id="links"></table>
       <p class="note">
-        <b>ツールとAPIキーのリンクには <code>?openExternalBrowser=1</code> が付いています。</b>
+        <b>4本の道具と使い方のリンクには <code>?openExternalBrowser=1</code> が付いています。</b>
         これが無いとLINE内のブラウザで開き、<b>Googleログインが弾かれて使えません</b>。消さないでください。<br>
+        <b>申込書ドロッパーはGoogleログインを使いませんが、それでも付けます。</b>
+        Excelのファイルを開いて保存する道具なので、LINE内のブラウザでは危ういためです。<br>
         安心の理由（プライバシーポリシー）は読むだけなので付けていません。
       </p>
     </div>
@@ -59,7 +61,12 @@
   <script>
     // ===== リッチメニュー画像 =====
     // 大サイズ 2500×1686 の6分割。3列 × 2行。
-    // 上段＝ツール3本（濃い色・白抜き）、下段＝サポート（淡色）。
+    // ★ 道具は4本ある（2026-09-24 に申込書ドロッパーを入れた）。上段は3マスしかないので、
+    //   4本目は下段の左に置き、**色を塗って道具だと分かるようにする**。
+    //   下段の中央・右（サポート）は淡色のまま。
+    // ★ 外したのは 🔑APIキー。キーが要る3本は**道具の中のキー入力欄から取得ガイドへ
+    //   直接行ける**（index.html の「こちら（取得ガイド）」「クレカ不要で0円な理由 ↗」）ので、
+    //   ここは近道であって唯一の道ではなかった。申込書ドロッパーはキーが要らない（AIを使わない）。
     // スマホでは 1080px 程度に縮んで表示されるので、文字は大きめに取っている。
     var W = 2500, H = 1686;
     var COLS = [0, 833, 1666], CW = [833, 833, 834];   // 合計 2500
@@ -80,8 +87,8 @@
         url:'https://app.dropper-tools.com/schedule/?openExternalBrowser=1' },
       { emoji:'✅', name:'決めごと',   sub:'会話・メモから',  bg:'#048b7f', fg:'#ffffff',
         url:'https://app.dropper-tools.com/decide/?openExternalBrowser=1' },
-      { emoji:'🔑', name:'APIキー',    sub:'無料・3分で取得', bg:'#f7fffd', fg:'#0f3d3a',
-        url:'https://dropper-tools.com/apikey.html?openExternalBrowser=1' },
+      { emoji:'📝', name:'申込書',     sub:'名簿から記入',    bg:'#ffd23f', fg:'#0f3d3a',
+        url:'https://app.dropper-tools.com/entry/?openExternalBrowser=1' },
       { emoji:'📖', name:'使い方',     sub:'ガイドを見る',    bg:'#f7fffd', fg:'#0f3d3a',
         url:'https://dropper-tools.com/guide.html?openExternalBrowser=1' },
       { emoji:'🔒', name:'安心の理由', sub:'データの扱い',    bg:'#f7fffd', fg:'#0f3d3a',
@@ -126,7 +133,9 @@
 
         fitFont(ctx, c.sub, '700', SUB_PX, maxW);
         // 淡色の下段は薄くしすぎると読めない。上段より控えめな下げ幅にする。
-        ctx.globalAlpha = (row === 0) ? 0.95 : 0.78;
+        // ★ 下段でも塗ってあるマス（申込書）は、上段と同じ濃さで出す
+        var pale = (row === 1 && c.bg.toLowerCase() === '#f7fffd');
+        ctx.globalAlpha = pale ? 0.78 : 0.95;
         ctx.fillText(c.sub, cx, y + h * 0.79);
         ctx.globalAlpha = 1;
       }
