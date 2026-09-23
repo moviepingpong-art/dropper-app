@@ -259,12 +259,33 @@
   //   - 表が見つかっているとき: 覚えている行に直す
   //   - 表が1つも見つからないとき: 教えてもらった形から作る（もう一度聞かない）
   //   戻り値 { tables, changed, taught }。changed が true のときは画面でそう知らせること
+  // 表を見分ける鍵（本人が付けた表の名前を覚えるため）。名前の列と見出しの行。
+  // 教えた表は見出しが無いので T（教えた表は1シートに1つ）
+  function tableKey(tb) { return (tb.nameCol || tb.familyCol) + '@' + (tb.headerRow || 'T'); }
+
+  // ★ 本人が付けた表の名前（2026-09-24）。作業中に「いま何の欄に入れているか」を見せるためだけのもの。
+  //   申込書には書かない。名簿の中身ではないので覚えてよい
+  var NAME_MAX = 40;
+  function applyNames(tables, remembered) {
+    var names = (remembered && remembered.names) || {};
+    (tables || []).forEach(function (tb) {
+      var n = names[tableKey(tb)];
+      if (typeof n === 'string' && n && n.length <= NAME_MAX) tb.userName = n;
+    });
+  }
+
   function restore(tables, remembered) {
     var rows = (remembered && remembered.rows) || {};
+    applyNames(tables, remembered);
     if (tables && tables.length) {
       var changed = false;
       tables.forEach(function (tb) {
-        var got = tb.nameCol && rows[tb.nameCol];
+        // ★ 表ごとの鍵（列＋見出しの行）で探す（2026-09-24）。前は列だけで覚えていたので、
+        //   同じ列に上下2つの表がある様式で、下の表の行が上の表にも当たり、
+        //   上の表の人を下の表の行に書くところだった（書き込みが重なる誤爆）。
+        //   列だけの古い覚えは、その列を使う表が1つのときだけ使う
+        var sameCol = tables.filter(function (x) { return x.nameCol === tb.nameCol; }).length;
+        var got = tb.nameCol && (rows[tableKey(tb)] || (sameCol === 1 ? rows[tb.nameCol] : null));
         if (!got || got.length !== 2) return;
         var tb2 = manual(tb.nameCol, got[0], got[1], tb.kanaAbove ? 2 : 1);
         if (!tb2 || (tb.firstRow === tb2.firstRow && tb.lastRow === tb2.lastRow)) return;
@@ -277,18 +298,24 @@
       var got = rows[col];
       return got && got.length === 2 ? manual(col, got[0], got[1]) : null;
     }).filter(Boolean);
+    applyNames(made, remembered);
     return { tables: made, changed: made.length > 0, taught: made.length > 0 };
   }
 
   // 覚える形を、いまの表から作る
   function remember(tables) {
-    var rows = {}, taught = [];
+    var rows = {}, taught = [], names = {};
     (tables || []).forEach(function (tb) {
+      if (tb.userName) names[tableKey(tb)] = String(tb.userName).slice(0, NAME_MAX);
       if (!tb.nameCol) return;
-      rows[tb.nameCol] = [tb.firstRow, tb.lastRow];
+      // 教えた表は1シートに1つなので列だけで覚える（作り直すとき列から探す）。
+      // 見つけた表は、表ごとの鍵で覚える（同じ列に表が2つある様式があるため）
+      rows[tb.taught ? tb.nameCol : tableKey(tb)] = [tb.firstRow, tb.lastRow];
       if (tb.taught) taught.push(tb.nameCol);
     });
-    return { rows: rows, taught: taught };
+    var out = { rows: rows, taught: taught };
+    if (Object.keys(names).length) out.names = names;
+    return out;
   }
 
   // ★ シートの名前そのものが「記入例」の様式がある（2026-09-20、本物の青梅市の登録名簿）。
@@ -296,5 +323,5 @@
   function isExampleName(name) { return EXAMPLE_RE.test(nfkc(name)); }
 
   global.EntryBlank = { tables: tables, manual: manual, restore: restore, remember: remember,
-                        isExampleName: isExampleName };
+                        isExampleName: isExampleName, tableKey: tableKey };
 })(typeof window !== 'undefined' ? window : this);

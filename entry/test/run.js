@@ -1569,10 +1569,27 @@ function blankSection(roster) {
   eq(B_.manual('C', 'あ', 8), null, '数でない行は受け取らない');
 
   // ★ 教えてもらった形・直した「書く行」を覚える（2026-09-20）。一度教えたら次から聞かない
-  eq(B_.remember([{ nameCol: 'B', firstRow: 5, lastRow: 19 },
+  eq(B_.remember([{ nameCol: 'B', headerRow: 4, firstRow: 5, lastRow: 19 },
     { nameCol: 'E', firstRow: 6, lastRow: 6, taught: true }]),
-    { rows: { B: [5, 19], E: [6, 6] }, taught: ['E'] },
+    { rows: { 'B@4': [5, 19], E: [6, 6] }, taught: ['E'] },
     '★ 覚えるのは列と行の番号だけ（名前も生年月日も入らない）');
+
+  // ★ 同じ列に上下2つの表がある様式（2026-09-24、見取り図を作っていて画面で見つけた）。
+  //   前は列だけで覚えていたので、下の表の行が上の表にも当たり、上の表の人を下の表の行に書くところだった
+  var stacked = function () {
+    return [{ nameCol: 'B', headerRow: 4, firstRow: 5, lastRow: 11, rows: [5, 6, 7, 8, 9, 10, 11] },
+            { nameCol: 'B', headerRow: 14, firstRow: 15, lastRow: 21, rows: [15, 16, 17, 18, 19, 20, 21] }];
+  };
+  var st = stacked(); st[1].firstRow = 16; st[1].lastRow = 20;   // 下の表だけ直した
+  var stMemo = B_.remember(st);
+  var st2 = stacked();
+  B_.restore(st2, stMemo);
+  eq([st2[0].firstRow, st2[0].lastRow, st2[1].firstRow, st2[1].lastRow], [5, 11, 16, 20],
+    '★ 同じ列に表が2つあっても、それぞれの行を覚えて戻す（上の表に下の表の行を当てない）');
+  var st3 = stacked();
+  B_.restore(st3, { rows: { B: [15, 21] }, taught: [] });
+  eq([st3[0].firstRow, st3[1].firstRow], [5, 15],
+    '★ 列だけの古い覚えは、その列に表が2つあるときは使わない');
 
   // 表が見つかっているとき: 覚えている行に直す
   var found2 = [{ nameCol: 'B', firstRow: 5, lastRow: 21, rows: [5, 6] }];
@@ -1911,8 +1928,81 @@ function viewSection() {
   eq([taught && taught.nameCol, taught && taught.rows.length], ['B', 10],
     '★ 押して選んだ範囲は、打ち込んだときと同じ表になる（EntryBlank.manual に渡す）');
 
+  // --- 表の名前（2026-09-24）：作業中に「いま何の欄に入れているか」を見せる。申込書には書かない ---
+  // 小さな様式を組む: 見出しは5行目（No・氏名・フリガナ）、書く行は6〜9
+  var mk = function (cells) {
+    var gg = [];
+    Object.keys(cells).forEach(function (ref) {
+      var p = X.parseRef(ref);
+      gg.push({ ref: ref, row: p.row, col: p.col, text: cells[ref], styled: true, bottom: '' });
+    });
+    return gg;
+  };
+  var head5 = { A5: 'No', B5: '氏名', C5: 'フリガナ' };
+  var tb5 = { nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [6, 7, 8, 9] };
+  var withAbove = function (above) {
+    var o = {}; Object.keys(head5).forEach(function (k) { o[k] = head5[k]; });
+    Object.keys(above).forEach(function (k) { o[k] = above[k]; });
+    return mk(o);
+  };
+  eq(V.titleOf(withAbove({ B4: '男子シングルス' }), [], tb5, [tb5]), '男子シングルス',
+    '★ 表のすぐ上に書いてあれば、それをそのまま表の名前にする');
+  eq(V.titleOf(withAbove({ A3: '100m 走' }), [], tb5, [tb5]), '100m 走',
+    '★ 語の一覧は持たない（卓球以外の申込書でも、書いてあるまま）');
+  eq(V.titleOf(withAbove({ A4: 'ソプラノ' }), [{ ref: 'A4:C4', top: 4, left: 1, bottom: 4, right: 3 }], tb5, [tb5]), 'ソプラノ',
+    '表の幅に結合してある題も拾う');
+  eq(V.titleOf(withAbove({ B4: 'ダブルス①～⑤の番号を記入', B3: '混合ダブルス' }), [], tb5, [tb5]), '混合ダブルス',
+    '指示文の行は飛ばして、その上の題を使う');
+  eq(V.titleOf(withAbove({ A4: '連絡責任者', B4: '山田 太郎', C4: '090-1234-5678' }), [], tb5, [tb5]), '',
+    '★ 記入欄の札がある行は、行ごと題にしない（人の名前・電話を表の名前に出さない）');
+  eq(V.titleOf(withAbove({ B4: 'チーム名' }), [], tb5, [tb5]), '', '記入欄の札（〜名）は題ではない');
+  eq(V.titleOf(withAbove({ B4: 'シ　ン　グ　ル　ス' }), [], tb5, [tb5]), 'シングルス',
+    '1字ずつ空けて並べた字（均等割り付け）は詰めて見せる');
+  eq(V.titleOf(withAbove({ A4: 'シングルス', C4: '混合ダブルス' }), [], tb5, [tb5]), 'シングルス／混合ダブルス',
+    '同じ行に題が2つあれば、書いてあるまま並べる');
+  eq(V.titleOf(withAbove({ A4: '種目 ⑪～⑭', C4: '種目 ⑪～⑭' }), [], tb5, [tb5]), '種目 ⑪～⑭',
+    '同じ題が2つ並んでいても1つだけ（左右の表の上に同じ題がある様式）');
+  eq(V.titleOf(withAbove({ A4: 'a', B4: 'b', C4: 'c', D5: 'x', D4: 'd' }), [], tb5, [tb5]), '',
+    '1行に文字が多すぎる行は題ではない（見出しや札の並び）');
+  var upper = { nameCol: 'B', headerRow: 1, firstRow: 2, lastRow: 4, rows: [2, 3, 4] };
+  eq(V.titleOf(withAbove({ B1: '氏名', B3: '女子シングルス' }), [], tb5, [upper, tb5]), '',
+    '★ 上の表の中に入ったら探すのをやめる（上の表の中身を題にしない）');
+  eq(V.titleOf(withAbove({}), [], tb5, [tb5]), '', '書いていなければ名前は無い（本人が付ける）');
+  eq(V.headersOf(withAbove({}), [], tb5), 'No・氏名・フリガナ', '名前が無いときの手がかりは表の見出し');
+
+  // いま入れている表
+  var two = [{ rows: [1, 2] }, { rows: [3, 4] }];
+  eq(V.activeTable(two, [[], []], null), 0, '開いている表が無ければ、最初のまだ空きのある表');
+  eq(V.activeTable(two, [[1, 2], []], null), 1, '★ 表が埋まったら、次の表が「いま入れている表」');
+  eq(V.activeTable(two, [[1, 2], [3, 4]], null), -1, 'ぜんぶ埋まったら無し');
+  eq(V.activeTable(two, [[], []], 1), 1, '開いた表が「いま入れている表」');
+  eq(V.marks([tb5], [[]]).B6.g, 0, '印には表の番号が付く（表ごとに色を分けるため）');
+
+  // 本人が付けた名前は覚える（同じ形の申込書で次から付いた状態になる）
+  var named = [{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [6, 7, 8, 9], userName: '女子の部' }];
+  var memo = B_.remember(named);
+  eq(memo.names, { 'B@5': '女子の部' }, '★ 本人が付けた表の名前を覚える');
+  var again = [{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [6, 7, 8, 9] }];
+  B_.restore(again, memo);
+  eq(again[0].userName, '女子の部', '★ 次に同じ形の申込書を入れると、名前が付いた状態で出る');
+  eq(B_.remember([{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9 }]).names, undefined,
+    '名前を付けていなければ覚えない（覚える形は今までどおり）');
+  var bad = [{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [] }];
+  B_.restore(bad, { names: { 'B@5': { x: 1 } } });
+  eq(bad[0].userName, undefined, '覚えの中身が文字でなければ使わない');
+
   // --- 画面の配線 ---
   var appSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
+  check(appSrc.indexOf("t('tblNow')") >= 0 && appSrc.indexOf('V.activeTable(sh.tables, sh.picks, sh.pickOpen)') >= 0,
+    '★ ③の上に「いま入れている表」を出す');
+  check(appSrc.indexOf('tb.userName = (v && v !== tb.formTitle) ? v : \'\';') >= 0 && /userName[\s\S]{0,80}saveRows\(sh\)/.test(appSrc),
+    '表の名前を直したら覚える');
+  check(appSrc.indexOf('open: ti === active && !full') >= 0,
+    '★ 開いておくのは「いま入れている表」だけ（ぜんぶ開くと、開いた知らせで表どうしが取り合い描き直しが止まらない）');
+  check(appSrc.indexOf('sh.pickOpen = (!more && picks.length >= cap) ? null : ti;') >= 0,
+    '表がちょうど埋まったら、次の表へ移る');
+  check(appSrc.indexOf("tb.headerRow) ? V.titleOf(") >= 0,
+    '★ 教えた表（見出しが無い）では、すぐ上の見出しの行を題として拾わない');
   var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   check(appSrc.indexOf('V.marks(sh.tables, sh.picks)') >= 0 && appSrc.indexOf('V.focusOf(sh.tables)') >= 0,
     '③の見取り図は、表と選んだ人から印を付ける');

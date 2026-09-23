@@ -358,6 +358,50 @@
     table.sv td.sv-next { background:#fff7cc; box-shadow:inset 0 0 0 2px var(--yellow); }
     table.sv td.sv-kana { background:#f5fbfa; }
     table.sv td.sv-head { background:#e3f4f0; font-weight:700; }
+    /* ===== 表ごとの色と「いま入れている表」（2026-09-24）=====
+       見取り図の色・下の「選ぶ」の枠の色・一覧の札の色をそろえる。いま入れている表のほかは薄くする。
+       .sv-g0 は上の既定（緑）のまま。色の数は entry-app.js の TBL_COLORS と同じ 5 */
+    table.sv td.sv-g1.sv-slot { background:#fff4e6; }
+    table.sv td.sv-g1.sv-put  { background:#ffe2bf; color:#b45309; }
+    table.sv td.sv-g1.sv-head { background:#ffecd6; }
+    table.sv td.sv-g2.sv-slot { background:#f3eeff; }
+    table.sv td.sv-g2.sv-put  { background:#e2d6ff; color:#6d28d9; }
+    table.sv td.sv-g2.sv-head { background:#ebe3ff; }
+    table.sv td.sv-g3.sv-slot { background:#eaf3ff; }
+    table.sv td.sv-g3.sv-put  { background:#d2e5ff; color:#1d4ed8; }
+    table.sv td.sv-g3.sv-head { background:#dfecff; }
+    table.sv td.sv-g4.sv-slot { background:#fdeef5; }
+    table.sv td.sv-g4.sv-put  { background:#fbd3e6; color:#be185d; }
+    table.sv td.sv-g4.sv-head { background:#fde2ee; }
+    table.sv td.sv-dim { opacity:.4; }
+    .tbl-top { margin:0 0 6px; }
+    .tbl-now { margin:0 0 6px; padding:8px 12px; border-radius:10px; font-size:14px; line-height:1.6;
+      background:#eefaf7; border:2px solid var(--teal); display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; }
+    .tbl-now.done { background:#f4f7f6; border-color:var(--line); color:var(--sub); }
+    .tbl-now-label { color:var(--sub); font-size:12.5px; }
+    .tbl-now-count { color:var(--sub); font-size:12.5px; }
+    .tbl-now.sv-g1 { background:#fff4e6; border-color:#f59e0b; }
+    .tbl-now.sv-g2 { background:#f3eeff; border-color:#8b5cf6; }
+    .tbl-now.sv-g3 { background:#eaf3ff; border-color:#3b82f6; }
+    .tbl-now.sv-g4 { background:#fdeef5; border-color:#ec4899; }
+    .sv-legend { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
+    .sv-chip { font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; border:2px solid var(--teal);
+      background:#eefaf7; color:var(--teal-d); opacity:.55; }
+    .sv-chip.on { opacity:1; }
+    .sv-chip.sv-g1 { border-color:#f59e0b; background:#fff4e6; color:#b45309; }
+    .sv-chip.sv-g2 { border-color:#8b5cf6; background:#f3eeff; color:#6d28d9; }
+    .sv-chip.sv-g3 { border-color:#3b82f6; background:#eaf3ff; color:#1d4ed8; }
+    .sv-chip.sv-g4 { border-color:#ec4899; background:#fdeef5; color:#be185d; }
+    .pick-table.sv-g0 { border-color:#9fdcd5; }
+    .pick-table.sv-g1 { border-color:#f7c98a; }
+    .pick-table.sv-g2 { border-color:#c9b5fb; }
+    .pick-table.sv-g3 { border-color:#a8c8fb; }
+    .pick-table.sv-g4 { border-color:#f5a8cc; }
+    .pick-table.on { border-width:3px; }
+    .tbl-title { margin:0 0 2px; font-size:15px; font-weight:700; color:var(--ink); }
+    .tbl-name { display:flex; gap:6px; align-items:center; flex-wrap:wrap; color:var(--sub); }
+    input.tbl-name-in { flex:1 1 14em; min-width:0; font-family:inherit; font-size:13px; padding:5px 8px;
+      border:1px solid var(--line); border-radius:8px; }
     /* 教える画面：押せるマスと、押して選んだ範囲 */
     table.sv.sv-click td.sv-c { cursor:pointer; }
     table.sv.sv-click td.sv-c:hover { background:#fff7cc; }

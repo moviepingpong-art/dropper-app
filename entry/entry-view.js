@@ -157,17 +157,18 @@
       tb.rows.forEach(function (row, i) {
         var m = list[i];
         var cls = m ? 'sv-put' : (i === list.length ? 'sv-next' : 'sv-slot');
+        // g は表の番号（画面で表ごとに色を分けるため）
         if (tb.nameCol) {
-          out[tb.nameCol + row] = { cls: cls, text: m ? m.name : null };
+          out[tb.nameCol + row] = { cls: cls, text: m ? m.name : null, g: ti };
         } else {
           // 姓と名が別の欄の様式。名簿で姓・名に分かれていなければ、姓の欄にまとめて見せる
           var split = m && m.family && m.given;
-          out[tb.familyCol + row] = { cls: cls, text: m ? (split ? m.family : m.name) : null };
-          out[tb.givenCol + row] = { cls: cls, text: m ? (split ? m.given : '') : null };
+          out[tb.familyCol + row] = { cls: cls, text: m ? (split ? m.family : m.name) : null, g: ti };
+          out[tb.givenCol + row] = { cls: cls, text: m ? (split ? m.given : '') : null, g: ti };
         }
-        if (tb.kanaAbove) soft((tb.nameCol || tb.familyCol) + (row - 1), { cls: 'sv-kana', text: null });
+        if (tb.kanaAbove) soft((tb.nameCol || tb.familyCol) + (row - 1), { cls: 'sv-kana', text: null, g: ti });
       });
-      if (tb.headerRow) soft((tb.nameCol || tb.familyCol) + tb.headerRow, { cls: 'sv-head', text: null });
+      if (tb.headerRow) soft((tb.nameCol || tb.familyCol) + tb.headerRow, { cls: 'sv-head', text: null, g: ti });
     });
     return out;
   }
@@ -193,6 +194,131 @@
     return out;
   }
 
+  // ===== 表の名前（2026-09-24、本人の要望） =====
+  // ★ 作業中に「いま何の欄に入れているか」が分かるようにするため。申込書には書かない（見せるだけ）。
+  // ★ 申込書に書いてあれば、それをそのまま使う（本人の判断）。語の一覧は持たない——
+  //   卓球の「男子シングルス」も、陸上の「100m」も、合唱の「ソプラノ」も同じ扱いにするため。
+  //   本物の様式48表で数えたら、種目の語が近くに無い表が25あった。無ければ本人が付ける。
+  var TITLE_UP = 4;       // 表の見出しから何行上まで探すか
+  var TITLE_MAX = 25;     // これより長い文字は題ではない（説明文）
+  // 指示文は題ではない（「ダブルス①～⑤の番号を記入」「○を付けてください」）
+  var INSTRUCT_RE = /記入|ください|下さい|番号を|を付け|をつけ|に○|に〇|丸で|選んで|※/;
+  // 記入欄の札は題ではない（「団体名 [____]」「連絡先」「代表者名」「連絡責任者」）
+  var FIELD_RE = /(名|番号|住所|電話|TEL|FAX|メール|mail|年月日|先|者|No\.?|№)$|代表|責任|連絡/i;
+  // 書き込まれた中身らしいもの（電話・日付・メール・郵便番号）
+  var DATA_RE = /\d{2,}\s*[-‐－\/.．]\s*\d|@|＠|〒/;
+
+  function textIndex(grid, merges) {
+    var text = {}, anchorOf = {};
+    (grid || []).forEach(function (c) { if (c.text) text[c.row + ',' + c.col] = c.text; });
+    (merges || []).forEach(function (g) {
+      if ((g.bottom - g.top + 1) * (g.right - g.left + 1) > 4000) return;   // 巨大な結合はほどかない
+      for (var r = g.top; r <= g.bottom; r++) {
+        for (var c = g.left; c <= g.right; c++) anchorOf[r + ',' + c] = g.top + ',' + g.left;
+      }
+    });
+    return function (r, c) {
+      var k = anchorOf[r + ',' + c] || (r + ',' + c);
+      return { key: k, text: text[k] || '' };
+    };
+  }
+
+  // 表の横の広がり。見出しの行で、名前の列から左右へ文字のある列が続くところ（1列の空きは続きとみなす）
+  function spanOf(at, tb) {
+    var nc = colNum(tb.nameCol || tb.familyCol);
+    var hr = tb.headerRow || tb.firstRow;
+    var has = function (c) { return c >= 1 && !!at(hr, c).text; };
+    var lo = nc, hi = nc;
+    while (lo > 1 && (has(lo - 1) || has(lo - 2))) lo -= has(lo - 1) ? 1 : 2;
+    while (hi - nc < 30 && (has(hi + 1) || has(hi + 2))) hi += has(hi + 1) ? 1 : 2;
+    return { lo: Math.max(1, lo - 1), hi: hi, hr: hr };
+  }
+
+  var TITLE_PARTS = 3;    // 1行に題らしい文字がこれより多ければ、題の行ではない（見出しや札の並び）
+  var TITLE_JOINED = 40;  // 並べた題がこれより長ければ使わない
+
+  // 見せる形に整える。改行は空白に。
+  // ★ 1字ずつ空けて並べた字（均等割り付け「シ　ン　グ　ル　ス」）は詰める。
+  //   ただし1字が3つ以上続くときだけ（「100m 走」の空白は残す）
+  function clean(t) {
+    var parts = String(t || '').split(/[\s　]+/).filter(Boolean);
+    var out = [], run = [];
+    var flush = function () {
+      if (run.length >= 3) out.push(run.join(''));
+      else out = out.concat(run);
+      run = [];
+    };
+    parts.forEach(function (p) {
+      if (p.length === 1) run.push(p);
+      else { flush(); out.push(p); }
+    });
+    flush();
+    return out.join(' ');
+  }
+
+  // 表の題。見出しのすぐ上から順に探し、最初に題らしい文字が見つかった行のものを返す。
+  //   同じ行に2つ以上あれば、書いてあるまま並べる（「シングルス／混合ダブルス」）。
+  //   ★ ほかの表の行に入ったら、そこで探すのをやめる（上の表の中身を題と取り違えない）
+  //   ★ 記入欄の札・指示文・書き込まれた中身が1つでもある行は、行ごと題にしない。
+  //     「連絡責任者｜山田 太郎｜090-…」の行から、人の名前を表の名前として出さないため
+  //   戻り値: 文字（無ければ ''）
+  function titleOf(grid, merges, tb, tables) {
+    var at = textIndex(grid, merges);
+    var sp = spanOf(at, tb);
+    var others = (tables || []).filter(function (x) { return x !== tb; });
+    for (var up = 1; up <= TITLE_UP; up++) {
+      var r = sp.hr - up;
+      if (r < 1) break;
+      var inOther = others.some(function (x) {
+        return r >= (x.headerRow || x.firstRow) && r <= x.lastRow;
+      });
+      if (inOther) break;
+      var seen = {}, got = [], fieldRow = false;
+      for (var c = sp.lo; c <= sp.hi; c++) {
+        var cell = at(r, c);
+        if (!cell.text || seen[cell.key]) continue;
+        seen[cell.key] = true;
+        var t = clean(cell.text);
+        var bare = t.replace(/\s+/g, '');
+        if (!bare || /^\d+$/.test(bare)) continue;
+        if (INSTRUCT_RE.test(bare) || FIELD_RE.test(bare) || DATA_RE.test(bare)) { fieldRow = true; continue; }
+        if (bare.length > TITLE_MAX) continue;
+        if (got.indexOf(t) < 0) got.push(t);   // 左右の表の上に同じ題が2つあることがある
+      }
+      if (fieldRow) continue;
+      if (got.length > TITLE_PARTS) continue;
+      var joined = got.join('／');
+      if (joined && joined.length <= TITLE_JOINED) return joined;
+    }
+    return '';
+  }
+
+  // 題が無いときの手がかり。表の見出し（氏名・フリガナ・生年月日…）を4つまで
+  function headersOf(grid, merges, tb) {
+    var at = textIndex(grid, merges);
+    var sp = spanOf(at, tb);
+    if (!tb.headerRow) return '';
+    var seen = {}, out = [];
+    for (var c = sp.lo; c <= sp.hi && out.length < 4; c++) {
+      var cell = at(sp.hr, c);
+      if (!cell.text || seen[cell.key]) continue;
+      seen[cell.key] = true;
+      out.push(clean(cell.text).replace(/\s+/g, ''));
+    }
+    return out.join('・');
+  }
+
+  // いま入れている表の番号。開いている表があればそれ、無ければ最初のまだ空きのある表。
+  // ぜんぶ埋まっていれば -1
+  function activeTable(tables, picks, open) {
+    if (typeof open === 'number' && open >= 0 && open < (tables || []).length) return open;
+    for (var i = 0; i < (tables || []).length; i++) {
+      if (((picks && picks[i]) || []).length < tables[i].rows.length) return i;
+    }
+    return -1;
+  }
+
   global.EntryView = { frame: frame, focusOf: focusOf, marks: marks, point: point, pointMarks: pointMarks,
+    titleOf: titleOf, headersOf: headersOf, activeTable: activeTable,
     colPx: colPx, rowPx: rowPx, letter: letter, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS, ABOVE: ABOVE };
 })(typeof window !== 'undefined' ? window : this);
