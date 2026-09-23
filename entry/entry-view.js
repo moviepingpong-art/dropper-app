@@ -205,8 +205,10 @@
   var INSTRUCT_RE = /記入|ください|下さい|番号を|を付け|をつけ|に○|に〇|丸で|選んで|※/;
   // 記入欄の札は題ではない（「団体名 [____]」「連絡先」「代表者名」「連絡責任者」）
   var FIELD_RE = /(名|番号|住所|電話|TEL|FAX|メール|mail|年月日|先|者|No\.?|№)$|代表|責任|連絡/i;
-  // 書き込まれた中身らしいもの（電話・日付・メール・郵便番号）
-  var DATA_RE = /\d{2,}\s*[-‐－\/.．]\s*\d|@|＠|〒/;
+  // 書き込まれた中身らしいもの（電話・日付・メール・郵便番号）。
+  // ★ 「札: 中身」を1つのセルに書いたもの（「参加チーム名: 白山クラブ」）も中身。2026-09-24、本物のスポレクで、
+  //   連絡責任者の表の名前がチーム名になっていた
+  var DATA_RE = /\d{2,}\s*[-‐－\/.．]\s*\d|@|＠|〒|[:：]\s*\S/;
 
   function textIndex(grid, merges) {
     var text = {}, anchorOf = {};
@@ -263,6 +265,13 @@
   //     「連絡責任者｜山田 太郎｜090-…」の行から、人の名前を表の名前として出さないため
   //   戻り値: 文字（無ければ ''）
   function titleOf(grid, merges, tb, tables) {
+    // ★ 名前の列の見出しのすぐ上に書いてある語（tb.label。スポレクの「連絡責任者」）を先に使う。
+    //   その表のための札なので、いちばん確か。記入欄の札の語（〜者）でも、ここでは題として使う
+    //   （横に中身が並ぶ行ではなく、表の真上に1つだけ書いてあるため）
+    if (tb.label) {
+      var lb = clean(tb.label).replace(/\s+/g, '');
+      if (lb && !INSTRUCT_RE.test(lb) && !DATA_RE.test(lb)) return clean(tb.label);
+    }
     var at = textIndex(grid, merges);
     var sp = spanOf(at, tb);
     var others = (tables || []).filter(function (x) { return x !== tb; });
@@ -318,7 +327,17 @@
     return -1;
   }
 
+  // ★ シートの表がぜんぶ埋まったか（2026-09-24、本人の要望。埋まったら次のシートへ移る）。
+  //   2枚目を足す表（more）は、いくらでも入るので「埋まった」にならない。表の無いシートも埋まらない
+  function sheetDone(tables, picks, more) {
+    if (!tables || !tables.length) return false;
+    return tables.every(function (tb, ti) {
+      if (more && more[ti]) return false;
+      return ((picks && picks[ti]) || []).length >= tb.rows.length;
+    });
+  }
+
   global.EntryView = { frame: frame, focusOf: focusOf, marks: marks, point: point, pointMarks: pointMarks,
-    titleOf: titleOf, headersOf: headersOf, activeTable: activeTable,
+    titleOf: titleOf, headersOf: headersOf, activeTable: activeTable, sheetDone: sheetDone,
     colPx: colPx, rowPx: rowPx, letter: letter, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS, ABOVE: ABOVE };
 })(typeof window !== 'undefined' ? window : this);

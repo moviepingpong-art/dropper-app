@@ -807,6 +807,8 @@
     if (!state.form || !state.roster) return;
     var book = state.form.book;
     state.sheets = [];
+    state.sheetAt = 0;        // ③でいま見せているシート（1枚ずつ見せる。2026-09-24）
+    state.sheetMoved = '';
     state.skipped = false;
     book.sheets.forEach(function (s, i) {
       if (s.state && s.state !== 'visible') return;   // 隠しシートは見ない
@@ -1033,6 +1035,57 @@
   }
   var TBL_COLORS = 5;   // 表の色の数（index.html の .sv-g0〜.sv-g4）
 
+  /* ===== シートを1枚ずつ（2026-09-24、本人の要望） =====
+     ★ 本物のスポレクは同じ形のシートが3枚（チームごと）あり、3枚ぶんが一気に並んで
+       どこに入れているか分からなかった。いまのシートだけを見せ、上にシートの札を並べる。
+     ★ シートの表がぜんぶ埋まったら、次のシートへ自動で移る。全部埋めなくてもよい
+       （選手が4人で表が6行、など）ので、「次のシートへ」のボタンでも移れる */
+  function sheetCount(sh) {
+    return sh.blank ? sh.picks.reduce(function (s, p) { return s + p.length; }, 0) : 0;
+  }
+  function sheetSteps() {
+    var bar = h('div', { class: 'sh-steps' });
+    state.sheets.forEach(function (sh, si) {
+      var now = si === state.sheetAt;
+      var done = sh.blank && V.sheetDone(sh.tables, sh.picks, sh.more);
+      var n = sheetCount(sh);
+      var mark = now ? '●' : done ? '✓' : n ? '…' : '○';
+      bar.appendChild(h('button', { type: 'button', class: 'sh-step' + (now ? ' on' : done ? ' done' : ''),
+        text: mark + ' ' + t('shChip', { i: si + 1, name: sh.name }) + (n ? t('shChipCount', { n: n }) : ''),
+        onclick: function () {
+          if (state.sheetAt === si) return;
+          state.sheetAt = si; state.sheetMoved = ''; renderNames(); scrollToNames();
+        } }));
+    });
+    return bar;
+  }
+  function sheetNav(si) {
+    var nav = h('div', { class: 'btns sh-nav' });
+    if (si > 0) nav.appendChild(h('button', { type: 'button', class: 'btn-sub', text: t('shPrev'),
+      onclick: function () { state.sheetAt = si - 1; state.sheetMoved = ''; renderNames(); scrollToNames(); } }));
+    if (si < state.sheets.length - 1) nav.appendChild(h('button', { type: 'button',
+      text: t('shNext', { name: state.sheets[si + 1].name }),
+      onclick: function () { state.sheetAt = si + 1; state.sheetMoved = ''; renderNames(); scrollToNames(); } }));
+    return nav;
+  }
+  function scrollToNames() {
+    var s = el('stepNames');
+    if (s && s.scrollIntoView) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  // 人を入れたあと。シートの表がぜんぶ埋まったら、次のシートへ移る（最後のシートなら移らない）
+  function afterPick(sh) {
+    state.sheetMoved = '';
+    var si = state.sheets.indexOf(sh);
+    if (si >= 0 && si < state.sheets.length - 1 && V.sheetDone(sh.tables, sh.picks, sh.more)) {
+      state.sheetAt = si + 1;
+      state.sheetMoved = sh.name;
+      renderNames();
+      scrollToNames();
+      return;
+    }
+    renderNames();
+  }
+
   // ★ 表が見つからなかったシート。名前の列と書く行を教えてもらう（2026-09-20）
   function renderTeachSheet(sh, sec, canSkip) {
     sec.appendChild(h('p', { class: 'name-note ng', text: t('teachTitle') }));
@@ -1186,7 +1239,8 @@
                 picks.push(m);
                 // ★ 表がちょうど埋まったら、次のまだ空きのある表を「いま入れている表」にする
                 sh.pickOpen = (!more && picks.length >= cap) ? null : ti;
-                renderNames();
+                // ★ シートの表がぜんぶ埋まったら、次のシートへ
+                afterPick(sh);
               } }));
           });
           details.appendChild(wrap);
@@ -1272,7 +1326,18 @@
     el('stepNamesTitle').textContent = anyBlank && state.sheets.every(function (sh) { return sh.blank; })
       ? t('step3TitlePick') : t('step3Title');
     el('stepNamesHint').textContent = anyBlank ? t('step3HintPick') : t('step3Hint');
-    state.sheets.forEach(function (sh) {
+    // ★ シートは1枚ずつ見せる（2026-09-24、本人の要望）。本物のスポレクは3枚あり、
+    //   3枚ぶんの表と名前のボタンが一気に並んで、どこに入れているか分からなかった
+    var multi = state.sheets.length > 1;
+    if (!(state.sheetAt >= 0 && state.sheetAt < state.sheets.length)) state.sheetAt = 0;
+    if (multi) body.appendChild(sheetSteps());
+    // ★ 「次のシートに移りました」は、次に何か押すまで出しておく。ここで消すと、
+    //   開いた表の知らせ（toggle）による描き直しですぐ消える（2026-09-24、画面で見つけた）
+    if (state.sheetMoved) {
+      body.appendChild(h('p', { class: 'name-note ok', text: t('shMoved', { name: state.sheetMoved }) }));
+    }
+    state.sheets.forEach(function (sh, si) {
+      if (multi && si !== state.sheetAt) return;
       var sec = h('div', { class: 'sheet' }, [h('h3', { text: t('sheetTitle', { name: sh.name }) })]);
       if (sh.teach) {
         renderTeachSheet(sh, sec, state.sheets.some(function (x) { return !x.teach; }));
@@ -1354,10 +1419,19 @@
       sec.appendChild(ul);
       body.appendChild(sec);
     });
+    if (multi) body.appendChild(sheetNav(state.sheetAt));
     var picked = state.sheets.reduce(function (sum, sh) {
       return sum + (sh.blank ? sh.picks.reduce(function (s, p) { return s + p.length; }, 0) : 0);
     }, 0);
     var left = unresolvedCount();
+    // ★ 最後のシートまで来るまで、④へは進ませない（1枚ずつ見る。2026-09-24）
+    var lastSheet = !multi || state.sheetAt === state.sheets.length - 1;
+    if (!lastSheet) {
+      el('namesNext').disabled = true;
+      setMsg('namesMsg', t('shNextHint', { i: state.sheetAt + 1, n: state.sheets.length }), 'wait');
+      hideFrom('stepReview');
+      return;
+    }
     // ★ 教えてもらう途中のシートしか無いときは進ませない（何も書かないまま進むため）。
     //   ほかに使えるシートがあれば進める。そのシートには書かないと、教える箱に出してある
     if (state.sheets.some(function (sh) { return sh.teach; }) &&
@@ -1369,7 +1443,14 @@
     }
     if (anyBlank) {
       el('namesNext').disabled = left > 0 || picked === 0;
-      setMsg('namesMsg', picked ? t('pickReady', { n: picked }) : t('pickNone'), picked ? 'ok' : 'wait');
+      // ★ いま見ているシートにまだ空きのある表があれば、「次へ進んでください」とは言わない
+      //   （2026-09-24、本物のスポレク。連絡責任者を1人入れた時点で「次へ進んで」と出て、
+      //   選手の表がまだ空なのに終わったように見えた）。進むことはできる（全部埋めなくてよい）
+      var cur = state.sheets[state.sheetAt];
+      var act = (cur && cur.blank) ? V.activeTable(cur.tables, cur.picks, cur.pickOpen) : -1;
+      setMsg('namesMsg', !picked ? t('pickNone')
+        : act >= 0 ? t('pickMoreRoom', { n: picked, table: tableTag(cur.tables[act], act) })
+        : t('pickReady', { n: picked }), picked ? 'ok' : 'wait');
     } else {
       el('namesNext').disabled = left > 0;
       setMsg('namesMsg', left ? t('namesLeft', { n: left }) : t('namesReady'), left ? 'wait' : 'ok');
