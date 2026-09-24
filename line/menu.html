@@ -89,8 +89,13 @@
         url:'https://app.dropper-tools.com/decide/?openExternalBrowser=1' },
       { emoji:'📝', name:'申込書',     sub:'名簿から記入',    bg:'#ffd23f', fg:'#0f3d3a',
         url:'https://app.dropper-tools.com/entry/?openExternalBrowser=1' },
+      // ★ 使い方は、周知サイトのホームの「シリーズを見る」と同じ所（#tools。4本のカード）へ
+      //   （2026-09-24、本人の指摘）。前は guide.html＝イベントドロッパーだけの使い方だった。
+      //   ★ ?openExternalBrowser=1 は # より前に置く（後ろに置くと LINE が読まない）。
+      //   カードからツールへのリンクには付いていないので、ここで外部ブラウザに出しておかないと、
+      //   LINE 内のブラウザのままツールが開き、Google ログインが弾かれる
       { emoji:'📖', name:'使い方',     sub:'ガイドを見る',    bg:'#f7fffd', fg:'#0f3d3a',
-        url:'https://dropper-tools.com/guide.html?openExternalBrowser=1' },
+        url:'https://dropper-tools.com/?openExternalBrowser=1#tools' },
       { emoji:'🔒', name:'安心の理由', sub:'データの扱い',    bg:'#f7fffd', fg:'#0f3d3a',
         url:'https://dropper-tools.com/privacy.html' }
     ];
