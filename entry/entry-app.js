@@ -1994,23 +1994,27 @@
     return '';
   }
 
-  // ★ この申込書に書く人のうち、いちばん多い都道府県。単独で最多なら省いて市区町村から書く
-  //   （2026-09-18、本人の要望。ほとんどが同じ県なので、そのほうが読みやすい）。
-  //   同数で並んだら省かない（どちらを省いても分かりにくいため）
+  // ★ この申込書に書く人のうち、いちばん多い都道府県（数え方は EntryRoster.majorityPref）
   function majorityPref() {
-    var counts = {}, total = 0;
-    state.sheets.forEach(function (sh) {
-      entriesOf(sh).forEach(function (e) {
-        var m = memberOf(sh, e);
-        if (!m || !m.pref || !m.addressRest) return;
-        counts[m.pref] = (counts[m.pref] || 0) + 1;
-        total++;
-      });
-    });
-    var prefs = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
-    if (!prefs.length) return null;
-    if (prefs.length > 1 && counts[prefs[0]] === counts[prefs[1]]) return null;   // 同数で並んだ
-    return { pref: prefs[0], n: counts[prefs[0]], total: total };
+    var members = [];
+    state.sheets.forEach(function (sh) { members = members.concat(writtenMembers(sh)); });
+    // ★ 無ければ省かない。entry/ の JS には ?v= が無く、公開の直後は古い entry-roster.js と
+    //   新しいこのファイルが組み合わさることがある（最大10分）。そのとき④ごと止めないため（2026-09-26）
+    return R.majorityPref ? R.majorityPref(members) : null;
+  }
+  // そのシートに書く人すべて。
+  // ★ 空の申込書で2枚目以降があるときは、ページごとに集める（2026-09-26、本番で発覚）。
+  //   sh.found は1枚目の人だけなので、それを数えると2枚目の人が抜け、
+  //   石川・福井が1枚目で同数になって「石川県」を省かなかった（2枚目の人も石川で、3人中2人だった）
+  function writtenMembers(sh) {
+    if (sh.blank && sh.picks) {
+      var out = [];
+      for (var p = 0; p < pagesOf(sh); p++) {
+        foundFromPicks(sh, p).names.forEach(function (n) { out.push(n.match.member); });
+      }
+      return out;
+    }
+    return entriesOf(sh).map(function (e) { return memberOf(sh, e); }).filter(Boolean);
   }
 
   function renderReview() {

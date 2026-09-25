@@ -1,6 +1,6 @@
 // entry-roster.js — 申込書ドロッパーの「名前の突き合わせ」と「書き込む値づくり」
 // window.EntryRoster = { matchName, findNames, fill, parseBirth, ageAt, toWareki,
-//                        nameKey, foldKey, distance } を公開する。
+//                        nameKey, foldKey, distance, majorityPref } を公開する。
 //
 // ★ 名簿は個人情報そのもの。このファイルは通信を一切しない。
 //   どこにも送らない（2026-09-15 までは AI に送る前に伏せ字にしていたが、AI をやめたので伏せ字の関数も無くした）。
@@ -276,8 +276,27 @@
     return { writes: writes, problems: problems, age: age };
   }
 
+  // ★ この申込書に書く人のうち、いちばん多い都道府県。単独で最多なら、住所は省いて市区町村から書く
+  //   （2026-09-18、本人の要望。ほとんどが同じ県なので、そのほうが読みやすい）。
+  //   同数で並んだら省かない（どちらを省いても分かりにくいため）。
+  //   members は**申込書に書く人すべて**（2枚目以降に入る人も。2026-09-26、1枚目の人だけを数えていた）
+  //   → { pref, n, total } か null
+  function majorityPref(members) {
+    var counts = {}, total = 0;
+    (members || []).forEach(function (m) {
+      if (!m || !m.pref || !m.addressRest) return;
+      counts[m.pref] = (counts[m.pref] || 0) + 1;
+      total++;
+    });
+    var prefs = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (!prefs.length) return null;
+    if (prefs.length > 1 && counts[prefs[0]] === counts[prefs[1]]) return null;   // 同数で並んだ
+    return { pref: prefs[0], n: counts[prefs[0]], total: total };
+  }
+
   global.EntryRoster = {
     matchName: matchName, findNames: findNames, fill: fill, parseBirth: parseBirth,
-    ageAt: ageAt, toWareki: toWareki, nameKey: nameKey, foldKey: foldKey, distance: distance
+    ageAt: ageAt, toWareki: toWareki, nameKey: nameKey, foldKey: foldKey, distance: distance,
+    majorityPref: majorityPref
   };
 })(typeof window !== 'undefined' ? window : this);
