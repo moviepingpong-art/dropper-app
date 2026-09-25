@@ -13,6 +13,7 @@
 //      通信は、このサイトの postal/ を読む1か所だけであること（名簿も申込書もどこにも送らない）
 //   9. 郵便番号から住所（tools/make-postal.js の変換と entry-postal.js の引き当て）
 //  10. 名簿ファイル（entry-book.js で作る・読む・申込書に書く形にする）
+//  14. 様式が無いときに作る空の申込書（entry-make.js）が、いまの「空の申込書」の道で読めること
 var fs = require('fs');
 var path = require('path');
 
@@ -26,8 +27,10 @@ eval(fs.readFileSync(path.join(__dirname, '..', 'entry-book.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-attend.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-blank.js'), 'utf8'));
 eval(fs.readFileSync(path.join(__dirname, '..', 'entry-view.js'), 'utf8'));
+eval(fs.readFileSync(path.join(__dirname, '..', 'entry-make.js'), 'utf8'));
 var X = window.EntryXlsx, R = window.EntryRoster, RU = window.EntryRules, M = window.EntryMap,
-    P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend, B_ = window.EntryBlank;
+    P = window.EntryPostal, B = window.EntryBook, AT = window.EntryAttend, B_ = window.EntryBlank,
+    MK = window.EntryMake;
 var MAKE_POSTAL = require(path.join(__dirname, '..', '..', 'tools', 'make-postal.js'));
 
 // 手で書いた欄の対応を、見出しの規則の答えと比べるために取っておく
@@ -234,6 +237,7 @@ function main() {
     .then(function () { return blankSection(roster); })
     .then(function () { return viewSection(); })
     .then(function () { return eventSection(); })
+    .then(function () { return makeSection(roster); })
     .then(function () {
       fs.writeFileSync(path.join(OUT, 'expect.json'), JSON.stringify(expectForExcel, null, 1), 'utf8');
       console.log('\n' + (ng ? 'NG が ' + ng + ' 件あります' : 'すべて OK') +
@@ -2251,6 +2255,103 @@ function bookSection() {
     vals['A2'] = '山田'; vals['B2'] = '太郎'; vals['C2'] = 'ヤマダ';
     vals['E2'] = String(B.serialOf({ y: 1950, m: 4, d: 1 })); vals['F2'] = '924-0001'; vals['I2'] = '090-0000-0001';
     expectForExcel.push({ file: 'roster-book.xlsx', sheet: '男子', cells: vals });
+  });
+}
+
+// ===== 様式が無いときに作る空の申込書（2026-09-26） =====
+// ★ 作った Excel は、いまの「空の申込書」の道（表さがし → 見出しの規則 → 書き込み）にそのまま流す。
+//   だから確かめるのは「その道で読めるか」。見出しの語を言い換えると見落としになるので、ここで止める
+function makeSection(roster) {
+  section('14. 様式が無いときに作る空の申込書（entry-make.js）');
+
+  var ALL = MK.ITEMS.map(function (it) { return it.key; });
+  // ★ 題に見出しの語（住所・電話・年齢）を混ぜても、欄の種類や表の名前に化けないこと
+  var TRICKY = '第10回 住所・電話 年齢区分あり 参加申込書';
+  var opts = { title: TRICKY, items: ALL, extras: ['所属'], others: ['種目', '備考'], rows: 5 };
+
+  eq(MK.columnsOf({ items: ['phone', 'kana'], others: ['フリガナ', ' 備考 ', ''] }).map(function (c) { return c.label; }),
+    ['No.', '氏名', 'フリガナ', '電話番号', '備考'], '列は No.・氏名・選んだ項目（決まった順）。同じ語と空は1つにまとめる');
+  eq([MK.fileName(' ○○教室 受講申込書 '), MK.fileName(''), MK.fileName('a/b:c')],
+    ['○○教室 受講申込書.xlsx', '申込書.xlsx', 'abc.xlsx'], 'ファイル名は題から（使えない文字は外す）');
+
+  var file = path.join(OUT, 'made-blank.xlsx');
+  function mapOf(book, rows, members) {
+    var names = members.map(function (m, i) {
+      return { refs: ['B' + rows[i]], row: rows[i], col: 2, text: m.name, match: { status: 'exact', member: m } };
+    });
+    var cells = X.cells(book, MK.SHEET);
+    var found = { names: names, suspects: [], duplicates: [] };
+    return { found: found, cells: cells, mapping: M.normalize(RU.map(cells, X.merges(book, MK.SHEET), found)) };
+  }
+
+  return MK.make(opts).then(function (bytes) {
+    if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
+    fs.writeFileSync(file, bytes);
+    return X.open(bytes);
+  }).then(function (book) {
+    eq(X.sheetNames(book), [MK.SHEET], 'シートは1枚');
+    eq(valueMap(book, MK.SHEET).A1, TRICKY, '題は A1 に打ったとおり');
+    var tb = B_.tables(X.grid(book, MK.SHEET));
+    eq(shownOf(tb), ['B:4-8'], '★ 表さがしが、氏名の列と書ける行（5行）を見つける');
+    // 画面の表の名前は entry-view.js の titleOf が題から付ける（表の真上の題。本物の様式と同じ。2026-09-26、本人の判断）。
+    // ここで見るのは、表さがしの「見出しのすぐ上の札」に題が入らないこと
+    eq(tb.map(function (t) { return t.label; }), [''], '表さがしは題を「見出しのすぐ上の札」と読まない');
+
+    var yamada = roster.members[0], nakazaki = roster.members[9];
+    var m = mapOf(book, [4, 5], [yamada, nakazaki]);
+    var t0 = m.mapping.tables[0];
+    eq(t0.fields.map(function (f) { return f.field + '@' + f.col; }),
+      ['kana@C', 'gender@D', 'birth@E', 'age@F', 'postal@G', 'address@H', 'phone@I'],
+      '★ 名簿から埋める7項目を、見出しの規則がすべて読む（言い換えると見落としになる）');
+    eq(t0.eventCol, '', '「種目」の列には書かない（種目を書くのは2人1組の表だけ。今までの様式と同じ扱い）');
+    eq((t0.cols || []).filter(function (c) { return c.col === 'J' || c.col === 'L'; }).map(function (c) { return c.col + ':' + (c.field || ''); }),
+      ['J:', 'L:'], '名簿に足した項目（所属）と自由な項目（備考）は、規則では決めない（所属は画面で名簿の項目に当てる）');
+
+    // 空の題でも、題を変えても、様式の鍵は同じ（④で選び直した内容が次に作ったときも効く）
+    var keyOf = function (title) {
+      return MK.make({ title: title, items: ALL, extras: ['所属'], others: ['種目', '備考'], rows: 5 })
+        .then(function (b) { return X.open(b); })
+        .then(function (bk) { return M.formKey(mapOf(bk, [4, 5], [yamada, nakazaki]).mapping); });
+    };
+    return Promise.all([M.formKey(m.mapping), keyOf(''), keyOf('○○教室 受講申込書')]).then(function (keys) {
+      check(keys[0] === keys[1] && keys[1] === keys[2], '★ 題が違っても様式の鍵は同じ');
+      var sl = M.slotsFor(m.mapping, sortedNames(m.found), { cells: m.cells });
+      return writeForm('作った空の申込書', file, book, MK.SHEET, roster, [yamada, nakazaki],
+        sl.slots, sl.groups, 'made-filled.xlsx', {
+          values: {
+            A1: TRICKY, A4: 1, A5: 2, A6: 3,
+            B4: '山田 太郎', C4: yamada.kana || undefined, D4: '男', G4: '920-0001', I4: yamada.phone,
+            B5: '中﨑 良子', D5: '女', F4: R.ageAt(yamada.birth, BASE), F5: R.ageAt(nakazaki.birth, BASE),
+            B6: undefined, J4: undefined, K4: undefined, L4: undefined
+          },
+          excel: { B4: '山田 太郎', D5: '女', G4: '920-0001' },
+          problems: ['B5 postal:not-in-roster']
+        });
+    });
+  }).then(function () {
+    // ★ 年齢の基準日（2026-09-26、本人の判断）。作るときに入れれば、④で聞かれず、紙にも残る
+    eq([MK.baseDateText({ y: 2027, m: 4, d: 1 }), MK.baseDateText(null), MK.baseDateText({ y: 2027, m: 13, d: 1 })],
+      ['※年齢は 2027年4月1日 現在', '', ''], '基準日の文（無い・おかしい日付なら書かない）');
+    return MK.make({ title: TRICKY, items: ALL, rows: 5, baseDate: { y: 2027, m: 4, d: 1 } }).then(function (b) { return X.open(b); })
+      .then(function (bk) {
+        var grid = X.grid(bk, MK.SHEET), tbs = B_.tables(grid);
+        eq(shownOf(tbs), ['B:4-8'], '基準日の行があっても、表は同じに見つかる');
+        var m = mapOf(bk, [4], [roster.members[0]]).mapping;
+        eq([m.baseDateRaw, m.baseDate], ['※年齢は 2027年4月1日 現在', { y: 2027, m: 4, d: 1 }],
+          '★ 見出しの規則が基準日を読む（④で聞かれない）');
+        eq(m.tables[0].fields.map(function (f) { return f.field + '@' + f.col; }),
+          ['kana@C', 'gender@D', 'birth@E', 'age@F', 'postal@G', 'address@H', 'phone@I'], '基準日の行で欄の対応は変わらない');
+        eq(window.EntryView.titleOf(grid, X.merges(bk, MK.SHEET), tbs[0], tbs), TRICKY,
+          '★ 基準日の行を表の名前にしない（「※」の目印。表の名前は題のまま）');
+      });
+  }).then(function () {
+    return Promise.all([MK.make({ items: [] }), MK.make({ rows: 999 })]).then(function (list) {
+      return Promise.all(list.map(function (b) { return X.open(b); }));
+    }).then(function (books) {
+      eq(books.map(function (bk) { return shownOf(B_.tables(X.grid(bk, MK.SHEET))); }),
+        [['B:4-' + (3 + MK.DEFAULT_ROWS)], ['B:4-' + (3 + MK.MAX_ROWS)]],
+        '行数は既定 ' + MK.DEFAULT_ROWS + '、多すぎれば ' + MK.MAX_ROWS + ' まで。項目が氏名だけでも表になる');
+    });
   });
 }
 
