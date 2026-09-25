@@ -199,6 +199,16 @@ function main() {
     eq(addrOf(yamada, 'plain', {}), '石川県金沢市テスト町1-1', '住所: 省く県が決まっていなければ、そのまま書く');
     eq(addrOf(yamada, 'with-postal', { dropPref: '石川県' }), '〒920-0001 金沢市テスト町1-1', '住所: 〒から書くときも県名を省く');
 
+    // ★ 省く県の決め方（EntryRoster.majorityPref）。数えるのは申込書に書く人すべて（2026-09-26）。
+    //   画面が2枚目以降の人を渡し忘れていて、1枚目で石川・福井が同数になり、県名を省かなかった（本番で発覚）
+    var P_ = function (pref) { return { pref: pref, addressRest: '市町1' }; };
+    eq(R.majorityPref([P_('石川県'), P_('福井県'), P_('石川県')]), { pref: '石川県', n: 2, total: 3 },
+      '省く県: 単独で最多の県（3人中2人）');
+    eq(R.majorityPref([P_('石川県'), P_('福井県')]), null, '省く県: 同数で並んだら省かない（1枚目だけを数えると、こうなっていた）');
+    eq(R.majorityPref([P_('石川県'), { pref: '福井県', addressRest: '' }, { pref: '', addressRest: 'x' }, null]),
+      { pref: '石川県', n: 1, total: 1 }, '省く県: 県や市区町村以下が空の人は数えない');
+    eq([R.majorityPref([]), R.majorityPref(null)], [null, null], '省く県: 誰もいなければ省かない');
+
     // ★ 見出しに空白が入っていても、見出しは名前として拾わない（2026-09-18、かほく市長杯の様式で発覚）
     var headerCells = [
       { ref: 'B4', row: 4, col: 2, text: '氏　名' },
