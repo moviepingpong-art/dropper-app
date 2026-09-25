@@ -1,6 +1,6 @@
 // entry-app.js — 申込書ドロッパーの画面
 //
-// 流れ: ① 名簿（このツールで作る・前に保存したファイルを開く）② 申込書（名前だけ書いた Excel）
+// 流れ: ① 名簿（このツールで作る・前に保存したファイルを開く）② 申込書（名前だけ書いた Excel。様式が無ければ項目を選んで作る）
 //       ③ 名前の確認（欄の対応は見出しの規則で作る。画面の段は無い）④ 書き込む内容の確認 ⑤ 保存
 //       ※ HTML の id は stepNames / stepReview / stepSave のまま（見出しの番号だけ振り直した）
 //
@@ -13,7 +13,7 @@
 
   var X = window.EntryXlsx, R = window.EntryRoster, M = window.EntryMap,
       B = window.EntryBook, P = window.EntryPostal, A = window.EntryAttend, BL = window.EntryBlank,
-      V = window.EntryView;
+      V = window.EntryView, MK = window.EntryMake;
 
   function t(k, v) { return window.I18N.t(k, v); }
   function has(k) { return Object.prototype.hasOwnProperty.call(window.I18N.dict(), k); }
@@ -63,6 +63,7 @@
   }
 
   function onForm(file) {
+    el('makeBox').hidden = true;
     state.form = null;
     state.sheets = [];
     hideFrom('stepNames');
@@ -72,6 +73,148 @@
       return X.open(bytes).then(function (book) {
         state.form = { name: file.name, bytes: bytes, book: book };
         setMsg('formMsg', t('formOk', { name: file.name, n: book.sheets.length }), 'ok');
+        analyze();
+      });
+    }).catch(function (e) { setMsg('formMsg', errText(e), 'ng'); });
+  }
+
+  /* ===== ② 様式が無いときに作る（2026-09-26、本人の要望） =====
+     ★ 自由書式の申込もある。項目を選んで空の申込書を作り（entry-make.js）、
+       いまの「空の申込書」の道（③ 人を選ぶ ④ 確認 ⑤ 保存）にそのまま流す。
+       書き込みは作った Excel に対して今までどおり行うので、④の確かめ・書式の守りがそのまま効く。
+     ★ 題はこちらで作らない。「大会」とは限らない（教室・発表会・講習会もある）。
+     ★ 選んだ内容は画面を開いているあいだだけ持つ（作り直すときに選び直さなくてよいように）。
+       端末には覚えない */
+  var MAKE_DEFAULT = ['kana', 'gender', 'birth', 'age'];
+
+  function makeState() {
+    if (!state.make) {
+      state.make = { title: '', items: MAKE_DEFAULT.slice(), extras: [], others: [], rows: MK.DEFAULT_ROWS, base: '' };
+    }
+    return state.make;
+  }
+  function toggleIn(list, v, on) {
+    var i = list.indexOf(v);
+    if (on && i < 0) list.push(v);
+    if (!on && i >= 0) list.splice(i, 1);
+  }
+  function checkChoice(label, on, onchange, disabled) {
+    var input = h('input', { type: 'checkbox', checked: on, disabled: disabled,
+      onchange: function () { onchange(input.checked); } });
+    return h('label', { class: 'choice' }, [input, h('span', { text: label })]);
+  }
+
+  function onMakeOpen() {
+    el('makeBox').hidden = false;
+    renderMake();
+  }
+
+  function renderMake() {
+    var ms = makeState();
+    var box = clear(el('makeBox'));
+
+    var title = h('input', { type: 'text', id: 'makeTitle', placeholder: t('makeTitlePh'), maxlength: '60', value: ms.title,
+      oninput: function () { ms.title = title.value; } });
+    box.appendChild(h('div', { class: 'field' }, [h('label', { for: 'makeTitle', text: t('makeTitleLabel') }), title,
+      h('p', { class: 'hint', text: t('makeTitleHint') })]));
+
+    // 名簿から書く項目（見出しの語は entry-make.js の ITEMS。規則が必ず読める語）
+    box.appendChild(h('p', { class: 'sub-title', text: t('makeItemsLabel') }));
+    var items = h('div', { class: 'choices' }, [checkChoice(t('makeName'), true, function () {}, true)]);
+    MK.ITEMS.forEach(function (it) {
+      items.appendChild(checkChoice(it.label, ms.items.indexOf(it.key) >= 0, function (on) {
+        toggleIn(ms.items, it.key, on);
+        if (it.key === 'age') renderMake();   // 基準日の欄は年齢を選んだときだけ出す
+      }));
+    });
+    box.appendChild(items);
+
+    // 名簿に足した項目。★ 見出しを名簿の項目名とぴったり同じにするので、③④で名簿から埋まる（addExtraFields）
+    box.appendChild(h('p', { class: 'sub-title', text: t('makeExtrasLabel') }));
+    var extras = state.book ? extraNamesOf() : [];
+    if (extras.length) {
+      var ex = h('div', { class: 'choices' });
+      extras.forEach(function (name) {
+        ex.appendChild(checkChoice(name, ms.extras.indexOf(name) >= 0, function (on) { toggleIn(ms.extras, name, on); }));
+      });
+      box.appendChild(ex);
+    } else {
+      box.appendChild(h('p', { class: 'hint', text: state.book ? t('extraNote') : t('makeExtrasNoRoster') }));
+    }
+
+    // 名簿にない項目（見出しだけの空いた列）
+    box.appendChild(h('p', { class: 'sub-title', text: t('makeOthersLabel') }));
+    if (ms.others.length) {
+      var row = h('p', { class: 'small extra-row' });
+      ms.others.forEach(function (name, i) {
+        row.appendChild(h('span', { class: 'extra-chip' }, [h('span', { text: name }),
+          h('button', { type: 'button', class: 'link-btn', text: '✕', title: t('extraRemove'),
+            onclick: function () { ms.others.splice(i, 1); renderMake(); } })]));
+      });
+      box.appendChild(row);
+    }
+    var other = h('input', { type: 'text', id: 'makeOther', class: 'filter', placeholder: t('makeOthersPh'), maxlength: '20' });
+    var addOther = function () {
+      var name = other.value.replace(/\s+/g, ' ').trim();
+      if (!name) return;
+      var taken = ['No.', '氏名'].concat(MK.ITEMS.map(function (it) { return it.label; }), extras, ms.others);
+      if (taken.indexOf(name) >= 0) { setMsg('makeMsg', t('makeOthersDup', { name: name }), 'ng'); return; }
+      ms.others.push(name);
+      renderMake();
+      el('makeOther').focus();
+    };
+    // ★ 日本語入力の変換を確定する Enter では足さない（打ちかけの文字で項目ができる）
+    other.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' || ev.isComposing || ev.keyCode === 229) return;
+      ev.preventDefault();
+      addOther();
+    });
+    box.appendChild(h('div', { class: 'list-head' }, [other,
+      h('button', { type: 'button', class: 'btn-sub', text: t('makeOthersAdd'), onclick: addOther })]));
+    box.appendChild(h('p', { class: 'hint', text: t('makeOthersHint') }));
+
+    // ★ 年齢の基準日（2026-09-26、本人の判断）。申込書に書けば見出しの規則が読むので、④で聞かれない。
+    //   年齢を選んでいるときだけ出す
+    if (ms.items.indexOf('age') >= 0) {
+      var base = h('input', { type: 'date', id: 'makeBase', value: ms.base,
+        onchange: function () { ms.base = base.value; } });
+      box.appendChild(h('div', { class: 'field' }, [h('label', { for: 'makeBase', text: t('makeBaseLabel') }), base,
+        h('p', { class: 'hint', text: t('makeBaseHint') })]));
+    }
+
+    var rows = h('input', { type: 'number', id: 'makeRows', min: '1', max: String(MK.MAX_ROWS), value: String(ms.rows),
+      onchange: function () {
+        var v = Math.floor(Number(rows.value));
+        ms.rows = v >= 1 ? Math.min(v, MK.MAX_ROWS) : MK.DEFAULT_ROWS;
+        rows.value = String(ms.rows);
+      } });
+    box.appendChild(h('div', { class: 'field' }, [h('label', { for: 'makeRows', text: t('makeRowsLabel') }), rows,
+      h('p', { class: 'hint', text: t('makeRowsHint', { max: MK.MAX_ROWS }) })]));
+
+    box.appendChild(h('div', { class: 'btns' }, [
+      h('button', { type: 'button', text: t('makeGo'), onclick: onMakeGo }),
+      h('button', { type: 'button', class: 'btn-sub', text: t('makeCancel'),
+        onclick: function () { el('makeBox').hidden = true; } })]));
+    box.appendChild(h('p', { class: 'msg', id: 'makeMsg' }));
+  }
+
+  function onMakeGo() {
+    var ms = makeState();
+    // 名簿に足した項目は、いまの名簿にあるものだけ（名簿を開き直して項目が消えていることがある）
+    var extras = state.book ? extraNamesOf().filter(function (n) { return ms.extras.indexOf(n) >= 0; }) : [];
+    var name = MK.fileName(ms.title);
+    state.form = null;
+    state.sheets = [];
+    hideFrom('stepNames');
+    setMsg('formMsg', t('makeMaking'), 'wait');
+    var ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ms.base || '');
+    var baseDate = (ymd && ms.items.indexOf('age') >= 0) ? { y: +ymd[1], m: +ymd[2], d: +ymd[3] } : null;
+    var opts = { title: ms.title, items: ms.items, extras: extras, others: ms.others, rows: ms.rows, baseDate: baseDate };
+    MK.make(opts).then(function (bytes) {
+      return X.open(bytes).then(function (book) {
+        state.form = { name: name, bytes: bytes, book: book, made: true };
+        el('makeBox').hidden = true;
+        setMsg('formMsg', t(state.roster ? 'makeDone' : 'makeNeedRoster', { name: name, n: ms.rows }), 'ok');
         analyze();
       });
     }).catch(function (e) { setMsg('formMsg', errText(e), 'ng'); });
@@ -2304,6 +2447,7 @@
   }
 
   wireDrop('formDrop', 'formInput', 'formPick', onForm);
+  el('formMake').addEventListener('click', onMakeOpen);
   wireDrop('rosterDrop', 'rosterInput', 'rosterPick', onRosterFile);
   el('rosterNew').addEventListener('click', function (ev) { ev.stopPropagation(); onNewRoster(); });
   el('rosterClose').addEventListener('click', onCloseRoster);

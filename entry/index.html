@@ -247,9 +247,9 @@
     .msg.ok { color:var(--teal-d); }
     .msg.ng { color:var(--ng); }
 
-    select, input[type=date] { font-family:inherit; font-size:14px; padding:8px 10px; border:2px solid var(--line);
+    select, input[type=date], input[type=number] { font-family:inherit; font-size:14px; padding:8px 10px; border:2px solid var(--line);
       border-radius:10px; background:#fff; color:var(--ink); max-width:100%; }
-    select:focus, input[type=date]:focus { outline:none; border-color:var(--teal); }
+    select:focus, input[type=date]:focus, input[type=number]:focus { outline:none; border-color:var(--teal); }
     .field { margin:4px 0 8px; }
     .field label { display:block; font-size:13px; font-weight:700; margin-bottom:6px; }
 
@@ -289,6 +289,11 @@
     .extra-row .extra-base { color:#5b6b66; font-size:13px; }
     .extra-row .extra-add { font-size:16px; font-weight:700; padding:9px 18px; }
     .extra-box { border:1px solid #cfe6dd; border-radius:10px; padding:12px; margin:10px 0; background:#f7fbf9; }
+    /* ② 様式が無いときに作る（2026-09-26）。箱は①の「項目を足す」と同じ見た目 */
+    .make-box .field input[type=text] { width:100%; }
+    .make-box .choices { margin:4px 0 6px; }
+    .make-box .choice input:disabled + span { color:var(--sub); }
+    .make-box input[type=number] { width:6em; }
     .extra-list { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
     .extra-list button { font-size:14px; }
     table.roster td.row-btns { white-space:nowrap; }
@@ -536,6 +541,12 @@
         <div class="drop-btns"><button type="button" id="formPick" class="btn-sub" data-i18n="formPick">ファイルを選ぶ</button></div>
       </div>
       <input type="file" id="formInput" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+      <!-- ★ 様式が無い（自由書式の）ときの入口（2026-09-26、本人の要望）。①と同じく枠の外に1つだけ置く。
+           項目を選んで空の申込書を作り、いまの「空の申込書」の道（③④⑤）に流す（entry-make.js） -->
+      <div class="other-ways">
+        <button type="button" id="formMake" class="btn-sub" data-i18n="formMake">様式がないとき：項目を選んで作る</button>
+      </div>
+      <div id="makeBox" class="extra-box make-box" hidden></div>
       <p class="hint" data-i18n="formNote">名前だけを書いてから入れてください。</p>
       <p class="msg" id="formMsg"></p>
     </section>
@@ -825,6 +836,7 @@
   <script src="entry-blank.js"></script>
   <script src="entry-view.js"></script>
   <script src="entry-book.js"></script>
+  <script src="entry-make.js"></script>
   <script src="entry-app.js"></script>
 </body>
 </html>
