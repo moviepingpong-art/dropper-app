@@ -1817,13 +1817,31 @@ function blankSection(roster) {
     { label: '様式C（姓と名が別の欄）', file: path.join(FIX, 'form-c-split.xlsx'), sheet: 0,
       names: ['B6', 'B7', 'B8', 'B9', 'C6', 'C7', 'C8', 'C9'], want: ['B+C:6-9'] },
     { label: '様式D（もともと空・監督の行つきの表が2つ）', file: path.join(FIX, 'form-d-blank.xlsx'), sheet: 0,
-      names: [], want: ['B:5-11', 'B:15-21'] }
+      names: [], want: ['B:5-11', 'B:15-21'] },
+    // ★ 点線が相方との区切りのダブルス（2026-09-27）。全部の行に書き、ふりがなとは読まない。
+    //   「結合の左上以外のセルを無いとみなす」直しを入れると、ここが「上段ふりがな・4行」に変わって落ちる
+    { label: '様式F（ダブルス。点線は相方との区切り）', file: path.join(FIX, 'form-f-dotted.xlsx'), sheet: 'ダブルス',
+      names: [], want: ['B:4-11'], rows: ['B 8行'] },
+    // ★ 分かっている限界（2026-09-27）。点線の上段がふりがなの1人=2行でも、上下の形が同じなら1人1行と読む。
+    //   形だけではダブルスと見分けられず、本物に実例が無いので規則は足さない（README「踏んだ罠」）。
+    //   見分けられるように直したら、ここを ['B 4行 上段ふりがな'] に直すこと
+    { label: '様式F（1人=2行・上下が同じ形）【分かっている限界】', file: path.join(FIX, 'form-f-dotted.xlsx'), sheet: '1人2行',
+      names: [], want: ['B:4-11'], rows: ['B 8行'] }
   ];
+  // 書く行の数と、上段をふりがなと読んだか（shown は最初と最後の行しか出さない）
+  function rowsOf(tables) {
+    return tables.map(function (t) {
+      return (t.nameCol || (t.familyCol + '+' + t.givenCol)) + ' ' + t.rows.length + '行' +
+        (t.kanaAbove ? ' 上段ふりがな' : '') + (t.skip ? ' 断る' : '');
+    });
+  }
 
   return cases.reduce(function (p, c) {
     return p.then(function () {
       return blankOf(c.file, c.sheet, c.names).then(function (book) {
-        eq(shown(B_.tables(X.grid(book, c.sheet))), c.want, c.label + ': 名前の列と書ける行');
+        var tb = B_.tables(X.grid(book, c.sheet));
+        eq(shown(tb), c.want, c.label + ': 名前の列と書ける行');
+        if (c.rows) eq(rowsOf(tb), c.rows, c.label + ': 書く行の数・ふりがなと読むか');
       });
     });
   }, Promise.resolve()).then(function () {
@@ -1852,12 +1870,25 @@ function blankSection(roster) {
     var side = files.filter(function (f) { return /エントリー用紙.*\.xlsx$/.test(f); })[0];
     if (side) jobs.push({ label: '本物のエントリー用紙（左右に同じ表）', file: path.join(LOCAL, side),
       sheet: 0, names: [], want: ['B:5-19', 'E:5-19'] });
+    // ★ 名前の欄の点線が相方との区切りのダブルス（2026-09-27）。全部の行に書き、ふりがなとは読まない。
+    //   上下の行の形が同じなので1人1行と読めている。点線だけで「上段ふりがな」と決めると、ここが崩れる
+    var dbl = [
+      [/東京卓球選手権.*\.xlsx$/, 'ダブルス申込書', ['E:8-27'], ['E 20行'], '東京卓球選手権'],
+      [/シニアフェスタ.*\.xlsx$/, '混合ﾀﾞﾌﾞﾙｽ申込書 ', ['C:33-48', 'P:33-48'], ['C 16行', 'P 16行'], 'シニアフェスタ 混合ダブルス'],
+      [/関東ラージ.*\.xlsx$/, '参加申込書', ['C:11-26'], ['C 16行'], '関東ラージ']
+    ];
+    dbl.forEach(function (d) {
+      var f = files.filter(function (x) { return d[0].test(x); })[0];
+      if (f) jobs.push({ label: '本物の' + d[4] + '（点線は相方との区切り）', file: path.join(LOCAL, f),
+        sheet: d[1], names: [], want: d[2], rows: d[3] });
+    });
     if (!jobs.length) { console.log('  --   本物の様式が entry/test/local/ に無いので飛ばします'); return; }
     return jobs.reduce(function (p, j) {
       return p.then(function () {
         return blankOf(j.file, j.sheet, j.names).then(function (book) {
           var tb = B_.tables(X.grid(book, j.sheet));
           eq(shown(tb), j.want, j.label + ': 名前の列と書ける行');
+          if (j.rows) eq(rowsOf(tb), j.rows, j.label + ': 書く行の数・ふりがなと読むか');
         });
       });
     }, Promise.resolve());
