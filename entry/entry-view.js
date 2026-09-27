@@ -323,11 +323,14 @@
   //   書ける行が、いちばん多い表の**半分に満たない表**を「ほかの表」としてたたむ。消さない——
   //   選手が申込責任者を兼ねることもあり、本物のスポレクは連絡責任者と選手の表を分けて両方使う。
   //   左右・男子女子に並ぶ同じくらいの表（相模原の20行と21行）は、どちらも主な表に残る。
-  //   表が1つだけなら何もたたまない。戻り値は表ごとの true（たたむ）/ false
+  //   ★ **書ける行が1行だけの表**は、表が1つだけのシートでもたたむ（2026-09-27、本人の判断＝A）。
+  //   申込責任者の欄は「その欄だけのシート」に多く（東京選手権の申込内訳表・神奈川ラージの「ねんりん」
+  //   「全日本」「全国」・ソフトテニスのシニアスポーツ）、半分の比べ方では1つもたたまれなかった。
+  //   1人用の申込書もたたまれるが、開けば使える。戻り値は表ごとの true（たたむ）/ false
   function minorTables(tables) {
     var list = tables || [];
     var max = list.reduce(function (m, tb) { return Math.max(m, tb.rows.length); }, 0);
-    return list.map(function (tb) { return list.length > 1 && tb.rows.length * 2 < max; });
+    return list.map(function (tb) { return tb.rows.length === 1 || (list.length > 1 && tb.rows.length * 2 < max); });
   }
 
   // いま入れている表の番号。開いている表があればそれ、無ければ最初のまだ空きのある表。

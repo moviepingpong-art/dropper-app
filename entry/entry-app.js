@@ -1297,11 +1297,14 @@
         h('span', { class: 'tbl-now-count', text: t('tblCount', {
           n: Math.min((sh.picks[active] || []).length, atb.rows.length), cap: atb.rows.length }) })
       ]));
-    } else {
-      top.appendChild(h('p', { class: 'tbl-now done', text: t('tblAllDone') }));
     }
     // 表が2つ以上なら、色と名前の一覧（見取り図の色と、下の枠の色がそろう）
     var shownCount = sh.tables.filter(function (tb, ti) { return !isHidden(ti); }).length;
+    if (active < 0) {
+      // ★ シートの表がぜんぶたたんである（1行だけの表しか無い）ときは「そろいました」と言わない（2026-09-27）
+      top.appendChild(shownCount ? h('p', { class: 'tbl-now done', text: t('tblAllDone') })
+        : h('p', { class: 'tbl-now', text: t('minorAll') }));
+    }
     if (shownCount > 1) {
       var legend = h('p', { class: 'sv-legend' });
       sh.tables.forEach(function (tb, ti) {

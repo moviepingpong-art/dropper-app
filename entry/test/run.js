@@ -2021,7 +2021,10 @@ function viewSection() {
   eq(V.minorTables([{ rows: new Array(20) }, { rows: new Array(21) }]), [false, false],
     '★ 左右に並ぶ同じくらいの表（本物の相模原の20行と21行）は、どちらも主な表');
   eq(V.minorTables([{ rows: [1, 2, 3, 4] }, { rows: [5, 6] }]), [false, false], 'ちょうど半分なら主な表に残す');
-  eq(V.minorTables([{ rows: [10] }]), [false], '表が1つだけなら何もたたまない（本物のソフトテニス シニアスポーツ）');
+  eq(V.minorTables([{ rows: [10] }]), [true],
+    '★ 1行だけの表は、表が1つだけのシートでもたたむ（本物のソフトテニス シニアスポーツの申込責任者の欄。案A）');
+  eq(V.minorTables([{ rows: [10, 11] }]), [false], '表が1つだけで2行以上なら、たたまない（本物の早良ジュニア）');
+  eq(V.minorTables([{ rows: [19] }, { rows: [19] }]), [true, true], '1行だけの表が並ぶシートは、ぜんぶたたむ（本物の愛知の中学生個人）');
   eq(V.minorTables([]), [], '表が無ければ空');
   var hid = V.minorTables(sp);
   eq(V.activeTable(sp, [[], []], null, hid), 1, '★ たたんだ表は「いま入れている表」にしない（見えない表に入れない）');
@@ -2057,6 +2060,8 @@ function viewSection() {
   check(/function minorOf\(sh\)[\s\S]{0,300}!\(\(sh\.picks && sh\.picks\[ti\]\) \|\| \[\]\)\.length/.test(appSrc),
     '★ 人を入れてある表はたたまない（見えないところに名前が書かれない）');
   check(appSrc.indexOf("t('teachRule')") >= 0, '表が見つからないときは、入れる申込書の約束ごと（直し方）を出す');
+  check(appSrc.indexOf("t('minorAll')") >= 0 && /if \(active < 0\) \{[\s\S]{0,200}shownCount \?[\s\S]{0,80}t\('tblAllDone'\)[\s\S]{0,80}t\('minorAll'\)/.test(appSrc),
+    '★ シートの表がぜんぶたたんであるときは「そろいました」と言わない');
   check(appSrc.indexOf('tb.userName = (v && v !== tb.formTitle) ? v : \'\';') >= 0 && /userName[\s\S]{0,80}saveRows\(sh\)/.test(appSrc),
     '表の名前を直したら覚える');
   check(appSrc.indexOf('open: ti === active && !full') >= 0,
