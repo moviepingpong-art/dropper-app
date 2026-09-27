@@ -13,6 +13,8 @@
 //   form-c-split.xlsx        … 分割型。姓と名が別欄・男女の列に○・都道府県が別欄・式のセル
 //   form-d-blank.xlsx        … ★ 空の様式（名前が1つも書かれていない）。監督の行つきの表が2つ。
 //                              空の申込書から表を見つける道（entry-blank.js）を試す
+//   form-f-dotted.xlsx       … ★ 名前の欄が点線で2行ずつ区切られた空の様式（2026-09-27）。
+//                              1枚目はダブルス（点線＝相方との区切り）、2枚目は分かっている限界（下の formF）
 // 様式にはすでに「幹事が名前だけ書いた」状態で名前が入っている。
 var fs = require('fs');
 var path = require('path');
@@ -89,10 +91,20 @@ var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1"/></cellXfs>' +
   '<cellStyles count="1"><cellStyle name="標準" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
 
+// 点線の書式を足したもの（s:6 = 罫線＋下だけ点線）。form-f だけが使う。
+// ★ STYLES そのものに足すと、ほかの様式のバイト列まで全部変わるので分けてある
+var STYLES_DOTTED = STYLES
+  .replace('<borders count="3">', '<borders count="4">')
+  .replace('</borders>', '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right>' +
+    '<top style="thin"><color auto="1"/></top><bottom style="dotted"><color auto="1"/></bottom><diagonal/></border></borders>')
+  .replace('<cellXfs count="6">', '<cellXfs count="7">')
+  .replace('</cellXfs>', '<xf numFmtId="0" fontId="0" fillId="0" borderId="3" xfId="0" applyBorder="1"/></cellXfs>');
+
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 // sheets: [{ name, cols: [幅...], cells: { A1: { v, s, f } }, merges: ['A1:C1'] }]
-function buildXlsx(sheets) {
+// styles を渡さなければ STYLES
+function buildXlsx(sheets, styles) {
   var sst = [], sstIndex = {};
   function si(t) { if (!(t in sstIndex)) { sstIndex[t] = sst.length; sst.push(t); } return sstIndex[t]; }
 
@@ -137,7 +149,7 @@ function buildXlsx(sheets) {
     '<Relationship Id="rId' + (n + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
     '<Relationship Id="rId' + (n + 2) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' +
     '</Relationships>';
-  parts['xl/styles.xml'] = STYLES;
+  parts['xl/styles.xml'] = styles || STYLES;
 
   sheets.forEach(function (s, i) {
     var byRow = {};
@@ -313,6 +325,33 @@ function formE(which) {
   };
 }
 
+// ★ 名前の欄が点線で2行ずつ区切られた空の様式（2026-09-27）。
+//   結合した欄の下段にも罫線つきのセルを置く。本物の Excel の様式はふつうこう書かれている
+//   （local/ の16ファイルで、縦の結合があるシートのほぼすべてがそうだった）。
+//   1枚目「ダブルス」：点線は**相方との区切り**（本物の東京卓球選手権・シニアフェスタ・関東ラージと同じ形）。
+//     組と合計年齢だけ2行で結合。**全部の行に書き、ふりがなとは読まないのが正しい**。
+//     「結合の左上以外のセルを無いとみなす」直しを入れると、上下の形が変わってふりがなと読み、
+//     相方の欄にフリガナを書いて相方を落とす。その見張り
+//   2枚目「1人2行」：点線の上段がふりがな。氏名のほかは全部2行で結合。
+//     **いまは1人1行と読む（ふりがなの行にも名前を書く）＝分かっている限界**。
+//     形だけでは1枚目と見分けられない。本物に実例が無いので、規則は足さない（README「踏んだ罠」）
+function formF(kind) {
+  var pair = kind === 'ダブルス';
+  var cells = { A1: { v: '第1回 架空オープン 参加申込書（' + kind + '）', s: 4 } };
+  var heads = pair ? ['組', '氏名', '性別', '年齢', '所属', '合計年齢'] : ['No', '氏名', '性別', '生年月日', '年齢', '所属'];
+  var merged = pair ? ['A', 'F'] : ['A', 'C', 'D', 'E', 'F'];
+  heads.forEach(function (h, k) { cells[X.toRef(k + 1, 3)] = { v: h, s: 2 }; });
+  var merges = [];
+  for (var i = 0; i < 4; i++) {
+    var top = 4 + i * 2;
+    cells['A' + top] = { v: i + 1, s: 1 };
+    cells['B' + top] = { s: 6 };            // 上段：下が点線
+    box(cells, 'A' + top, 'F' + (top + 1), 1);
+    merged.forEach(function (c) { merges.push(c + top + ':' + c + (top + 1)); });
+  }
+  return { name: kind, cols: [5, 18, 6, 12, 6, 16], cells: cells, merges: merges };
+}
+
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });
 Promise.all([
   rosterBook().then(function (b) { fs.writeFileSync(path.join(OUT, 'roster.xlsx'), Buffer.from(b)); }),
@@ -320,7 +359,8 @@ Promise.all([
   buildXlsx([formB()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-b-pairs.xlsx'), b); }),
   buildXlsx([formC()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-c-split.xlsx'), b); }),
   buildXlsx([formD()]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-d-blank.xlsx'), b); }),
-  buildXlsx([formE('A'), formE('B')]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-e-two-sheets.xlsx'), b); })
+  buildXlsx([formE('A'), formE('B')]).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-e-two-sheets.xlsx'), b); }),
+  buildXlsx([formF('ダブルス'), formF('1人2行')], STYLES_DOTTED).then(function (b) { fs.writeFileSync(path.join(OUT, 'form-f-dotted.xlsx'), b); })
 ]).then(function () {
   console.log('fixtures を作りました: ' + fs.readdirSync(OUT).join(', '));
 }).catch(function (e) { console.error(e); process.exit(1); });
