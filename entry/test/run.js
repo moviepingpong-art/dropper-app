@@ -2016,6 +2016,22 @@ function viewSection() {
   eq(V.sheetDone(sp, [[1], [1, 2, 3]], { 1: true }), false, '2枚目を足す表はいくらでも入るので「そろった」にならない');
   eq(V.sheetDone([], [], null), false, '表の無いシートは「そろった」にならない（教える途中など）');
 
+  // ★ 主な表だけを見せる（2026-09-27、本人の判断＝案2）。主な表の半分に満たない表はたたむ
+  eq(V.minorTables(sp), [true, false], '★ スポレクの連絡責任者（1行）は、選手の表（3行）の半分に満たないのでたたむ');
+  eq(V.minorTables([{ rows: new Array(20) }, { rows: new Array(21) }]), [false, false],
+    '★ 左右に並ぶ同じくらいの表（本物の相模原の20行と21行）は、どちらも主な表');
+  eq(V.minorTables([{ rows: [1, 2, 3, 4] }, { rows: [5, 6] }]), [false, false], 'ちょうど半分なら主な表に残す');
+  eq(V.minorTables([{ rows: [10] }]), [false], '表が1つだけなら何もたたまない（本物のソフトテニス シニアスポーツ）');
+  eq(V.minorTables([]), [], '表が無ければ空');
+  var hid = V.minorTables(sp);
+  eq(V.activeTable(sp, [[], []], null, hid), 1, '★ たたんだ表は「いま入れている表」にしない（見えない表に入れない）');
+  eq(V.activeTable(sp, [[], []], 0, hid), 1, 'たたんだ表を開いた扱いになっていても、たたんでいる間は選ばない');
+  eq(V.activeTable(sp, [[], [1, 2, 3]], null, hid), -1, 'たたんだ表が空でも、見えている表がそろえば「無し」');
+  eq(V.sheetDone(sp, [[], [1, 2, 3]], null, hid), true,
+    '★ たたんだ表（連絡責任者）が空でも、見えている表がそろえば次のシートへ進める');
+  eq(V.sheetDone(sp, [[], [1, 2, 3]], null), false, 'たたまないときは今までどおり（連絡責任者が空なら「そろった」ではない）');
+  eq(V.sheetDone(sp, [[], []], null, [true, true]), false, 'ぜんぶたたんだシートは「そろった」にしない');
+
   // 本人が付けた名前は覚える（同じ形の申込書で次から付いた状態になる）
   var named = [{ nameCol: 'B', headerRow: 5, firstRow: 6, lastRow: 9, rows: [6, 7, 8, 9], userName: '女子の部' }];
   var memo = B_.remember(named);
@@ -2031,8 +2047,16 @@ function viewSection() {
 
   // --- 画面の配線 ---
   var appSrc = fs.readFileSync(path.join(__dirname, '..', 'entry-app.js'), 'utf8');
-  check(appSrc.indexOf("t('tblNow')") >= 0 && appSrc.indexOf('V.activeTable(sh.tables, sh.picks, sh.pickOpen)') >= 0,
-    '★ ③の上に「いま入れている表」を出す');
+  check(appSrc.indexOf("t('tblNow')") >= 0 && appSrc.indexOf('V.activeTable(sh.tables, sh.picks, sh.pickOpen, hidden)') >= 0,
+    '★ ③の上に「いま入れている表」を出す（たたんだ表は数えない）');
+  // ★ 主な表だけを見せる（2026-09-27、案2）。「いま入れている表」「埋まったか」「まだ空き」の3か所すべてで、
+  //   たたんだ表を数えない。1か所でも抜けると、見えない表のせいで次へ進めない・「まだ空き」と言い続ける
+  check((appSrc.match(/hiddenOf\((sh|cur)\)\)/g) || []).length === 3 &&
+    appSrc.indexOf('V.activeTable(cur.tables, cur.picks, cur.pickOpen, hiddenOf(cur))') >= 0,
+    '★ たたんだ表は、埋まったか・次へ進むか・まだ空きの案内のどれにも数えない');
+  check(/function minorOf\(sh\)[\s\S]{0,300}!\(\(sh\.picks && sh\.picks\[ti\]\) \|\| \[\]\)\.length/.test(appSrc),
+    '★ 人を入れてある表はたたまない（見えないところに名前が書かれない）');
+  check(appSrc.indexOf("t('teachRule')") >= 0, '表が見つからないときは、入れる申込書の約束ごと（直し方）を出す');
   check(appSrc.indexOf('tb.userName = (v && v !== tb.formTitle) ? v : \'\';') >= 0 && /userName[\s\S]{0,80}saveRows\(sh\)/.test(appSrc),
     '表の名前を直したら覚える');
   check(appSrc.indexOf('open: ti === active && !full') >= 0,
@@ -2045,15 +2069,15 @@ function viewSection() {
   check(appSrc.indexOf('if (multi && si !== state.sheetAt) return;') >= 0, '★ ③はシートを1枚ずつ見せる');
   check(/var lastSheet = [^\n]*\n[\s\S]{0,200}if \(!lastSheet\) \{\s*el\('namesNext'\)\.disabled = true;/.test(appSrc),
     '★ 最後のシートまで来るまで、④へは進ませない');
-  check(appSrc.indexOf('afterPick(sh);') >= 0 && /function afterPick[\s\S]{0,300}V\.sheetDone\(sh\.tables, sh\.picks, sh\.more\)[\s\S]{0,80}state\.sheetAt = si \+ 1;/.test(appSrc),
+  check(appSrc.indexOf('afterPick(sh);') >= 0 && /function afterPick[\s\S]{0,300}V\.sheetDone\(sh\.tables, sh\.picks, sh\.more, hiddenOf\(sh\)\)[\s\S]{0,80}state\.sheetAt = si \+ 1;/.test(appSrc),
     '★ シートの表がぜんぶ埋まったら、次のシートへ移る');
   check(/t\('shMoved'[^\n]*\n\s*\}/.test(appSrc),
     '「次のシートに移りました」は描き直しで消さない（toggle の描き直しですぐ消えていた）');
   check(appSrc.indexOf("act >= 0 ? t('pickMoreRoom'") >= 0,
     '★ いまのシートにまだ空きのある表があれば「次へ進んでください」と言わない（連絡責任者だけで終わったように見えた）');
   var html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  check(appSrc.indexOf('V.marks(sh.tables, sh.picks)') >= 0 && appSrc.indexOf('V.focusOf(sh.tables)') >= 0,
-    '③の見取り図は、表と選んだ人から印を付ける');
+  check(appSrc.indexOf('V.marks(marked, sh.picks)') >= 0 && appSrc.indexOf('V.focusOf(sh.tables.filter(') >= 0,
+    '③の見取り図は、表と選んだ人から印を付ける（たたんだ表には印を付けない）');
   check(appSrc.indexOf('sh.teachSel = V.point(sh.teachSel, c, r)') >= 0 && appSrc.indexOf('marks: V.pointMarks(s)') >= 0,
     '★ 教える画面で押したマスが、列と行になる');
   check(/value: s \? s\.col/.test(appSrc), '押して選んだ列と行が、下の入力欄にも入る（打ち込みでも直せる）');
