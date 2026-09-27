@@ -1178,6 +1178,17 @@
   }
   var TBL_COLORS = 5;   // 表の色の数（index.html の .sv-g0〜.sv-g4）
 
+  // ★ たたんでいる表（2026-09-27、本人の判断＝案2）。主な表の半分に満たない表（申込責任者の欄など）は
+  //   「ほかの表も使う」を押すまで見せず、「いま入れている表」「埋まったら次のシートへ」にも数えない。
+  //   ★ 人を入れてある表はたたまない（見えないところに名前が書かれるのを防ぐ）。
+  //   戻り値は表ごとの true（たたむ）。たたむ表が無い・開いているときは null
+  function minorOf(sh) {
+    if (!sh.tables) return null;
+    var m = V.minorTables(sh.tables).map(function (x, ti) { return x && !((sh.picks && sh.picks[ti]) || []).length; });
+    return m.some(Boolean) ? m : null;
+  }
+  function hiddenOf(sh) { return sh.showMinor ? null : minorOf(sh); }
+
   /* ===== シートを1枚ずつ（2026-09-24、本人の要望） =====
      ★ 本物のスポレクは同じ形のシートが3枚（チームごと）あり、3枚ぶんが一気に並んで
        どこに入れているか分からなかった。いまのシートだけを見せ、上にシートの札を並べる。
@@ -1190,7 +1201,7 @@
     var bar = h('div', { class: 'sh-steps' });
     state.sheets.forEach(function (sh, si) {
       var now = si === state.sheetAt;
-      var done = sh.blank && V.sheetDone(sh.tables, sh.picks, sh.more);
+      var done = sh.blank && V.sheetDone(sh.tables, sh.picks, sh.more, hiddenOf(sh));
       var n = sheetCount(sh);
       var mark = now ? '●' : done ? '✓' : n ? '…' : '○';
       bar.appendChild(h('button', { type: 'button', class: 'sh-step' + (now ? ' on' : done ? ' done' : ''),
@@ -1219,7 +1230,7 @@
   function afterPick(sh) {
     state.sheetMoved = '';
     var si = state.sheets.indexOf(sh);
-    if (si >= 0 && si < state.sheets.length - 1 && V.sheetDone(sh.tables, sh.picks, sh.more)) {
+    if (si >= 0 && si < state.sheets.length - 1 && V.sheetDone(sh.tables, sh.picks, sh.more, hiddenOf(sh))) {
       state.sheetAt = si + 1;
       state.sheetMoved = sh.name;
       renderNames();
@@ -1233,6 +1244,7 @@
   function renderTeachSheet(sh, sec, canSkip) {
     sec.appendChild(h('p', { class: 'name-note ng', text: t('teachTitle') }));
     sec.appendChild(h('p', { class: 'hint', text: t('teachHint') }));
+    sec.appendChild(h('p', { class: 'hint', text: t('teachRule') }));
     if (canSkip) sec.appendChild(h('p', { class: 'hint', text: t('teachSkipNote') }));
     // ★ 見取り図のマスを押して教える（2026-09-24）。列の英字と行の番号を打たなくてよい
     var s = sh.teachSel;
@@ -1273,7 +1285,9 @@
   function renderPickSheet(sh, sec) {
     // ★ 見取り図（2026-09-24）。選んだ人がその行に入って見える。↑↓で並べ替えればすぐ動く
     // ★ いま入れている表（2026-09-24）。開いている表、無ければ最初のまだ空きのある表
-    var active = V.activeTable(sh.tables, sh.picks, sh.pickOpen);
+    var hidden = hiddenOf(sh);
+    var isHidden = function (ti) { return !!(hidden && hidden[ti]); };
+    var active = V.activeTable(sh.tables, sh.picks, sh.pickOpen, hidden);
     var top = h('div', { class: 'tbl-top' });
     if (active >= 0) {
       var atb = sh.tables[active];
@@ -1283,22 +1297,30 @@
         h('span', { class: 'tbl-now-count', text: t('tblCount', {
           n: Math.min((sh.picks[active] || []).length, atb.rows.length), cap: atb.rows.length }) })
       ]));
-    } else {
-      top.appendChild(h('p', { class: 'tbl-now done', text: t('tblAllDone') }));
     }
     // 表が2つ以上なら、色と名前の一覧（見取り図の色と、下の枠の色がそろう）
-    if (sh.tables.length > 1) {
+    var shownCount = sh.tables.filter(function (tb, ti) { return !isHidden(ti); }).length;
+    if (active < 0) {
+      // ★ シートの表がぜんぶたたんである（1行だけの表しか無い）ときは「そろいました」と言わない（2026-09-27）
+      top.appendChild(shownCount ? h('p', { class: 'tbl-now done', text: t('tblAllDone') })
+        : h('p', { class: 'tbl-now', text: t('minorAll') }));
+    }
+    if (shownCount > 1) {
       var legend = h('p', { class: 'sv-legend' });
       sh.tables.forEach(function (tb, ti) {
+        if (isHidden(ti)) return;
         legend.appendChild(h('span', { class: 'sv-chip sv-g' + (ti % TBL_COLORS) + (ti === active ? ' on' : ''),
           text: tableTag(tb, ti) }));
       });
       top.appendChild(legend);
     }
-    var view = sheetView(sh, { focus: V.focusOf(sh.tables), marks: V.marks(sh.tables, sh.picks),
-      hint: t('svPickHint'), active: active, top: top });
+    // たたんでいる表は、見取り図にも印を付けない（番号と色は元の表の番号のまま）
+    var marked = sh.tables.map(function (tb, ti) { return isHidden(ti) ? { rows: [], headerRow: 0 } : tb; });
+    var view = sheetView(sh, { focus: V.focusOf(sh.tables.filter(function (tb, ti) { return !isHidden(ti); })),
+      marks: V.marks(marked, sh.picks), hint: t('svPickHint'), active: active, top: top });
     sec.appendChild(view || top);
     sh.tables.forEach(function (tb, ti) {
+      if (isHidden(ti)) return;
       var picks = sh.picks[ti];
       var box = h('div', { class: 'pick-table sv-g' + (ti % TBL_COLORS) + (ti === active ? ' on' : '') });
       box.appendChild(h('p', { class: 'tbl-title', text: tableTag(tb, ti) }));
@@ -1441,6 +1463,20 @@
       ]));
       sec.appendChild(box);
     });
+    // ★ たたんだ表を開く・たたむ（2026-09-27、案2）。選手が申込責任者を兼ねるときなどに開く
+    var minor = minorOf(sh);
+    if (minor) {
+      var n = minor.filter(Boolean).length;
+      sec.appendChild(h('p', { class: 'small minor-tables' }, [
+        h('button', { type: 'button', class: 'link-btn', text: sh.showMinor ? t('minorHide') : t('minorShow', { n: n }),
+          onclick: function () {
+            sh.showMinor = !sh.showMinor;
+            if (!sh.showMinor && typeof sh.pickOpen === 'number' && minor[sh.pickOpen]) sh.pickOpen = null;
+            renderNames();
+          } }),
+        sh.showMinor ? null : h('span', { class: 'hint', text: t('minorNote') })
+      ]));
+    }
   }
 
   // 選んだ人から、いままでの道（見出しの規則・④・⑤）が使う形を作る
@@ -1590,7 +1626,8 @@
       //   （2026-09-24、本物のスポレク。連絡責任者を1人入れた時点で「次へ進んで」と出て、
       //   選手の表がまだ空なのに終わったように見えた）。進むことはできる（全部埋めなくてよい）
       var cur = state.sheets[state.sheetAt];
-      var act = (cur && cur.blank) ? V.activeTable(cur.tables, cur.picks, cur.pickOpen) : -1;
+      // ★ たたんだ表は数えない（空の連絡責任者の欄を「まだ空き」と案内しない。2026-09-27）
+      var act = (cur && cur.blank) ? V.activeTable(cur.tables, cur.picks, cur.pickOpen, hiddenOf(cur)) : -1;
       setMsg('namesMsg', !picked ? t('pickNone')
         : act >= 0 ? t('pickMoreRoom', { n: picked, table: tableTag(cur.tables[act], act) })
         : t('pickReady', { n: picked }), picked ? 'ok' : 'wait');

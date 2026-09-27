@@ -317,27 +317,49 @@
     return out.join('・');
   }
 
+  // ★ 主な表だけを見せる（2026-09-27、本人の判断＝案2）。
+  //   申込書には、選手の表の外に申込責任者の欄のような小さな表がよくある（本物の空の様式32件で、
+  //   東京選手権の申込内訳表・神奈川ラージの責任者の欄・ソフトテニスのシニアスポーツが1行の表になった）。
+  //   書ける行が、いちばん多い表の**半分に満たない表**を「ほかの表」としてたたむ。消さない——
+  //   選手が申込責任者を兼ねることもあり、本物のスポレクは連絡責任者と選手の表を分けて両方使う。
+  //   左右・男子女子に並ぶ同じくらいの表（相模原の20行と21行）は、どちらも主な表に残る。
+  //   ★ **書ける行が1行だけの表**は、表が1つだけのシートでもたたむ（2026-09-27、本人の判断＝A）。
+  //   申込責任者の欄は「その欄だけのシート」に多く（東京選手権の申込内訳表・神奈川ラージの「ねんりん」
+  //   「全日本」「全国」・ソフトテニスのシニアスポーツ）、半分の比べ方では1つもたたまれなかった。
+  //   1人用の申込書もたたまれるが、開けば使える。戻り値は表ごとの true（たたむ）/ false
+  function minorTables(tables) {
+    var list = tables || [];
+    var max = list.reduce(function (m, tb) { return Math.max(m, tb.rows.length); }, 0);
+    return list.map(function (tb) { return tb.rows.length === 1 || (list.length > 1 && tb.rows.length * 2 < max); });
+  }
+
   // いま入れている表の番号。開いている表があればそれ、無ければ最初のまだ空きのある表。
-  // ぜんぶ埋まっていれば -1
-  function activeTable(tables, picks, open) {
-    if (typeof open === 'number' && open >= 0 && open < (tables || []).length) return open;
+  // ぜんぶ埋まっていれば -1。hidden（表ごとの true）の表は数えない（たたんでいる表）
+  function activeTable(tables, picks, open, hidden) {
+    if (typeof open === 'number' && open >= 0 && open < (tables || []).length && !(hidden && hidden[open])) return open;
     for (var i = 0; i < (tables || []).length; i++) {
+      if (hidden && hidden[i]) continue;
       if (((picks && picks[i]) || []).length < tables[i].rows.length) return i;
     }
     return -1;
   }
 
   // ★ シートの表がぜんぶ埋まったか（2026-09-24、本人の要望。埋まったら次のシートへ移る）。
-  //   2枚目を足す表（more）は、いくらでも入るので「埋まった」にならない。表の無いシートも埋まらない
-  function sheetDone(tables, picks, more) {
+  //   2枚目を足す表（more）は、いくらでも入るので「埋まった」にならない。表の無いシートも埋まらない。
+  //   ★ たたんでいる表（hidden）は数えない。数えると、見えない表が空いているせいで次へ進めない
+  function sheetDone(tables, picks, more, hidden) {
     if (!tables || !tables.length) return false;
-    return tables.every(function (tb, ti) {
+    var seen = 0;
+    var done = tables.every(function (tb, ti) {
+      if (hidden && hidden[ti]) return true;
+      seen++;
       if (more && more[ti]) return false;
       return ((picks && picks[ti]) || []).length >= tb.rows.length;
     });
+    return done && seen > 0;
   }
 
   global.EntryView = { frame: frame, focusOf: focusOf, marks: marks, point: point, pointMarks: pointMarks,
-    titleOf: titleOf, headersOf: headersOf, activeTable: activeTable, sheetDone: sheetDone,
+    titleOf: titleOf, headersOf: headersOf, activeTable: activeTable, sheetDone: sheetDone, minorTables: minorTables,
     colPx: colPx, rowPx: rowPx, letter: letter, MAX_ROWS: MAX_ROWS, MAX_COLS: MAX_COLS, ABOVE: ABOVE };
 })(typeof window !== 'undefined' ? window : this);
