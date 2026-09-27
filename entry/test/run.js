@@ -599,7 +599,14 @@ function mapSection(roster) {
     // ★ 2026-09-20 まで「年齢区分に年齢を書く＝誤爆」を期待値にしていた。いまは書かない
     { label: 'まぎらわしい語（年齢区分・緊急連絡先・住所（市町村まで））【年齢区分には書かない】',
       headers: { F6: '年齢区分', I6: '緊急連絡先', H6: '住所（市町村まで）' },
-      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) G:postal H:address(plain) I:phone' }
+      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) G:postal H:address(plain) I:phone' },
+    // ★ 2026-09-27 まで「勤務先所在地に自宅住所を書く＝誤爆」だった（本物のシニアフェスタ「在勤の方」）。いまは書かない
+    { label: '勤務先の住所（本物のシニアフェスタの「勤務先所在地／会社名」）【自宅住所は書かない】',
+      headers: { H6: '勤務先所在地\r\n会社名' },
+      want: 'C:kana D:gender(kanji) E:birth(seireki-slash) F:age G:postal I:phone' },
+    { label: '勤務先の住所（「勤務先住所」「所在地」）【自宅住所は書かない】',
+      headers: { H6: '勤務先住所', D6: '所在地' },
+      want: 'C:kana E:birth(seireki-slash) F:age G:postal I:phone' }
   ];
   var variantsDone = VARIANTS.reduce(function (p, v) {
     return p.then(function () {

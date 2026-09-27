@@ -243,7 +243,11 @@
         else if (/年[齢令]/.test(near) && !/年[齢令]\s*(区分|制限|層|別|順|区切)/.test(near)) f = 'age';
         else if (/郵便|〒/.test(near)) f = 'postal';
         else if (/都道府県/.test(near)) f = 'addressPref';
-        else if (/住所|所在地/.test(near)) f = 'address';
+        // ★ 名簿の住所は自宅（2026-09-27、本人の判断）。「勤務先所在地」は勤務先の住所を書く欄で、自宅住所は書いてはいけない。
+        //   本物のシニアフェスタ「在勤の方」で、見出しの規則が「勤務先所在地／会社名」を住所にしていた
+        //   （画面の addExtraFields は、名簿に同じ見出しの項目を足したときしか止められない）。
+        //   「所在地」は人以外の場所に使う語なので住所にしない。「住所」でも勤務先・会社のものは住所にしない
+        else if (/住所/.test(near) && !/勤務先|勤め先|職場|会社/.test(near)) f = 'address';
         else if (/電話|TEL|携帯|連絡先/i.test(near)) f = 'phone';
         else if (hasBirthParent(c.chain)) {
           if (/^(元号|和暦)$/.test(near)) f = 'birthEra';
