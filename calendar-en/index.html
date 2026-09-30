@@ -75,7 +75,8 @@
     /* 種類選択後：ドロップ→確認のあとに待っている2つの機能を大きく見せるピル */
     /* 矢印はピル群の外に置く。狭い画面で2つ目のピルが折り返しても、1つ目のピルと左端が揃う */
     .guide-link { margin:8px 0 0; font-size:13px; }
-    .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; }
+    /* リンクは言葉の途中で切らない。折り返しはリンクとリンクのあいだで起きる（2026-09-30。スマホの幅で「ドロッパーについ｜て」と切れていた） */
+    .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; white-space:nowrap; }
     .guide-link a:hover { border-bottom-color:var(--teal); }
     .visitor-badge { margin:0; }
     .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
@@ -765,7 +766,7 @@
            以前は href に privacy が入っているかで行き先を当てていたので、
            3本目を足すと英語版でトップが guide.html に化けた。 -->
     <p class="guide-link" id="guideLink">
-      <a href="https://dropper-tools.com/guide.html" data-site="guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド ↗</a>
+      <a href="https://dropper-tools.com/guide.html" data-site="guide.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド（動画つき）↗</a>
       <a href="https://dropper-tools.com/" data-site="" target="_blank" rel="noopener" data-i18n="siteLink">🏠 ドロッパーについて ↗</a>
       <a href="https://dropper-tools.com/privacy.html" data-site="privacy.html" target="_blank" rel="noopener" data-i18n="privacyLink">📄 プライバシーポリシー</a>
       <!-- 英語のニュースレター。**日本語では i18n.js が隠す**（本文は3言語で同一に保つ決まりのため、
