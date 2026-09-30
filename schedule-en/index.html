@@ -196,6 +196,10 @@
     @media (prefers-reduced-motion: reduce){ .tm-panel.on { animation:none; } }
 
     .lead { color:var(--sub); font-size:15px; margin:10px 0 0; }
+    /* 周知サイトの使い方ガイドへのリンク（イベントドロッパーの .guide-link と同じ見た目。2026-09-30） */
+    .guide-link { margin:8px 0 0; font-size:13px; }
+    .guide-link a { color:var(--teal); text-decoration:none; font-weight:700; border-bottom:1px solid transparent; transition:border-color .2s; white-space:nowrap; }
+    .guide-link a:hover { border-bottom-color:var(--teal); }
     .visitor-badge { margin:10px 0 0; }
     .visitor-badge img { height:20px; vertical-align:middle; opacity:0.85; }
     main { padding:8px 22px 48px; max-width:1000px; }
@@ -358,6 +362,12 @@
          同じことを「🔍 何ができる？」が図つきで言うので、二重になっていた -->
     <h1 data-i18n="appName">予定表ドロッパー</h1>
     <p class="lead" data-i18n="lead">年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録</p>
+    <!-- 周知サイトの使い方ガイドへ（2026-09-30）。日本語のガイドはいちばん上に使い方の動画がある（dropper #24）。
+         ★ 行き先は data-site に書く。schedule-i18n.js が言語別のフォルダを前に付けて張り替える（イベントの guideLink と同じ作り）。
+           href の直書きは ja 用の既定値 -->
+    <p class="guide-link" id="guideLink">
+      <a href="https://dropper-tools.com/guide-schedule.html" data-site="guide-schedule.html" target="_blank" rel="noopener" data-i18n="guideLink">📖 使い方ガイド（動画つき）↗</a>
+    </p>
     <!-- 訪問者カウンター。src は window.LANG を読んだあと（ページ末尾）で入れる -->
     <p class="visitor-badge" id="visitorBadge">
       <img id="visitorImg" alt="visitor counter" loading="lazy" referrerpolicy="no-referrer-when-downgrade">
@@ -769,9 +779,9 @@
       if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
     })();
   </script>
-  <script src="schedule-i18n.js"></script>
-  <script src="schedule-parser.js"></script>
-  <script src="schedule-ai.js"></script>
-  <script src="schedule-app.js"></script>
+  <script src="schedule-i18n.js?v=20260877"></script>
+  <script src="schedule-parser.js?v=20260877"></script>
+  <script src="schedule-ai.js?v=20260877"></script>
+  <script src="schedule-app.js?v=20260877"></script>
 </body>
 </html>

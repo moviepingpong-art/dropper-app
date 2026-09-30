@@ -12,6 +12,9 @@
       pageTitle: '予定表ドロッパー｜予定表から文章を抽出してGoogleカレンダーへ一括登録',
       appName: '予定表ドロッパー',
       lead: '年間行事予定・大会日程・リーグ戦日程などの予定表をドロップ → 一覧で確認 → Googleカレンダーにまとめて登録',
+      // 見出しの下の、周知サイトの使い方ガイドへのリンク。日本語のガイドはいちばん上に使い方の動画がある（2026-09-30、dropper #24）。
+      // en / in のガイドには動画が無いので、日本語だけ「動画つき」（イベントの guideLink と同じ文言）
+      guideLink: '📖 使い方ガイド（動画つき）↗',
       freeBadge: '完全無料',
       // --- ドロッパー切り替えタブ ---
       toolTabsLabel: 'ドロッパーの選択',
@@ -209,6 +212,7 @@
       pageTitle: 'Schedule Dropper | Extract a whole schedule into Google Calendar',
       appName: 'Schedule Dropper',
       lead: 'Drop a schedule — a year planner, a fixture list, a season calendar → check the list → add it all to Google Calendar at once',
+      guideLink: '📖 User guide ↗',
       freeBadge: 'Completely free',
       toolTabsLabel: 'Choose a dropper',
       toolEvent: '🎪 Event',
@@ -386,6 +390,7 @@
       pageTitle: 'Schedule Dropper | Poore schedule se text extract karke Google Calendar mein',
       appName: 'Schedule Dropper',
       lead: 'Schedule drop karein — year planner, fixture list, season calendar → list check karein → sab ek saath Google Calendar mein',
+      guideLink: '📖 Guide ↗',
       freeBadge: 'Bilkul free',
       toolTabsLabel: 'Dropper chunein',
       toolEvent: '🎪 Event',
@@ -612,6 +617,16 @@
     for (var ak = 0; ak < akIds.length; ak++) {
       var akEl = document.getElementById(akIds[ak]);
       if (akEl) { akEl.href = 'https://dropper-tools.com/' + akPath; }
+    }
+    // 見出しの下の使い方ガイドへのリンク（2026-09-30）。行き先は HTML の data-site から取り、
+    // 同じ言語の版へ送る（イベントの i18n.js の guideLink と同じ作り）。HTMLに直書きの href は ja 用の既定値
+    var gl = document.getElementById('guideLink');
+    if (gl) {
+      var glPre = (global.LANG === 'en') ? 'en/' : (global.LANG === 'in') ? 'in/' : '';
+      var glAs = gl.querySelectorAll('a[data-site]');
+      for (var gi = 0; gi < glAs.length; gi++) {
+        glAs[gi].href = 'https://dropper-tools.com/' + glPre + glAs[gi].getAttribute('data-site');
+      }
     }
     // LINE公式アカウントの導線は **日本語のときだけ** 出す。
     // LINE Botは日本語のみで、en/in の利用者はLINEを使わない（WhatsApp圏）。
