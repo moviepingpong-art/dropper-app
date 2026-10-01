@@ -83,6 +83,19 @@ localStorage.setItem(undefined, …)      →  "undefined" という名の項目
 - 直し方：**発火はファイル末尾でやる**（`applyHandoff_` / `wireAttendEntry_` と同じ場所）。
   クエリを見て何かを始める処理は、これから足すぶんもすべてそこに置くこと
 
+## ★ AI が返した文字は、外から来た文字として扱う（2026-10-02 に直した）
+
+Gemini の答え（大会名・会場・`format_label`・重要情報など）は、**要項を書いた人の文字**と同じ扱いにする。
+要項に誘導文を仕込まれると、AI が HTML やスクリプトを返しうる。このページには
+**利用者の Gemini の鍵（`localStorage`）と Google のログイン**がある。
+
+- 画面に入れるときは `textContent` か `.value`。`innerHTML` の文字列に組み込むなら必ずエスケープする
+  （`calendar/app.js` は `escHtml_`、`schedule/schedule-app.js` は `esc`）
+- `format_label` は、今ある行には `textContent` で入っていたが、「日を追加」の新しい行
+  （`dayRowHtml_`）ではそのまま `innerHTML` に入っていた（#141）。**同じ値でも、入る道が2つあることがある**
+- `innerHTML` を足したら、`git grep -n innerHTML -- 'calendar/*.js' 'schedule/*.js' 'decide/*.js'` で
+  中に外からの値が入らないかを見る
+
 ## ★ 締切は2つある。混ぜない
 
 要項から読む `shimekiri` は**大会主催者へ申し込む期限**（申込締切）。主催者はその前に
