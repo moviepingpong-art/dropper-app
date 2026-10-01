@@ -2575,9 +2575,18 @@ function fieldHtml(label, key) {
 // 「○日目」ラベル（t()のプレースホルダ拡張版：辞書は dayLabel: '{n}日目' / 'Day {n}' 等）
 function dayLabel_(n) { return I18N.t('dayLabel', { n: n }); }
 
+// HTML に文字として埋め込むためのエスケープ
+function escHtml_(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
 // 開催日＋試合形式のペア行を1行分のHTMLで返す（n=1始まりの行番号）
+// ★ formatLabel は AI が要項から読んだ見出し（format_label）が入る。**外から来た文字なので必ずエスケープする**
+//   （要項に仕込まれた文で AI が HTML を返すと、「日を追加」を押したときにスクリプトが動いていた。2026-10-02）
 function dayRowHtml_(n, formatLabel) {
-  var fmtLbl = formatLabel || I18N.t('fldFormat');
+  var fmtLbl = escHtml_(formatLabel || I18N.t('fldFormat'));
   return '' +
     '<div class="day-row" data-day-row>' +
       '<span class="day-row-label">' + dayLabel_(n) + '</span>' +
