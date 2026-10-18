@@ -273,9 +273,9 @@
     .reg-btn:disabled { opacity:.45; cursor:default; box-shadow:none; }
 
     /* ポップアップ（AI利用の選択・APIキー入力）。枠は2つで共有する */
-    #key-modal, #ai-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
+    #ai-modal { position:fixed; inset:0; z-index:1100; display:none; align-items:center; justify-content:center;
       background:rgba(15,61,58,.45); padding:18px; }
-    #key-modal.show, #ai-modal.show { display:flex; }
+    #ai-modal.show { display:flex; }
     /* AI利用の選択。イベントドロッパーの同名ポップアップと同じ見せ方にそろえる */
     #ai-modal { z-index:1090; }
     .ai-intro { color:var(--sub); font-size:13.5px; margin:0 0 16px; line-height:1.7; }
@@ -287,49 +287,14 @@
     .ai-opt li { font-size:12.5px; color:var(--sub); line-height:1.8; margin-top:4px; }
     .ai-opt a { color:var(--teal-d); font-weight:700; }
     .ai-modal-foot { color:var(--sub); font-size:12px; margin:12px 0 0; line-height:1.7; }
-    /* 「クレカ不要・0円・3分」を先に見せるバッジ。イベントドロッパー側と同じ見せ方。
-       キーを求める前にお金の不安を打ち消す目的なので、両方のポップアップに出す。 */
+    /* 「キー不要・0円・1日の上限」を先に見せるバッジ。イベントドロッパー側と同じ見せ方。 */
     .ai-badges { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px; }
     .ai-badge { font-size:11.5px; font-weight:700; color:var(--teal-d); background:#e6fffb;
       border:1px solid var(--teal); border-radius:999px; padding:4px 10px; white-space:nowrap; }
-    /* 取得手順（イベントドロッパーの key-modal と同じ4ステップ＋同じボタン体裁） */
-    .key-steps { margin:8px 0 12px; padding-left:1.3em; font-size:13px; color:var(--sub); line-height:1.9; }
-    .key-studio-btn { display:inline-block; background:var(--teal); color:#fff !important; font-weight:700;
-      font-size:14px; padding:11px 18px; border-radius:12px; text-decoration:none; box-shadow:0 4px 14px rgba(6,182,164,.3);
-      transition:transform .15s, box-shadow .15s; }
-    .key-studio-btn:hover { transform:translateY(-2px); box-shadow:0 7px 20px rgba(6,182,164,.4); }
-    /* キーの行き先を並べて見せる箱（安全性の可視化） */
-    .key-trust { margin:14px 0 0; border:2px solid var(--teal); border-radius:14px;
-      background:linear-gradient(180deg,#f0fffb,#ffffff); padding:12px 14px; }
-    .key-trust h3 { margin:0 0 6px; font-size:14px; font-weight:700; color:var(--teal-d); }
-    .key-trust ul { margin:0; padding-left:0; list-style:none; font-size:12.5px; color:var(--sub); line-height:1.85; }
-    .key-trust li { padding-left:16px; position:relative; }
-    .key-trust li::before { content:'✓'; position:absolute; left:0; color:var(--teal-d); font-weight:700; }
-    .key-more { margin:10px 0 0; font-size:12.5px; }
-    .key-more a { color:var(--teal-d); font-weight:700; }
     .modal-card { background:var(--paper); border-radius:22px; max-width:560px; width:100%; padding:26px 24px;
       box-shadow:0 24px 60px rgba(6,182,164,.35); max-height:92vh; overflow:auto; }
     .modal-card h2 { font-family:'Mochiy Pop One',sans-serif; font-weight:400; font-size:21px; margin:0 0 8px; color:var(--teal-d); }
-    .key-field input { width:100%; font-size:15px; padding:12px 14px; border:2px solid var(--line); border-radius:12px; font-family:inherit; }
-    .key-field input:focus { outline:none; border-color:var(--teal); }
-    .key-field > label { display:block; font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; }
-    /* 入力欄の右端に重ねる「目」ボタン。キーはマスク（type=password）で伏せるが、
-       貼り付けた内容を目視できないと逆に不安になるため、表示切り替えとは必ずセットで置く。
-       イベントドロッパー（calendar/index.html）と同じ作りにそろえている。 */
-    .key-input-wrap { position:relative; }
-    .key-input-wrap input { padding-right:50px; }
-    .key-eye { position:absolute; top:50%; right:6px; transform:translateY(-50%);
-      width:38px; height:38px; padding:0; border:none; border-radius:10px; cursor:pointer;
-      background:none; box-shadow:none; color:var(--sub); font-size:18px; line-height:1; }
-    .key-eye:hover { background:#e6fffb; transform:translateY(-50%); }
-    .key-eye:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
-    /* 入力直後の接続テスト結果。成功/失敗のどちらも同じ位置に出す（視線を動かさない）。 */
-    .key-check { margin:8px 0 0; font-size:12.5px; font-weight:700; line-height:1.7; display:none; }
-    .key-check.show { display:block; }
-    .key-check.testing { color:var(--sub); }
-    .key-check.ok { color:var(--teal-d); }
-    .key-check.ng { color:#d4380d; }
-    .key-warn { margin:14px 0; background:#fff8e6; border:1px solid #ffd591; border-radius:12px; padding:11px 13px; font-size:12px; color:#7a4f01; }
+ background:#fff8e6; border:1px solid #ffd591; border-radius:12px; padding:11px 13px; font-size:12px; color:#7a4f01; }
     .modal-btns { display:flex; gap:10px; flex-wrap:wrap; }
     .modal-btns button { flex:1 1 auto; font-family:inherit; font-size:15px; font-weight:700; padding:12px 18px; border-radius:12px; cursor:pointer; border:none; color:#fff;
       background:linear-gradient(100deg,var(--teal),var(--lime-d)); }
@@ -404,7 +369,7 @@
       <!-- 通常モードで読んだあとの逃げ道。取りこぼしても、モードを切り替えずここからAIで読み直せる。 -->
       <div id="retryAi" style="display:none; margin-top:10px">
         <button type="button" class="tool-btn" id="retryAiBtn" data-i18n="retryAiBtn">🤖 AIで読み直す</button>
-        <span class="fy-hint" data-i18n="retryAiHint">読み取れていない予定があるときに使います（APIキーが必要）。</span>
+        <span class="fy-hint" data-i18n="retryAiHint">読み取れていない予定があるときに使います（キーは要りません）。</span>
       </div>
 
       <!-- 読み取れなかったときに、実際に読み取れた文字を見せる。
@@ -463,27 +428,26 @@
 
       <div class="ai-opt aiuse">
         <h3 data-i18n="aiModalUseTitle">AIを使う（AIモード）</h3>
-        <!-- お金の不安を先に打ち消す3点。ここを削ると「キーを入れさせられる」印象に戻る。 -->
+        <!-- キーが要らないこと・お金がかからないこと・1日の上限を先に見せる3点。 -->
         <div class="ai-badges">
-          <span class="ai-badge" data-i18n="aiBadgeCard">💳 クレカ登録なし</span>
-          <span class="ai-badge" data-i18n="aiBadgeFree">🆓 無料枠内なら0円</span>
-          <span class="ai-badge" data-i18n="aiBadgeTime">⏱ 取得は約3分</span>
+          <span class="ai-badge" data-i18n="aiBadgeCard">🔑 キーは要りません</span>
+          <span class="ai-badge" data-i18n="aiBadgeFree">🆓 0円</span>
+          <span class="ai-badge" data-i18n="aiBadgeTime">📅 1人1日10枚まで</span>
         </div>
-        <p data-i18n="aiModalUseDesc">ご自身の Google Gemini APIキー を使って、予定表をAIで読み取ります。</p>
+        <p data-i18n="aiModalUseDesc">設定は要りません。予定表をAIで読み取ります。</p>
         <ul>
           <li data-i18n="aiModalWhy1">📥 1枚の予定表から何十件・何百件の予定をまとめて読み取ります（実データで157件・211件を確認）。</li>
-          <li data-i18n="aiModalUse1">🔒 キーはお使いの端末内だけに保存されます。当方はサーバーを持っていないため、受け取ることができません。</li>
-          <li data-i18n="aiModalUse2">💳 クレジットカードの登録は不要。無料枠は1日およそ1,500回で、超えても課金されず止まるだけです。</li>
-          <!-- リンク先は周知サイトのAPIキー案内ページ。href は schedule-i18n.js が言語別に張り替える（HTMLの値は ja 用の既定値）。 -->
-          <li><span data-i18n="aiModalUse3">🔑 キーの取得方法は</span> <a id="aiKeyGuideLink" href="https://dropper-tools.com/apikey.html" target="_blank" rel="noopener" data-i18n="aiModalGuideLink">こちら（取得ガイド）</a> <span data-i18n="aiModalUse3b">をご覧ください（クレカ不要・3分・0円の理由も説明しています）。</span></li>
+          <li data-i18n="aiModalUse1">📤 予定表のファイルは、当方の中継（何も保存しません）を通して OpenAI のAIへ送ります。</li>
+          <li data-i18n="aiModalUse2">⚠️ 送った内容は、OpenAI がAIの改良に使うことがあります（無料で使える条件です）。個人の情報が入った文書はドロップしないでください。</li>
+          <li data-i18n="aiModalUse3">📅 1人1日10枚まで使えます。AIの枠が終わった日も、通常モードでそのまま読み取れます。</li>
         </ul>
       </div>
 
       <div class="modal-btns">
         <button type="button" class="ghost" id="aiSkipBtn" data-i18n="aiModalSkipBtn">AIを使わない</button>
-        <button type="button" id="aiUseBtn" data-i18n="aiModalUseBtn">AIを使う（キーを入力）</button>
+        <button type="button" id="aiUseBtn" data-i18n="aiModalUseBtn">AIを使う</button>
       </div>
-      <p class="ai-modal-foot" data-i18n="aiModalFoot">※あとから「AIモード」を押せば、いつでもキーを入れ直せます。</p>
+      <p class="ai-modal-foot" data-i18n="aiModalFoot">※あとから「通常モード」「AIモード」を押せば、いつでも切り替えられます。</p>
     </div>
   </div>
 
@@ -659,58 +623,6 @@
     </div>
   </div>
 
-  <div id="key-modal" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <h2 data-i18n="keyModalTitle">🔑 Gemini APIキーの設定</h2>
-      <p class="note" data-i18n="keyModalNote">AIで読み取るには、ご自身のGemini APIキーが必要です。Googleアカウントがあれば無料で取得できます（3分ほど）。クレジットカードの登録は求められません。</p>
-      <div class="ai-badges">
-        <span class="ai-badge" data-i18n="aiBadgeCard">💳 クレカ登録なし</span>
-        <span class="ai-badge" data-i18n="aiBadgeFree">🆓 無料枠内なら0円</span>
-        <span class="ai-badge" data-i18n="aiBadgeTime">⏱ 取得は約3分</span>
-      </div>
-      <!-- 取得手順。イベントドロッパーの key-modal と同じ4ステップにそろえている。 -->
-      <div class="ai-opt aiuse">
-        <h3 data-i18n="keyStepsTitle">取得のしかた</h3>
-        <ol class="key-steps">
-          <li data-i18n="keyStep1">下のリンクから Google AI Studio を開く</li>
-          <li data-i18n="keyStep2">Googleアカウントでログインする</li>
-          <li data-i18n="keyStep3">「APIキーを作成」をクリックする</li>
-          <li data-i18n="keyStep4">できたキーをコピーして、下の欄に貼り付ける</li>
-        </ol>
-        <a class="key-studio-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="keyStudioLink">Google AI Studio を開く ↗</a>
-      </div>
-      <!-- キーはマスク表示（type=password）。目のボタンで表示を切り替える。
-           label で input を包まないこと（目のボタンのクリックが label に吸われるため）。 -->
-      <div class="key-field">
-        <label for="keyInput" data-i18n="keyLabel">🔑 APIキー</label>
-        <div class="key-input-wrap">
-          <input type="password" id="keyInput" autocomplete="off" spellcheck="false" placeholder="AIza...">
-          <button type="button" id="keyEyeBtn" class="key-eye" aria-pressed="false"
-                  data-i18n="keyShow" data-i18n-attr="aria-label">👁</button>
-        </div>
-      </div>
-      <!-- 貼り付け直後の接続テスト結果（schedule-app.js が書き込む） -->
-      <p class="key-check" id="keyCheck"></p>
-      <!-- 入力欄のすぐ下で「このキーがどこへ行くのか」を言い切る（安全性の可視化）。
-           詳しい説明は周知サイトの apikey.html へ。href は schedule-i18n.js が言語別に張り替える。 -->
-      <div class="key-trust">
-        <h3 data-i18n="keyTrustTitle">🔒 入力したキーの扱い</h3>
-        <ul>
-          <li data-i18n="keyTrust1">保存先は、お使いの端末の中（ブラウザ）だけです。他の端末には同期されません。</li>
-          <li data-i18n="keyTrust2">当方はサーバーを持っていないため、キーも読み取った内容も受け取れません。</li>
-          <li data-i18n="keyTrust3">送信先は Google の Gemini API だけです。やめたいときは Google AI Studio でキーを削除すれば、その場で無効になります。</li>
-        </ul>
-        <p class="key-more"><a id="keyMoreLink" href="https://dropper-tools.com/apikey.html" target="_blank" rel="noopener" data-i18n="keyMoreLink">クレカ不要で0円な理由・安全性の詳しい説明 ↗</a></p>
-      </div>
-      <p class="key-warn" data-i18n="keyWarn">⚠️ 無料枠では、送信内容がGoogleのサービス改善に利用される場合があります。機密文書はドロップしないでください。</p>
-      <div class="modal-btns">
-        <button type="button" class="ghost" id="keyCancel" data-i18n="keyCancel">キャンセル</button>
-        <button type="button" id="keySave" data-i18n="keySave">保存して使う</button>
-      </div>
-      <p class="note" data-i18n="keyPrivacy">🔒 キーはお使いの端末内だけに保存され、当方のサーバーには送信も保存もしません。</p>
-    </div>
-  </div>
-
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>window.LANG = 'ja';</script>
   <script>
@@ -723,9 +635,9 @@
       if (img) img.src = 'https://hits.sh/app.dropper-tools.com/' + seg + '.svg?style=flat-square&label=visitors&color=0f9d8c&labelColor=555555';
     })();
   </script>
-  <script src="schedule-i18n.js?v=20260878"></script>
+  <script src="schedule-i18n.js?v=20260880"></script>
   <script src="schedule-parser.js?v=20260877"></script>
-  <script src="schedule-ai.js?v=20260877"></script>
-  <script src="schedule-app.js?v=20260877"></script>
+  <script src="schedule-ai.js?v=20260880"></script>
+  <script src="schedule-app.js?v=20260880"></script>
 </body>
 </html>
