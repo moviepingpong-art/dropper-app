@@ -105,9 +105,8 @@ var sportRow = sportSel ? sportSel.closest('.sport-row') : null;
 //                     slot: name(名称) / format(日ごとの内容) / opening(時刻) / deadline(締切)
 //   hideFields      : カードで非表示にする欄のフィールドキー配列（例: ['shimekiri']）
 //   annEmoji        : 案内文の先頭絵文字
-//   aiHint          : AI抽出プロンプトへ差し込む種類別の補足（{ja, en}）。
-//                     汎用プロンプトは共通で使い、この一文だけを種類ごとに足す。
-// スポーツは競技用プロンプト、それ以外は汎用プロンプト＋aiHint（runAiRecheck_ 内で選択）。
+// AI の頼み文（種類ごとの補足 aiHint を含む）は中継が持つ（dropper の workers/monster-ai/tool-prompts.js）。
+// 種類を足したら、あちらにも同じ鍵で補足を足して出し直す。
 var DROPPER_TYPES = {
   sports: {
     subtitleKey: 'typeSports',
@@ -120,22 +119,7 @@ var DROPPER_TYPES = {
     evKey: 'evMusic', docKey: 'docMusic',
     useSportSelector: false,
     labels: { name: 'fldNameMusic', format: 'fldFormatMusic', opening: 'fldOpeningMusic', deadline: 'fldDeadlineMusic' },
-    annEmoji: '🎵',
-    aiHint: {
-      ja: 'このチラシはコンサート・演奏会・発表会・舞台公演の告知です。' +
-          'kaikai_jikan には開場と開演の両方が書かれていれば「開場17:30 開演18:00」のように併記すること。' +
-          'schedule の events には、その日の演目・出演者・プログラム（例：ベートーヴェン交響曲第5番／第1部 合唱の部）を入れること。' +
-          'key_info には「出演」「指揮」「演目」「チケット料金（席種と価格）」「チケット発売日」「全席指定・自由席の別」' +
-          '「未就学児の入場可否」「主催・問合せ先」のうち、記載があり重要なものを優先して入れること。' +
-          'チケットの発売日は shimekiri（申込締切）ではない。発売日は key_info に入れ、shimekiri には予約や申込の締切がある場合だけ入れること。' +
-          'format_label は「演目」。\n',
-      en: 'This flyer announces a concert, recital, or stage performance. ' +
-          'If both doors-open and start times are given, put both in kaikai_jikan (e.g. "Doors 17:30 / Start 18:00"). ' +
-          'In schedule events, put the programme or performers for that day. ' +
-          'In key_info, prioritise: performers, conductor, programme, ticket prices by seat type, ticket on-sale date, reserved/unreserved seating, age restrictions, and the organiser or contact. ' +
-          'A ticket on-sale date is NOT an application deadline: put it in key_info and leave shimekiri empty unless there is a real booking or application deadline. ' +
-          'format_label should be "Programme".\n'
-    }
+    annEmoji: '🎵'
   },
   exhibition: {
     subtitleKey: 'typeExhibition',
@@ -146,71 +130,21 @@ var DROPPER_TYPES = {
     // 会期（初日〜最終日）で開催する種類。日付行のラベルを初日/最終日にし、
     // 案内文も期間として1行で書く。会期が長くても「日付が離れている」警告は出さない。
     dateRange: true,
-    longRun: true,
-    aiHint: {
-      ja: 'このチラシは展示会・個展・作品展の告知です。' +
-          '会期（例：10月1日〜10月12日）は初日と最終日の2つだけを kaisai_dates に入れ、その間の日は入れないこと。' +
-          'kaikai_jikan には開館時間（例「10:00〜17:00」）を入れること。' +
-          'schedule の events には、その日に行われる関連催し（オープニング、ギャラリートーク、講評会など）があれば入れること。' +
-          'key_info には「入場料」「休館日」「関連イベント」「最終日の閉館時刻」「出品・応募方法」「主催・問合せ先」' +
-          'のうち記載があり重要なものを優先して入れること。' +
-          'shimekiri は公募展などで出品・応募の締切がある場合だけ入れ、単なる会期の終わりは入れないこと。' +
-          'format_label は「展示内容」。\n',
-      en: 'This flyer announces an exhibition, solo show, or art display. ' +
-          'For a run of dates (e.g. 1–12 October), put only the first and last day in kaisai_dates, not the days in between. ' +
-          'Put the opening hours in kaikai_jikan (e.g. "10:00-17:00"). ' +
-          'In schedule events, note any related happenings that day (opening reception, gallery talk, critique). ' +
-          'In key_info, prioritise: admission fee, closed days, related events, closing time on the final day, how to submit work, and the organiser or contact. ' +
-          'Only set shimekiri when there is a real submission or entry deadline; the end of the run is not a deadline. ' +
-          'format_label should be "Exhibits".\n'
-    }
+    longRun: true
   },
   lecture: {
     subtitleKey: 'typeLecture',
     evKey: 'evLecture', docKey: 'docLecture',
     useSportSelector: false,
     labels: { name: 'fldNameLecture', format: 'fldFormatLecture', opening: 'fldOpeningLecture', deadline: 'fldDeadlineLecture' },
-    annEmoji: '🎓',
-    aiHint: {
-      ja: 'このチラシは講演会・セミナー・シンポジウム・講座・教室の告知です。' +
-          'kaikai_jikan には開始〜終了の時刻（例「13:30〜15:40」）を、記載があればそのまま入れること。' +
-          'schedule の events には、その日の演題と講師（例：講演①「◯◯」／山田太郎 氏）を入れること。' +
-          'key_info には「講師（所属・肩書）」「参加費」「定員」「対象」「申込方法」' +
-          '「会場参加とオンライン（Zoom等）の別」「主催・問合せ先」のうち、記載があり重要なものを優先して入れること。' +
-          'shimekiri には申込の締切日を入れること（「◯月◯日までに申し込み」も締切として扱う）。' +
-          'format_label は「演題」。\n',
-      en: 'This flyer announces a lecture, seminar, symposium, course, or class. ' +
-          'Put the start and end time in kaikai_jikan as written (e.g. "13:30-15:40"). ' +
-          'In schedule events, put the talk title and speaker for that day. ' +
-          'In key_info, prioritise: speaker with affiliation and title, fee, capacity, who it is for, how to apply, whether it is in person or online (Zoom etc.), and the organiser or contact. ' +
-          'Put the application deadline in shimekiri (a phrase such as "apply by 12 December" counts as a deadline). ' +
-          'format_label should be "Topic".\n'
-    }
+    annEmoji: '🎓'
   },
   festival: {
     subtitleKey: 'typeFestival',
     evKey: 'evFestival', docKey: 'docFestival',
     useSportSelector: false,
     labels: { name: 'fldNameFestival', format: 'fldFormatFestival', opening: 'fldOpeningFestival', deadline: 'fldDeadlineFestival' },
-    annEmoji: '🎪',
-    aiHint: {
-      ja: 'このチラシは祭り・地域の催し・マルシェ・フリーマーケット・盆踊り・縁日などの告知です。' +
-          'kaikai_jikan には開催時間（例「10:00〜16:00」）を入れること。' +
-          'schedule の events には、その日の出し物・ステージ・体験コーナーなど催しの内容を入れること。' +
-          'key_info には「荒天・雨天時の扱い（中止／順延／小雨決行）」を最優先で入れ、続いて' +
-          '「入場料・参加費」「屋台・出店」「駐車場・交通アクセス」「交通規制」「対象」「主催・問合せ先」' +
-          'のうち記載があり重要なものを入れること。' +
-          '雨天時の記載は来場判断に直結するため、短くても必ず拾うこと。' +
-          'shimekiri は出店・参加の申込締切がある場合だけ入れること。' +
-          'format_label は「内容」。\n',
-      en: 'This flyer announces a festival, community event, market, or similar local gathering. ' +
-          'Put the opening times in kaikai_jikan (e.g. "10:00-16:00"). ' +
-          'In schedule events, describe what happens that day (stage acts, stalls, hands-on corners). ' +
-          'In key_info, put the bad-weather policy first (cancelled / postponed / goes ahead in light rain), then admission or fees, food stalls, parking and access, road closures, who it is for, and the organiser or contact. ' +
-          'Always capture the wet-weather note even if it is brief, since it decides whether people turn up. ' +
-          'Only set shimekiri when there is a deadline to apply or to book a stall. ' +
-          'format_label should be "Programme".\n'
-    }
+    annEmoji: '🎪'
   },
   general: {
     subtitleKey: 'typeGeneral',
@@ -331,10 +265,8 @@ function chooseHybrid_() {
   renderModeBanner_();
   updateAiRecheckVisibility_();
 }
-// 「AIを使う」を選択 → キー入力モーダル → 入力できたらAIモードで記憶。キャンセルなら通常モードのまま。
-async function chooseAi_() {
-  var key = await askAiKey_();
-  if (!key) { return; }   // キャンセル＝AI利用選択のポップアップは閉じず再選択を促す
+// 「AIを使う」を選択 → AIモードで記憶。キーは要らない（当方の中継が OpenAI に頼む）
+function chooseAi_() {
   aiMode = 'ai';
   try { localStorage.setItem(AI_CHOICE_STORE, 'ai'); } catch (e) {}
   closeAiModal_();
@@ -346,10 +278,9 @@ async function chooseAi_() {
 // （全項目が最初からAI取得済みで、項目ごとの検算は使わないため不要）
 function updateAiRecheckVisibility_() {
   var isAi = (aiMode === 'ai');
-  /* 手入力のカード（data-manual）では、AIモードに関わらず**常に隠す**。
-     検算は読み取った生テキストをAIに掛け直すもので、手で打ったカードには
-     掛ける中身が無い（ocrText が空のまま走る）。 */
-  var manual_ = function (el) { return !!(el.closest && el.closest('.card[data-manual]')); };
+  /* 元のファイルが無いカード（手入力・LINE から ?d= で来たもの）では、AIモードに関わらず**常に隠す**。
+     検算は要項のファイルを AI に掛け直すもので、掛ける中身が無い。 */
+  var manual_ = function (el) { var c = el.closest && el.closest('.card'); return !c || !c.__aiFile; };
   var btns = document.querySelectorAll('.ai-recheck');
   for (var i = 0; i < btns.length; i++) { btns[i].style.display = (isAi || manual_(btns[i])) ? 'none' : ''; }
   var notes = document.querySelectorAll('.ai-anyfield');
@@ -695,11 +626,13 @@ async function processOne(file) {
     card.setText(res.text);
     card.fill(fields);
     items.push({ file: file, card: card, fileId: res.fileId, mimeType: res.mimeType });
+    card.el.__aiFile = file;   // AI に送るのは元のファイル（OCR の文字は送らない。runAiRecheck_ の上の説明）
+    updateAiRecheckVisibility_();   // ファイルが付いたので検算ボタンを出す（付く前は隠れている）
     // 「最初からAI」モード：正規表現の結果はフォールバックとして裏で保持し画面では隠す。
     // AI成功→AI結果を表示、AI失敗→正規表現の結果を表示し理由を添える（案①）。
     if (aiMode === 'ai') {
       card.hideFields();   // 正規表現結果のちらつきを防ぐ
-      await runAiRecheck_(card.el, res.text, true);   // 第3引数=AIモード（失敗時フォールバック説明を出す）
+      await runAiRecheck_(card.el, true);   // 第2引数=AIモード（失敗時フォールバック説明を出す）
     }
   } catch (e) {
     card.setStatus(I18N.t('stFailedPrefix') + (e && e.message ? e.message : e), 'ng');
@@ -1802,7 +1735,7 @@ function addCard(name) {
   li.querySelector('.fn').textContent = name;
   list.appendChild(li);
   var stEl = li.querySelector('.st');
-  var ocrText = '';   // この要項のOCR生テキスト（AI検算で使用）
+  var ocrText = '';   // この要項のOCR生テキスト（通常モードの読み取りと診断用。AI には送らない）
   var rowsEl = li.querySelector('.day-rows');
   var keyInfoWrap = li.querySelector('.keyinfo-wrap');
   var keyInfoRows = li.querySelector('.keyinfo-rows');
@@ -1934,7 +1867,7 @@ function addCard(name) {
 
   // AI検算ボタン（この大会の全項目をAIで取り直す。⚠の有無に関わらず実行できる）
   var aiBtn = li.querySelector('.ai-recheck');
-  if (aiBtn) aiBtn.addEventListener('click', function () { runAiRecheck_(li, ocrText); });
+  if (aiBtn) aiBtn.addEventListener('click', function () { runAiRecheck_(li); });
   if (aiMode === 'ai') {   // AIモードでは検算ボタン・any-field注意文は不要
     if (aiBtn) aiBtn.style.display = 'none';
     var anyNote = li.querySelector('.ai-anyfield');
@@ -2134,178 +2067,83 @@ function renderWarnings_(li, warnings) {
   }
 }
 
-/* ===== AI検算（BYOK：ユーザー自身のGeminiキーで実行） =====
-   ・キーはこの端末のみ（localStorage）に保持し、当方サーバーには送らない／保存しない。
-   ・⚠の有無に関わらず、この大会の全項目をAIで取り直す。結果は必ず人が確認する前提。
-   ・無料枠超過(429)時は「翌日まで利用不可」を表示する。 */
-// AIモデル。先頭が主モデル、以降は混雑(500/502/503/504)時のフォールバック先。
-// 混雑したら「同じモデルで待って再試行」ではなく「別モデルへ即切り替え」で回数と待ち時間を抑える。
-// レート上限(RPD)はプロジェクト単位でモデル非依存なので、フォールバックは混雑回避のみが目的（上限突破ではない）。
-// ★ 予備に版番号つきの名前を使わない（2026-09-15）。gemini-2.0-flash は提供が終わって 404 を返し、
-//   主モデルが混雑したとき必ず失敗していた。「latest」の名前は提供終了で消えない。3本とも同じ。
-var AI_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
-var AI_MODEL = AI_MODELS[0];   // 後方互換（他所からの参照用）。主モデル
-var AI_KEY_STORE = 'dropper_ai_key';
+/* ===== AI（当方の中継を通して OpenAI に頼む。2026-10-18〜） =====
+   ・利用者はキーを入れない。中継（ai.dropper-tools.com）が当方の OpenAI キーで頼む。
+   ・送るのは要項のファイルそのものと、言語・イベントの種類だけ。頼み文は中継が持つ（ページからは送らない）。
+   ・★ ドライブの OCR の文字は送らないこと。Google の API から得たデータは、Google の Limited Use の決まりで、
+     AI の学習に使われる先（OpenAI の無料枠）へ渡せない。OCR の文字は、AIなしの読み取りにだけ使う。
+   ・中継はファイルも答えも保存しない。送ったファイルは OpenAI が AI の改良に使うことがある（無料枠の条件）。
+   ・上限は中継が決める（全体の1日の枠・1人1日20枚）。超えたら error: 'quota' / 'limit' が返る。
+   ・⚠の有無に関わらず、この大会の全項目をAIで取り直す。結果は必ず人が確認する前提。 */
+var AI_RELAY = 'https://ai.dropper-tools.com/event';
+var AI_MAX_BYTES = 10 * 1024 * 1024;   // 中継が受け付けるファイルの大きさ（base64 にして約1.4倍になる）
+var AI_IMAGE_MAX = 2400;               // 画像は長い辺をここまで縮めて送る（読み取りには十分で、送る量と枠を節約できる）
+var AI_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-// ===== AIリクエストのスロットル（毎分制限=RPM回避） =====
-// Gemini無料枠のFlashは約10〜15リクエスト/分。連続ドロップで一気に送ると429になるため、
-// 各AIリクエストの間に最低 AI_MIN_INTERVAL_MS の間隔を空けて1件ずつ順番に処理する。
-var AI_MIN_INTERVAL_MS = 5000;   // 約5秒間隔（15回/分でも安全側）
-var aiLastRequestAt_ = 0;        // 直近のAIリクエスト時刻
-var aiThrottleChain_ = Promise.resolve();   // 直列化用チェーン
-
-// 前のAIリクエストから AI_MIN_INTERVAL_MS 経つまで待つ。呼び出しは直列化される。
-function aiThrottleWait_() {
-  aiThrottleChain_ = aiThrottleChain_.then(function () {
-    var now = Date.now();
-    var wait = Math.max(0, AI_MIN_INTERVAL_MS - (now - aiLastRequestAt_));
-    aiLastRequestAt_ = now + wait;
-    return wait ? new Promise(function (r) { setTimeout(r, wait); }) : null;
-  });
-  return aiThrottleChain_;
+// ファイルを、中継に送る形（base64 と種類）にする。画像は縮めて JPEG にする。
+// 戻り値: { b64, mime } または { error: 'size' | 'type' }
+async function aiPayload_(file) {
+  var mime = file.type || (/\.pdf$/i.test(file.name || '') ? 'application/pdf' : '');
+  var dataUrl;
+  if (/^image\//.test(mime)) {
+    try { dataUrl = await aiShrinkImage_(file); } catch (e) { dataUrl = null; }
+    if (dataUrl) mime = 'image/jpeg';
+  }
+  if (AI_MIMES.indexOf(mime) < 0) return { error: 'type' };
+  if (!dataUrl) {
+    if (file.size > AI_MAX_BYTES) return { error: 'size' };
+    dataUrl = await new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error('read failed')); };
+      fr.onload = function () { resolve(String(fr.result)); };
+      fr.readAsDataURL(file);
+    });
+  }
+  var b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  if (b64.length > AI_MAX_BYTES * 1.37) return { error: 'size' };
+  return { b64: b64, mime: mime };
 }
 
-// 保存済みのAIキーを返す（無ければ空文字）。入力を求めるときは askAiKey_() を使う。
-function getAiKey_() {
-  try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; }
-}
-
-// ===== APIキーの接続テスト =====
-// 貼り付けた直後に「このキーで本当に使えるか」を返す。実際にドロップするまで間違いに気づけないと、
-// キーを入れること自体が不安な操作になるため。
-// 叩くのは ListModels（GET /v1beta/models）。generateContent でダミー送信すると、
-// 無料枠の1日あたり回数（RPD）を検証だけで消費してしまうので使わない。ListModels はこの枠を消費しない。
-// 戻り値: { ok:true, model:'…' } または { ok:false, reason:'invalid|forbidden|quota|network|other' }
-function testAiKey_(key) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key);
-  return fetch(url).then(function (res) {
-    if (res.ok) {
-      return res.json().then(function (data) {
-        // 返るのは "models/gemini-flash-latest" の形。接頭辞を落として突き合わせる。
-        var names = [], list = (data && data.models) || [];
-        for (var i = 0; i < list.length; i++) {
-          names.push(String(list[i].name || '').replace(/^models\//, ''));
-        }
-        // 表示するモデル名は文言に直書きせず、実際に使う AI_MODELS から採る。
-        // 一覧に出ないことがあっても弾かない（キーは有効なのに失敗表示になる方が害が大きい）。
-        var model = AI_MODELS[0];
-        for (var m = 0; m < AI_MODELS.length; m++) {
-          if (names.indexOf(AI_MODELS[m]) >= 0) { model = AI_MODELS[m]; break; }
-        }
-        return { ok: true, model: model };
-      }).catch(function () { return { ok: true, model: AI_MODELS[0] }; });
-    }
-    if (res.status === 400 || res.status === 401) return { ok: false, reason: 'invalid' };
-    if (res.status === 403) return { ok: false, reason: 'forbidden' };
-    if (res.status === 429) return { ok: false, reason: 'quota' };
-    return { ok: false, reason: 'other' };
-  }).catch(function () { return { ok: false, reason: 'network' }; });
-}
-
-// ===== APIキー入力モーダル =====
-// window.prompt では取得手順やリンクを示せず、キーの取り方が分からない人が詰まるため、
-// 手順・AI Studioへのボタン・注意書きを備えた専用モーダルで入力してもらう。
-// 保存済みなら即その値を返す。未保存ならモーダルを開き、Promiseでキー（またはキャンセル時は空文字）を返す。
-function askAiKey_() {
-  var saved = getAiKey_();
-  if (saved) return Promise.resolve(saved);
-
-  var modal = document.getElementById('key-modal');
-  var input = document.getElementById('keyInput');
-  var errEl = document.getElementById('keyError');
-  var saveBtn = document.getElementById('keySaveBtn');
-  var cancelBtn = document.getElementById('keyCancelBtn');
-  var eyeBtn = document.getElementById('keyEyeBtn');
-  var checkEl = document.getElementById('keyCheck');
-  if (!modal || !input || !saveBtn || !cancelBtn) return Promise.resolve('');
-
-  return new Promise(function (resolve) {
-    var checkTimer = null;   // デバウンス用
-    var checkSeq = 0;        // 入力が進んだら古い結果を捨てるための通し番号
-
-    var setCheck = function (cls, text) {
-      if (!checkEl) return;
-      checkEl.className = 'key-check show ' + cls;
-      checkEl.textContent = text;
+function aiShrinkImage_(file) {
+  return new Promise(function (resolve, reject) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var s = Math.min(1, AI_IMAGE_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      var g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // 透明な PNG を黒くしない
+      g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.9));
     };
-    var clearCheck = function () {
-      if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
-      checkSeq++;
-      if (checkEl) { checkEl.className = 'key-check'; checkEl.textContent = ''; }
-    };
-
-    var finish = function (value) {
-      modal.classList.remove('show');
-      saveBtn.removeEventListener('click', onSave);
-      cancelBtn.removeEventListener('click', onCancel);
-      input.removeEventListener('keydown', onKey);
-      input.removeEventListener('input', onInput);
-      if (eyeBtn) eyeBtn.removeEventListener('click', onEye);
-      clearCheck();
-      input.value = '';
-      input.type = 'password';   // 次に開いたときも伏せた状態から始める
-      resolve(value);
-    };
-    // 接続テストは、キーの形（AIza + 英数）が整ってから1回だけ。1文字ごとには叩かない。
-    var KEY_SHAPE = /^AIza[\w-]{30,}$/;
-    var onInput = function () {
-      var k = (input.value || '').trim();
-      clearCheck();
-      if (!KEY_SHAPE.test(k)) return;
-      setCheck('testing', I18N.t('keyTestRunning'));
-      var seq = checkSeq;
-      checkTimer = setTimeout(function () {
-        testAiKey_(k).then(function (r) {
-          if (seq !== checkSeq) return;   // その後に入力が変わっていたら捨てる
-          if (r.ok) { setCheck('ok', I18N.t('keyTestOk', { model: r.model })); return; }
-          var keys = { invalid: 'keyTestInvalid', forbidden: 'keyTestForbidden', quota: 'keyTestQuota', network: 'keyTestNetwork' };
-          setCheck('ng', I18N.t(keys[r.reason] || 'keyTestOther'));
-        });
-      }, 600);
-    };
-    var onEye = function () {
-      var toShow = (input.type === 'password');
-      input.type = toShow ? 'text' : 'password';
-      eyeBtn.textContent = toShow ? '🙈' : '👁';
-      eyeBtn.setAttribute('aria-pressed', toShow ? 'true' : 'false');
-      eyeBtn.setAttribute('aria-label', I18N.t(toShow ? 'keyModalHide' : 'keyModalShow'));
-      input.focus();
-    };
-    var onSave = function () {
-      var k = (input.value || '').trim();
-      if (!k) {
-        if (errEl) { errEl.textContent = I18N.t('keyModalEmpty'); errEl.style.display = 'block'; }
-        input.focus();
-        return;
-      }
-      // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまうため。
-      try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
-      track('key_saved');
-      finish(k);
-    };
-    var onCancel = function () { finish(''); };
-    var onKey = function (e) { if (e.key === 'Enter') { e.preventDefault(); onSave(); } };
-
-    input.value = '';
-    input.type = 'password';
-    if (eyeBtn) {
-      eyeBtn.textContent = '👁';
-      eyeBtn.setAttribute('aria-pressed', 'false');
-      eyeBtn.setAttribute('aria-label', I18N.t('keyModalShow'));
-      eyeBtn.addEventListener('click', onEye);
-    }
-    clearCheck();
-    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
-    saveBtn.addEventListener('click', onSave);
-    cancelBtn.addEventListener('click', onCancel);
-    input.addEventListener('keydown', onKey);
-    input.addEventListener('input', onInput);
-    modal.classList.add('show');
-    setTimeout(function () { input.focus(); }, 50);
+    img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode')); };
+    img.src = url;
   });
 }
 
-async function runAiRecheck_(li, ocrText, isAiMode) {
+// 中継に頼む。戻り値: { answer } または { error: 'quota' | 'limit' | 'size' | 'type' | 'busy' | 'slow' | 'bad' | 'network' }
+// ★ fetch は 4xx/5xx でも例外を投げない。応答の status と中身を必ず見る（CLAUDE.md）。
+async function aiAsk_(file, type) {
+  var p = await aiPayload_(file);
+  if (p.error) return p;
+  var url = AI_RELAY + '?lang=' + encodeURIComponent(window.LANG || 'ja') +
+    '&type=' + encodeURIComponent(type) + '&mime=' + encodeURIComponent(p.mime);
+  var res;
+  try {
+    res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: p.b64 });
+  } catch (e) { return { error: 'network' }; }
+  var data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (res.ok && data && data.answer && typeof data.answer === 'object') return { answer: data.answer };
+  var err = (data && data.error) || '';
+  if (!err) console.warn('AI relay', res.status);
+  return { error: ['quota', 'limit', 'size', 'type', 'busy', 'slow', 'bad'].indexOf(err) >= 0 ? err : 'bad' };
+}
+
+// li.__aiFile（processOne が付ける元の要項ファイル）を中継に送る。ドライブの OCR の文字は送らない（上の説明）。
+async function runAiRecheck_(li, isAiMode) {
   var statusEl = li.querySelector('.ai-status');
   // AIの状態表示（.ai-status）は .card-foot の中にあり、AIモードでは入力欄ごと隠れている。
   // そのままでは処理中も失敗時も画面が空のままで、動いているのか分からない。
@@ -2320,115 +2158,32 @@ async function runAiRecheck_(li, ocrText, isAiMode) {
   var fallback = function (reason) {
     if (isAiMode && li.__cardApi && li.__cardApi.showAiFallback) li.__cardApi.showAiFallback(reason);
   };
-  if (!ocrText) { setAi(I18N.t('aiFail') + 'no text'); fallback('no text'); return; }
-  var key = await askAiKey_();
-  if (!key) { setAi(I18N.t('aiNoKey')); fallback(I18N.t('aiNoKey')); return; }
+  var file = li.__aiFile;
+  if (!file) { setAi(I18N.t('aiFail') + 'no file'); fallback('no file'); return; }
 
   setAi(I18N.t('aiRunning'));
-  // カード作成時の種類（data-type）でプロンプトを切り替える（sports=競技用 / それ以外=汎用イベント用）
+  // カード作成時の種類（data-type）を送る。中継が種類に合った頼み文を選ぶ（sports=競技用 / それ以外=汎用イベント用）
   var cardType = li.getAttribute('data-type') || DEFAULT_TYPE;
-  var isSportsCard = !!typeCfg_(cardType).useSportSelector;
-  var promptEn =
-    'You are an assistant that extracts information from sports event guidelines. From the following text, read the actual competition date(s), event name, venue, address, opening ceremony time, match format, entry deadline, and sport, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. Do not include practice days, reception days, or the entry deadline in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format as kaisai_dates. events must contain the match format / competition method / categories held that day (e.g. knockout, round-robin, final round, singles, team event, division names). For a one-day event too, if the guidelines state the competition method / match format / categories, put them in schedule events (always refer to items such as competition method, match format, format, event details). Only leave events as an empty string if the categories for that day truly cannot be determined, but never omit the element itself. Use an empty string or empty array for unknown values.\nsport is the sport; answer with one concise sport name in English (e.g. Table Tennis, Badminton, Volleyball, Soccer, Kendo). For a multi-sport event, give the main one; empty string if it cannot be determined.\nformat_label is the natural heading for the item corresponding to match format for that sport (e.g. Format for table tennis, Events for athletics, Legs for a road relay, Division/Class for martial arts). Empty string if it cannot be determined.\nkey_info is an array of up to 5 items of the most important information a participant should know, taken from the guidelines in order of importance. Each element is {\"label\":\"short heading\",\"text\":\"content\"}. label is a concise heading matching the content, such as Eligibility, Entry fee, Entry deadline, Entry limit, What to bring, Parking, Safety, Awards. text summarizes the specific content clearly for a participant. Also include eligibility, entry restrictions, entry fees, and payment deadlines in key_info if they are stated and important. Empty array if there is none. Strictly keep to a maximum of 5, and omit trivial administrative details.\nSchema: {\"taikai_mei\":\"\",\"kaisai_dates\":[],\"kaijo\":\"\",\"kaijo_jusho\":\"\",\"kaikai_jikan\":\"\",\"shiai_keishiki\":\"\",\"shimekiri\":\"\",\"schedule\":[{\"date\":\"\",\"events\":\"\"}],\"sport\":\"\",\"format_label\":\"\",\"key_info\":[{\"label\":\"\",\"text\":\"\"}]}\n\n--- Guideline text ---\n' + ocrText;
-  var promptJa =
-    'あなたはスポーツ大会の要項から情報を抽出するアシスタントです。' +
-    '次のテキストから、実際に試合が行われる開催日・大会名・会場・住所・開会式時刻・試合形式・申込締切・競技種目を読み取り、' +
-    'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
-    '開催日は YYYY-MM-DD の配列。練習日・受付日・申込締切日は開催日に含めないこと。' +
-    'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は kaisai_dates と同じ YYYY-MM-DD 形式にすること。' +
-    'events には、その日に行われる試合形式・競技方法・種目（例：トーナメント方式、予選リーグ、優勝決定戦、個人戦、団体戦、◯◯の部 など）を必ず入れること。' +
-    '1日開催の場合も、要項に競技方法・試合形式・種目の記載があれば、その内容を schedule の events に必ず入れること（要項本文の「競技方法」「試合方法」「試合内容」「試合形式」などの項目を必ず参照する）。' +
-    'その日の種目がどうしても判断できないときのみ events を空文字にしてよいが、要素自体は省略しないこと。値が不明な項目は空文字または空配列。\n' +
-    'sport は競技種目で、要項に書かれている競技名を簡潔な日本語で1つ答えること（例：卓球、バドミントン、バレーボール、サッカー、剣道）。' +
-    '複数競技の大会なら主要なものを1つ、判断できなければ空文字。\n' +
-    'format_label は、その競技で「試合形式」に相当する項目の自然な見出し名（例：卓球なら「試合形式」、陸上なら「実施種目」、駅伝なら「区間」、武道なら「部門・階級」）。判断できなければ空文字。\n' +
-    'key_info は、この大会に参加するにあたって参加者が知っておくべき重要な情報を、要項から重要な順に最大5件抜き出した配列。' +
-    '各要素は {"label":"短い見出し","text":"内容"} の形。' +
-    'label は「参加資格」「参加費」「申込締切」「エントリー制限」「持ち物」「駐車場」「安全・注意」「表彰」など内容に合った簡潔な見出し。' +
-    'text はその具体的な内容を参加者が読んで分かるよう簡潔にまとめる。' +
-    '参加資格・出場制限・参加費・支払期限なども、要項に記載があり重要と判断すれば key_info に含めること。' +
-    '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。\n' +
-    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
-    '--- 要項テキスト ---\n' + ocrText;
-  // 汎用イベント用プロンプト（コンサート・展示・講演・祭り等。スキーマは競技用と同一で下流処理を共通化）
-  // 種類ごとの違いは aiHint の一文だけを差し込んで表現する（プロンプト全文は複製しない）。
-  var aiHint = typeCfg_(cardType).aiHint || {};
-  var promptEnGeneral =
-    'You are an assistant that extracts information from event flyers and notices (concerts, recitals, exhibitions, lectures, seminars, festivals, community events, etc.). From the following text, read the event date(s), event name, venue, address, start time, application/reservation deadline (if any), and the program for each day, and return JSON only (no preamble, explanation, or code fences). kaisai_dates is an array in YYYY-MM-DD. For an event held over a continuous period (such as an exhibition), put the first day and the last day in kaisai_dates. Do not include deadlines in kaisai_dates. schedule must have exactly one element per date in kaisai_dates; date must be the same YYYY-MM-DD format. events is a short description of the program or content for that day (e.g. performance title, session names, activities); empty string only if it truly cannot be determined, but never omit the element itself. kaikai_jikan is the start time as written, including doors-open / start distinctions if stated (e.g. "Doors 17:30 / Start 18:00"); empty string if unknown. shimekiri is the application or reservation deadline if any; empty string if none. sport must be an empty string. format_label is a natural short heading for the per-day content (e.g. Program); empty string if unsure.\nkey_info is an array of up to 5 items of the most important information a visitor or participant should know, in order of importance. Each element is {"label":"short heading","text":"content"}. label examples: Admission, Tickets, Performers, Target audience, Capacity, How to apply, Parking, Rain policy. Empty array if none; strictly keep to a maximum of 5. Use an empty string or empty array for unknown values.\n' +
-    (aiHint.en || '') +
-    'Schema: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n--- Flyer text ---\n' + ocrText;
-  var promptJaGeneral =
-    'あなたはイベントの案内チラシ（コンサート・発表会・展示会・個展・講演会・セミナー・祭り・地域の催し等）から情報を抽出するアシスタントです。' +
-    '次のテキストから、開催日・イベント名・会場・住所・開始時刻・申込や予約の締切・各日の内容を読み取り、' +
-    'JSONのみを返してください（前置き・説明・コードフェンスは不要）。' +
-    '開催日は YYYY-MM-DD の配列。会期・期間で開催されるイベント（展示会・個展など）は、初日と最終日を kaisai_dates に入れること。締切日は開催日に含めないこと。' +
-    'schedule は kaisai_dates の各日付に対応する要素を必ず1件ずつ作り、date は同じ YYYY-MM-DD 形式にすること。' +
-    'events にはその日の内容・プログラム（例：◯◯公演、上映会、体験コーナー、ギャラリートーク など）を入れること。' +
-    'どうしても判断できないときのみ events を空文字にしてよいが、要素自体は省略しないこと。' +
-    'kaikai_jikan は開場・開演・開始時刻など（例：「開場17:30 開演18:00」）。不明なら空文字。' +
-    'shimekiri は申込・予約の締切（あれば）。無ければ空文字。' +
-    'sport は必ず空文字にすること。' +
-    'format_label は各日の内容欄に付ける自然な見出し（例：「内容」「プログラム」「上演内容」）。判断できなければ空文字。\n' +
-    'key_info は、来場者・参加者が知っておくべき重要な情報を、チラシから重要な順に最大5件抜き出した配列。' +
-    '各要素は {"label":"短い見出し","text":"内容"} の形。' +
-    'label は「入場料」「チケット」「出演」「対象」「定員」「申込方法」「駐車場」「雨天時」など内容に合った簡潔な見出し。' +
-    'text はその具体的な内容を読んで分かるよう簡潔にまとめる。' +
-    '重要な情報が無ければ空配列。最大5件を厳守し、些末な事務的記述は省く。値が不明な項目は空文字または空配列。\n' +
-    (aiHint.ja || '') +
-    'スキーマ: {"taikai_mei":"","kaisai_dates":[],"kaijo":"","kaijo_jusho":"","kaikai_jikan":"","shiai_keishiki":"","shimekiri":"","schedule":[{"date":"","events":""}],"sport":"","format_label":"","key_info":[{"label":"","text":""}]}\n\n' +
-    '--- チラシ本文 ---\n' + ocrText;
-  var prompt = (window.LANG === 'en' || window.LANG === 'in')
-    ? (isSportsCard ? promptEn : promptEnGeneral)
-    : (isSportsCard ? promptJa : promptJaGeneral);
 
   try {
-    // 一時的なサーバーエラー（混雑・過負荷）のときは1回だけ再試行する。
-    // 一般利用者には待ち時間が長く感じられるため、2回→1回に短縮（体感重視）。
-    // 各試行の間隔は既存のスロットル(aiThrottleWait_ = 約5秒)を使うのでRPM制限も同時に守られる。
-    var resp = null;
-    var busy = false;   // 混雑系エラー(500/502/503/504)を最後に受けたか
-    // 主モデル→フォールバックの順に、各モデル1回ずつだけ試す（計 最大2回）。
-    // 混雑時は「同じモデルで待って再試行」せず、別モデルへ即切り替え＝待ち時間を最小化。
-    for (var mi = 0; mi < AI_MODELS.length; mi++) {
-      // スロットル(RPM回避)は最初の1回だけ待つ。モデル切り替え時は待たない（別モデルでRPM干渉が小さいため）。
-      if (mi === 0) {
-        setAi(I18N.t('aiQueued'));
-        await aiThrottleWait_();
-      } else {
-        setAi(I18N.t('aiRetry'));   // 「別のAIで再試行中…」相当。待たずに即投げる
-      }
-      setAi(I18N.t('aiRunning'));
-      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODELS[mi] + ':generateContent?key=' + encodeURIComponent(key);
-      resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0, responseMimeType: 'application/json' }
-        })
-      });
-      busy = ([500, 502, 503, 504].indexOf(resp.status) !== -1);
-      // 混雑系エラーのときだけ次のモデルへ。それ以外は抜けて通常判定へ。
-      if (!busy) break;
+    var r = await aiAsk_(file, cardType);
+    if (r.error === 'quota' || r.error === 'limit') {
+      var lim = I18N.t(r.error === 'quota' ? 'aiQuota' : 'aiLimit');
+      setAi(lim); fallback(lim); return;
     }
-    if (resp.status === 429) { setAi(I18N.t('aiLimit')); fallback(I18N.t('aiLimit')); return; }
-    // 混雑・過負荷（500/502/503/504）は、数字やHTTPを見せず「混み合っている」旨のやさしい文言で返す。
+    if (r.error === 'size' || r.error === 'type') {
+      var big = I18N.t(r.error === 'size' ? 'aiTooLarge' : 'aiBadType');
+      setAi(big); fallback(big); return;
+    }
+    // 混雑・時間切れ・通信は、数字を見せず「混み合っている」旨のやさしい文言で返す。
     // 下に表示中の読み取り結果を確認・手直しできることも伝える（aiBusyNotice）。
-    if (busy || [500, 502, 503, 504].indexOf(resp.status) !== -1) {
+    if (r.error === 'busy' || r.error === 'slow' || r.error === 'network') {
       setAi(I18N.t('aiBusyStatus'));
       if (isAiMode && li.__cardApi && li.__cardApi.showAiBusy) li.__cardApi.showAiBusy();
       return;
     }
-    if (!resp.ok) {
-      var et = await resp.text();
-      if (resp.status === 400 && /API key not valid|API_KEY_INVALID/i.test(et)) { try { localStorage.removeItem(AI_KEY_STORE); } catch (e) {} }
-      setAi(I18N.t('aiFail') + resp.status); fallback('HTTP ' + resp.status); return;
-    }
-    var data = await resp.json();
-    var txt = ((((data.candidates || [])[0] || {}).content || {}).parts || [])
-      .map(function (p) { return p.text || ''; }).join('').trim();
-    txt = txt.replace(/^```(?:json)?|```$/g, '').trim();
-    var obj = JSON.parse(txt);
+    if (r.error) { setAi(I18N.t('aiFail') + r.error); fallback(r.error); return; }
+    var obj = r.answer;
 
     // AI結果を入力欄へ反映（必ず人が確認する前提）
     if ('taikai_mei' in obj) setVal(li, 'taikai_mei', obj.taikai_mei);
@@ -3254,6 +3009,7 @@ function applyHandoff_() {
     });
     if (card.setKeyInfo && f.key_info && f.key_info.length) card.setKeyInfo(f.key_info);
     reshapeHandoffCard_(list.lastElementChild);
+    updateAiRecheckVisibility_();   // 元のファイルが無いので検算ボタンを隠す
     // file は無い（LINE側が読み取った結果だけを受け取っている）。
     // doRegister は file が無ければ要項の保存をスキップするので、これで整合する。
     items.push({ file: null, card: card, fileId: null, mimeType: '' });

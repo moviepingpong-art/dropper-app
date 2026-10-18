@@ -15,10 +15,10 @@ var CALENDAR_ID = 'primary';
 var EVENT_COLOR_ID = '11';
 // GoogleドライブOCRの言語（en/in版は英語、日本語版はja）。イベントドロッパーと同じ決め方。
 var OCR_LANG = (window.LANG === 'en' || window.LANG === 'in') ? 'en' : 'ja';
-var AI_KEY_STORE = 'dropper_ai_key';   // イベントドロッパーと同じ保存先（入れ直しの手間を省く）
 
 var accessToken = null, tokenClient = null, pendingAuth = null;
 var aiMode = false;
+var aiChosen = false;   // この画面で一度「AIを使う」を押したか（送り先の説明を読んだ印）
 var items = [];        // 画面に出している予定（一覧の1行＝1件）
 var lastFile = null;   // 「AIで読み直す」で同じファイルをもう一度読むために覚えておく
 
@@ -92,150 +92,29 @@ function setMode(useAi) {
 }
 
 /* AIを使うかどうかのポップアップ。イベントドロッパーと同じ流れにそろえてある。
-   キーを求める前に「端末内にしか保存しない」「無料枠がある」を必ず見せたいので、
-   AIモードへの入口はここ1つに統一する（「APIキーを変更」の専用ボタンは置かない）。
-   すでにAIモードでも、もう一度押せばキーを入れ直せる。 */
+   キーは要らないが、「送ったファイルは OpenAI が AI の改良に使うことがある」を必ず先に見せたいので、
+   AIモードへの入口はここ1つに統一する。 */
 function openAiModal() { el('ai-modal').classList.add('show'); }
 function closeAiModal() { el('ai-modal').classList.remove('show'); }
 el('aiSkipBtn').addEventListener('click', function () { closeAiModal(); setMode(false); });
-el('aiUseBtn').addEventListener('click', async function () {
-  // キーを入れ直せるよう、保存済みでも必ず入力欄を出す
-  var key = await askKey(true);
-  if (!key) return;   // キャンセル＝選び直しを促すため、ポップアップは閉じない
+el('aiUseBtn').addEventListener('click', function () {
+  aiChosen = true;
   closeAiModal();
   setMode(true);
 });
 
 el('modeNormal').addEventListener('click', function () { setMode(false); });
 el('modeAi').addEventListener('click', function () { openAiModal(); });
-// ヘッダーのAI無料枠の帯。開くのは同じポップアップ（説明を飛ばす経路は増やさない）。
 setMode(false);   // 既定は通常モード。案内文もここで入る
 
-/* ===== APIキー ===== */
-function savedKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
-
-// 貼り付けた直後に「このキーで本当に使えるか」を返す。実際にドロップするまで間違いに気づけないと、
-// キーを入れること自体が不安な操作になるため。イベントドロッパー（app.js の testAiKey_）と同じ作り。
-// 叩くのは ListModels（GET /v1beta/models）。generateContent でダミー送信すると、
-// 無料枠の1日あたり回数（RPD）を検証だけで消費してしまうので使わない。ListModels はこの枠を消費しない。
-// 戻り値: { ok:true, model:'…' } または { ok:false, reason:'invalid|forbidden|quota|network|other' }
-function testKey(key) {
-  var models = (window.SchedAI && window.SchedAI.MODELS) || ['gemini-flash-latest'];
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key);
-  return fetch(url).then(function (res) {
-    if (res.ok) {
-      return res.json().then(function (data) {
-        // 返るのは "models/gemini-flash-latest" の形。接頭辞を落として突き合わせる。
-        var names = [], list = (data && data.models) || [];
-        for (var i = 0; i < list.length; i++) {
-          names.push(String(list[i].name || '').replace(/^models\//, ''));
-        }
-        // 表示するモデル名は文言に直書きせず、実際に使う MODELS から採る。
-        // 一覧に出ないことがあっても弾かない（キーは有効なのに失敗表示になる方が害が大きい）。
-        var model = models[0];
-        for (var m = 0; m < models.length; m++) {
-          if (names.indexOf(models[m]) >= 0) { model = models[m]; break; }
-        }
-        return { ok: true, model: model };
-      }).catch(function () { return { ok: true, model: models[0] }; });
-    }
-    if (res.status === 400 || res.status === 401) return { ok: false, reason: 'invalid' };
-    if (res.status === 403) return { ok: false, reason: 'forbidden' };
-    if (res.status === 429) return { ok: false, reason: 'quota' };
-    return { ok: false, reason: 'other' };
-  }).catch(function () { return { ok: false, reason: 'network' }; });
-}
-
-function askKey(force) {
-  var have = savedKey();
-  if (have && !force) return Promise.resolve(have);
-  var modal = el('key-modal'), input = el('keyInput');
-  var eyeBtn = el('keyEyeBtn'), checkEl = el('keyCheck');
-  return new Promise(function (resolve) {
-    var checkTimer = null;   // デバウンス用
-    var checkSeq = 0;        // 入力が進んだら古い結果を捨てるための通し番号
-
-    function setCheck(cls, text) {
-      if (!checkEl) return;
-      checkEl.className = 'key-check show ' + cls;
-      checkEl.textContent = text;
-    }
-    function clearCheck() {
-      if (checkTimer) { clearTimeout(checkTimer); checkTimer = null; }
-      checkSeq++;
-      if (checkEl) { checkEl.className = 'key-check'; checkEl.textContent = ''; }
-    }
-    function close(v) {
-      modal.classList.remove('show');
-      el('keySave').removeEventListener('click', onSave);
-      el('keyCancel').removeEventListener('click', onCancel);
-      input.removeEventListener('input', onInput);
-      if (eyeBtn) eyeBtn.removeEventListener('click', onEye);
-      clearCheck();
-      input.type = 'password';   // 次に開いたときも伏せた状態から始める
-      resolve(v);
-    }
-    // 接続テストは、キーの形（AIza + 英数）が整ってから1回だけ。1文字ごとには叩かない。
-    var KEY_SHAPE = /^AIza[\w-]{30,}$/;
-    function onInput() {
-      var k = (input.value || '').trim();
-      clearCheck();
-      if (!KEY_SHAPE.test(k)) return;
-      setCheck('testing', I18N.t('keyTestRunning'));
-      var seq = checkSeq;
-      checkTimer = setTimeout(function () {
-        testKey(k).then(function (r) {
-          if (seq !== checkSeq) return;   // その後に入力が変わっていたら捨てる
-          if (r.ok) { setCheck('ok', I18N.t('keyTestOk', { model: r.model })); return; }
-          var keys = { invalid: 'keyTestInvalid', forbidden: 'keyTestForbidden', quota: 'keyTestQuota', network: 'keyTestNetwork' };
-          setCheck('ng', I18N.t(keys[r.reason] || 'keyTestOther'));
-        });
-      }, 600);
-    }
-    function onEye() {
-      var toShow = (input.type === 'password');
-      input.type = toShow ? 'text' : 'password';
-      eyeBtn.textContent = toShow ? '🙈' : '👁';
-      eyeBtn.setAttribute('aria-pressed', toShow ? 'true' : 'false');
-      eyeBtn.setAttribute('aria-label', I18N.t(toShow ? 'keyHide' : 'keyShow'));
-      input.focus();
-    }
-    function onSave() {
-      var k = (input.value || '').trim();
-      if (!k) { input.focus(); return; }
-      // 接続テストがNGでも保存は通す。通信エラーで保存できないと、そこで詰んでしまうため。
-      try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {}
-      track('key_saved');
-      close(k);
-    }
-    function onCancel() { close(''); }
-    input.value = have || '';
-    input.type = 'password';
-    if (eyeBtn) {
-      eyeBtn.textContent = '👁';
-      eyeBtn.setAttribute('aria-pressed', 'false');
-      eyeBtn.setAttribute('aria-label', I18N.t('keyShow'));
-      eyeBtn.addEventListener('click', onEye);
-    }
-    clearCheck();
-    el('keySave').addEventListener('click', onSave);
-    el('keyCancel').addEventListener('click', onCancel);
-    input.addEventListener('input', onInput);
-    // 「AI設定を変更」から開いたときは保存済みのキーが入っている。そのキーがまだ生きているかを
-    // その場で確かめられるよう、開いた時点で1回テストする（ListModels は無料枠を消費しない）。
-    if (have) onInput();
-    modal.classList.add('show');
-    setTimeout(function () { input.focus(); }, 50);
-  });
-}
 // 通常モードで読んだが取りこぼした、というときの逃げ道。
 // モードそのものをAIへ切り替える。切り替えずにAIで読むと、画面は「通常モード」を選択中と
 // 表示したままAIが動くことになり、何が起きているのか分からなくなる。
 el('retryAiBtn').addEventListener('click', async function () {
   if (!lastFile) { setMsg(I18N.t('msgDropFirst')); return; }
-  // キーがまだ無い人に、いきなりキーだけ求めない。先に説明のポップアップを見せる。
-  // 入力を終えたらAIモードになるので、もう一度このボタンを押せば読み直せる。
-  if (!savedKey()) { openAiModal(); return; }
+  // まだAIモードを選んだことが無い人には、先に説明のポップアップを見せる（送り先と学習の話を読まずに送らせない）。
+  // 「AIを使う」を押せばAIモードになるので、もう一度このボタンを押せば読み直せる。
+  if (!aiChosen) { openAiModal(); return; }
   setMode(true);
   await handleFile(lastFile);
 });
@@ -294,17 +173,8 @@ async function handleFile(file) {
     var fy = fiscalYearInput();
     var noYear = false;
     if (useAi) {
-      var key = await askKey(false);
-      if (!key) { setMsg(I18N.t('errNoKeyAborted')); return; }
       setMsg(I18N.t('msgAiReading'));
-      items = await window.SchedAI.extract(file, {
-        apiKey: key, fiscalYear: fy, lang: window.LANG,
-        onStatus: function (s) {
-          if (s === 'queued') setMsg(I18N.t('msgAiQueued'));
-          else if (s === 'retry') setMsg(I18N.t('msgAiRetry'));
-          else setMsg(I18N.t('msgAiReadingShort'));
-        }
-      });
+      items = await window.SchedAI.extract(file, { fiscalYear: fy, lang: window.LANG });
       // AIが年を返せなかった行に、年度から年を補う
       items.forEach(function (it) { it.outOfRange = false; });
     } else {
@@ -340,11 +210,11 @@ async function handleFile(file) {
     }
   } catch (e) {
     var m = String(e && e.message || e);
-    if (m === 'no-key') setMsg(I18N.t('errNoKey'));
-    else if (m === 'too-large') setMsg(I18N.t('errTooLarge'));
-    else if (m === 'rate-minute') setMsg(I18N.t('errRateMinute'));
-    else if (m === 'rate-day') setMsg(I18N.t('errRateDay'));
-    else if (m === 'busy') setMsg(I18N.t('errBusy'));
+    if (m === 'too-large') setMsg(I18N.t('errTooLarge'));
+    else if (m === 'type') setMsg(I18N.t('errBadType'));
+    else if (m === 'limit') setMsg(I18N.t('errLimit'));
+    else if (m === 'quota') setMsg(I18N.t('errQuota'));
+    else if (m === 'busy' || m === 'network') setMsg(I18N.t('errBusy'));
     else if (m === 'bad-json') setMsg(I18N.t('errBadJson'));
     else setMsg(I18N.t('errOther', { m: m }));
   }
