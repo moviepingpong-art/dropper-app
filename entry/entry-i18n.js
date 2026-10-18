@@ -1,6 +1,6 @@
 // entry-i18n.js — 申込書ドロッパーの辞書（window.I18N）
 //
-// ほかの3本の辞書とは別物（辞書を跨がせない決まり）。
+// ほかの2本の辞書とは別物（辞書を跨がせない決まり）。
 // いまは日本語だけ。申込書の Excel・和暦・年齢区分は日本の事情が強く、en/in は作っていない。
 // en/in を足すときは、同じキーを全部そろえ、tools/sync-check.js の GROUPS に entry を足すこと。
 (function (global) {
@@ -13,19 +13,18 @@
       // 見出しの右端のリンク（周知サイトの使い方ガイドへ。動画つき）。index.html の予備の文と同じにしておく
       howtoLink: '▶ 使い方（動画 2分半）',
 
-      // ドロッパーの切り替えタブ。★ ほかの3本の辞書と同じキー名にしてあるが、
-      // 辞書そのものは跨がせない決まり（entry-i18n.js は独立）。文言を直すときは4本ぶん見ること
+      // ドロッパーの切り替えタブ。★ ほかの2本の辞書と同じキー名にしてあるが、
+      // 辞書そのものは跨がせない決まり（entry-i18n.js は独立）。文言を直すときは3本ぶん見ること
       typePrompt: 'ドロッパーの選択',
       toolEvent: '🎪 イベント',
       toolSchedule: '📅 予定表',
-      toolDecide: '✅ 決めごと',
       toolEntry: '📝 申込書',
 
       // --- 「何ができる？」ポップアップ（#tools-modal）---
-      // ★ ほかの3本（decide/schedule）と同じ中身。直すときは4本ぶん直すこと
+      // ★ ほかの2本（calendar/schedule）と同じ中身。直すときは3本ぶん直すこと
       // --- 「何ができる？」ポップアップ（#tools-modal）---
       tmBtn: '🔍 何ができる？',
-      tmTitle: '🎁 4つのドロッパー、何ができる？',
+      tmTitle: '🎁 3つのドロッパー、何ができる？',
       tmIntro: 'どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。',
       tmNameEvent: '🎪 イベントドロッパー',
       tmOneEvent: 'チラシ1枚から、予定1件と、そのまま配れる案内文。',
@@ -43,18 +42,6 @@
       tmTagSchedule1: '1枚からまとめて',
       tmTagSchedule2: 'マス目の予定表もOK',
       tmTagSchedule3: '二重登録を防ぐ',
-      tmNameDecide: '✅ 決めごとドロッパー',
-      tmOneDecide: '会話やメモから、決まったこと・未決・やること・記録に仕分け。',
-      tmFigChat: '会話・手書きメモ',
-      tmFigSort: '4つに仕分け',
-      tmFigDeadline: '期限だけ登録',
-      tmBinDecided: '✅ 決まった',
-      tmBinOpen: '❓ 未決',
-      tmBinTodo: '📌 やること',
-      tmBinRecord: '🗒 記録',
-      tmTagDecide1: 'ログイン不要で試せる',
-      tmTagDecide2: '会話のスクショから',
-      tmTagDecide3: '手書き・議事録もOK',
       tmGoEvent: '🎪 イベントドロッパーを使ってみる',
       tmGoSchedule: '📅 予定表ドロッパーを使ってみる',
       tmHere: 'いま使っています',
@@ -72,7 +59,6 @@
       tmLineText: '公式アカウントに要項の画像やPDFを送るだけ。ログインなしで読み取り結果が返ります。',
       tmLineBtn: '友だち追加して試す',
       tmLineQr: 'パソコンの方はスマホのLINEで読み取り',
-      tmGoDecide: '✅ 決めごとドロッパーを使ってみる',
 
       privTitle: '入れたものの扱い',
       priv1: '申込書も名簿も、この端末の中（ブラウザ）だけで扱います。当方はサーバーを持っていないため、受け取れません。',

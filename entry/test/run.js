@@ -538,8 +538,8 @@ function mapSection(roster) {
   check(/<span class="tm-here"[\s\S]{0,400}?data-panel="entry"/.test(html) === false &&
         /data-panel="entry"[\s\S]*?<span class="tm-here"/.test(html),
     '★ 「いま使っています」の印は申込書のパネルにある');
-  check(!/id="tmGoEntry"/.test(html) && /id="tmGoDecide"/.test(html),
-    '★ 自分への入口は出さず、決めごとへの入口は出す');
+  check(!/id="tmGoEntry"/.test(html) && /id="tmGoSchedule"/.test(html),
+    '★ 自分への入口は出さず、予定表への入口は出す');
   // ★ 図の組（.sheet .bar .fig）は短い名前。申込書ドロッパーの .sheet は「Excelのシート」で
   //   ③④が使っている。囲いの外に置くと、シートの見出しが78pxの白い箱に化ける（2026-09-22）
   check(!/\n    \.(bar|fig|tbl|chk|cal|bub|sheet\.wide)[ .{]/.test(html),
