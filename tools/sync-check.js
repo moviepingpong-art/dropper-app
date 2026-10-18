@@ -28,7 +28,8 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const SIBLINGS = path.resolve(ROOT, '..');
-const GROUPS = ['calendar', 'schedule', 'decide'];
+const GROUPS = ['calendar', 'schedule'];
+/* 決めごとドロッパー（decide*）は 2026-10-18 に廃止した。フォルダごと消してある */
 const LANGS = ['ja', 'en', 'in'];
 
 /* 2026-07-19 に本番審査を通したスコープ。増やすと再審査になる */
@@ -247,6 +248,7 @@ else {
 
 /* ---------- 8. 「何ができる？」ポップアップ ---------- */
 /* ★ 2026-09-22、本人の指示で entry にも同じものを置いた。
+ *   元は decide（決めごと）だったが、2026-10-18 の廃止で schedule を元にした。
  *   置かなかった唯一の理由が「写しが黙ってずれる」ことだったので、ここで見張る。
  *   本ごとに違ってよいのは3つだけ。それを同じ印に直してから比べる。
  *     - data-home（開いたとき、どのパネルから見せるか）
@@ -254,7 +256,7 @@ else {
  *     - 「いま使っています」の印と、ほかへの入口（tm-here / tm-go）
  *   calendar は末尾に出欠の案内がもう1段あるので、この比べには入れない。
  */
-section('8. 「何ができる？」ポップアップ（schedule・decide・entry で同じ中身）');
+section('8. 「何ができる？」ポップアップ（schedule・entry で同じ中身）');
 {
   const pickModal = (rel) => {
     const p = path.join(ROOT, rel);
@@ -274,19 +276,19 @@ section('8. 「何ができる？」ポップアップ（schedule・decide・ent
     .replace(/\s+/g, ' ')
     .trim();
 
-  const base = pickModal('decide/index.html');
-  if (!base) skipped('decide/index.html にポップアップが無い');
+  const base = pickModal('schedule/index.html');
+  if (!base) bad('schedule/index.html にポップアップが無い');
   else {
-    for (const rel of ['schedule/index.html', 'entry/index.html']) {
+    for (const rel of ['entry/index.html']) {
       const b = pickModal(rel);
       if (!b) { bad(rel + ' にポップアップが無い'); continue; }
-      if (norm(b) === norm(base)) { ok(rel + ' は decide と同じ中身'); continue; }
+      if (norm(b) === norm(base)) { ok(rel + ' は schedule と同じ中身'); continue; }
       // どこから食い違うかを出す。直す手がかりになる
       const a = norm(base), c = norm(b);
       let k = 0;
       while (k < Math.min(a.length, c.length) && a[k] === c[k]) k++;
-      bad(rel + ' が decide とずれている（' + k + '字目から）\n'
-        + '       decide: ' + JSON.stringify(a.slice(k, k + 90)) + '\n'
+      bad(rel + ' が schedule とずれている（' + k + '字目から）\n'
+        + '       schedule: ' + JSON.stringify(a.slice(k, k + 90)) + '\n'
         + '       こちら: ' + JSON.stringify(c.slice(k, k + 90)));
     }
     // 文言の鍵も、増減していないか見る（中身の訳は本ごとに同じ日本語のはず）
@@ -297,17 +299,17 @@ section('8. 「何ができる？」ポップアップ（schedule・decide・ent
       const ja = s.slice(0, s.indexOf('\n    en: {') > 0 ? s.indexOf('\n    en: {') : s.length);
       return (ja.match(/^      (tm[A-Z]\w*):/gm) || []).map((x) => x.trim().slice(0, -1)).sort();
     };
-    const kd = tmKeys('decide/decide-i18n.js');
+    const kd = tmKeys('schedule/schedule-i18n.js');
     const ke = tmKeys('entry/entry-i18n.js');
     if (!kd || !ke) skipped('文言の辞書が読めない');
     else {
-      // entry は自分なので tmGoEntry を持たず、代わりに tmGoDecide を持つ
-      const want = kd.filter((k) => k !== 'tmGoEntry').concat(['tmGoDecide']).sort();
+      // entry は自分なので tmGoEntry を持たず、代わりに tmGoSchedule を持つ
+      const want = kd.filter((k) => k !== 'tmGoEntry').concat(['tmGoSchedule']).sort();
       const lack = want.filter((k) => !ke.includes(k));
       const extra = ke.filter((k) => !want.includes(k));
       if (lack.length) bad('entry の文言に足りない鍵: ' + lack.join(', '));
       if (extra.length) bad('entry の文言に余分な鍵: ' + extra.join(', '));
-      if (!lack.length && !extra.length) ok('文言の鍵が decide と揃っている（' + ke.length + '件）');
+      if (!lack.length && !extra.length) ok('文言の鍵が schedule と揃っている（' + ke.length + '件）');
     }
   }
 }

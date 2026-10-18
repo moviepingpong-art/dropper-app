@@ -20,12 +20,11 @@
       toolTabsLabel: 'ドロッパーの選択',
       toolEvent: '🎪 イベント',
       toolSchedule: '📅 予定表',
-      toolDecide: '✅ 決めごと',
       toolEntry: '📝 申込書',
       // --- 「何ができる？」ポップアップ（#tools-modal）---
       // 3本の違いは「1枚から何が、いくつ出てくるか」に尽きる。図のラベルもそこだけを言う。
       tmBtn: '🔍 何ができる？',
-      tmTitle: '🎁 4つのドロッパー、何ができる？',
+      tmTitle: '🎁 3つのドロッパー、何ができる？',
       tmIntro: 'どれも「ファイルをドロップするだけ」。違うのは、何が出てくるかです。',
       tmNameEvent: '🎪 イベントドロッパー',
       tmOneEvent: 'チラシ1枚から、予定1件と、そのまま配れる案内文。',
@@ -43,20 +42,7 @@
       tmTagSchedule1: '1枚からまとめて',
       tmTagSchedule2: 'マス目の予定表もOK',
       tmTagSchedule3: '二重登録を防ぐ',
-      tmNameDecide: '✅ 決めごとドロッパー',
-      tmOneDecide: '会話やメモから、決まったこと・未決・やること・記録に仕分け。',
-      tmFigChat: '会話・手書きメモ',
-      tmFigSort: '4つに仕分け',
-      tmFigDeadline: '期限だけ登録',
-      tmBinDecided: '✅ 決まった',
-      tmBinOpen: '❓ 未決',
-      tmBinTodo: '📌 やること',
-      tmBinRecord: '🗒 記録',
-      tmTagDecide1: 'ログイン不要で試せる',
-      tmTagDecide2: '会話のスクショから',
-      tmTagDecide3: '手書き・議事録もOK',
       tmGoEvent: '🎪 イベントドロッパーを使ってみる',
-      tmGoDecide: '✅ 決めごとドロッパーを使ってみる',
       tmHere: 'いま使っています',
       tmNameEntry: '📝 申込書ドロッパー',
       tmOneEntry: '大会の申込書に、名簿から生年月日・年齢・住所を埋めて返します。',
@@ -217,11 +203,10 @@
       toolTabsLabel: 'Choose a dropper',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolDecide: '✅ Decide',
       toolEntry: '📝 Entry forms',
       tmBtn: '🔍 What can these do?',
-      tmTitle: '🎁 Three droppers — what does each one do?',
-      tmIntro: 'All three work the same way: drop a file. What differs is what comes out.',
+      tmTitle: '🎁 Two droppers — what does each one do?',
+      tmIntro: 'Both work the same way: drop a file. What differs is what comes out.',
       tmNameEvent: '🎪 Event Dropper',
       tmOneEvent: 'One flyer becomes one calendar entry, plus a ready-to-post announcement.',
       tmFigFlyer: 'One flyer',
@@ -238,20 +223,7 @@
       tmTagSchedule1: 'Many entries from one sheet',
       tmTagSchedule2: 'Calendar grids too',
       tmTagSchedule3: 'No double entries',
-      tmNameDecide: '✅ Decide Dropper',
-      tmOneDecide: 'Chats and notes sorted into decided, still open, to do, and record.',
-      tmFigChat: 'Chats and notes',
-      tmFigSort: 'Sorted into four',
-      tmFigDeadline: 'Deadlines only',
-      tmBinDecided: '✅ Decided',
-      tmBinOpen: '❓ Still open',
-      tmBinTodo: '📌 To do',
-      tmBinRecord: '🗒 Record',
-      tmTagDecide1: 'No sign-in to try it',
-      tmTagDecide2: 'From chat screenshots',
-      tmTagDecide3: 'Handwriting and minutes too',
       tmGoEvent: '🎪 Try Event Dropper',
-      tmGoDecide: '✅ Try Decide Dropper',
       tmHere: 'You are here',
       tmNameEntry: '📝 Entry Form Dropper',
       tmOneEntry: 'Fills a tournament entry form with dates of birth, ages and addresses from your club roster.',
@@ -395,11 +367,10 @@
       toolTabsLabel: 'Dropper chunein',
       toolEvent: '🎪 Event',
       toolSchedule: '📅 Schedule',
-      toolDecide: '✅ Decide',
       toolEntry: '📝 Entry forms',
       tmBtn: '🔍 Ye kya kar sakte hain?',
-      tmTitle: '🎁 Teen dropper — kaunsa kya karta hai?',
-      tmIntro: 'Teeno mein bas file drop karni hai. Farq sirf itna hai ki bahar kya aata hai.',
+      tmTitle: '🎁 Do dropper — kaunsa kya karta hai?',
+      tmIntro: 'Dono mein bas file drop karni hai. Farq sirf itna hai ki bahar kya aata hai.',
       tmNameEvent: '🎪 Event Dropper',
       tmOneEvent: 'Ek flyer se ek calendar entry, aur saath mein ready announcement.',
       tmFigFlyer: 'Ek flyer',
@@ -416,20 +387,7 @@
       tmTagSchedule1: 'Ek sheet se kai entries',
       tmTagSchedule2: 'Calendar grid bhi',
       tmTagSchedule3: 'Double entry nahi',
-      tmNameDecide: '✅ Decide Dropper',
-      tmOneDecide: 'Chat aur notes se tay hua, pending, karne wale kaam, aur record alag.',
-      tmFigChat: 'Chat aur notes',
-      tmFigSort: 'Chaar mein baant',
-      tmFigDeadline: 'Sirf deadline add',
-      tmBinDecided: '✅ Tay hua',
-      tmBinOpen: '❓ Pending',
-      tmBinTodo: '📌 Karna hai',
-      tmBinRecord: '🗒 Record',
-      tmTagDecide1: 'Bina sign-in try karein',
-      tmTagDecide2: 'Chat screenshots se',
-      tmTagDecide3: 'Handwriting aur minutes bhi',
       tmGoEvent: '🎪 Event Dropper try karein',
-      tmGoDecide: '✅ Decide Dropper try karein',
       tmHere: 'Abhi yahi khula hai',
       tmNameEntry: '📝 Entry Form Dropper',
       tmOneEntry: 'Tournament entry form mein roster se date of birth, age aur address bhar deta hai.',
@@ -591,24 +549,16 @@
     //   日本語だけのツールへ飛ばすと行き止まりになる。HTML は3言語ともバイト同一のまま。
     var te = document.getElementById('tabEntry');
     if (te) { te.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
-    // 「何ができる？」の中の4本目も、同じ理由で日本語のときだけ出す
+    // 「何ができる？」の中の申込書も、同じ理由で日本語のときだけ出す
     ['tmTabEntry', 'tmPanelEntry'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) { el.style.display = (global.LANG === 'ja' || !global.LANG) ? '' : 'none'; }
     });
-    var td = document.getElementById('tabDecide');
-    if (td) {
-      td.href = (global.LANG === 'en') ? '/decide-en/' : (global.LANG === 'in') ? '/decide-in/' : '/decide/';
-    }
     // 「何ができる？」ポップアップの「使ってみる」。タブと同じく同じ言語の版へ送る。
     // タブと同じ規則なので、リンク先を変えるときは両方そろえること。
     var tmGoE = document.getElementById('tmGoEvent');
     if (tmGoE) {
       tmGoE.href = (global.LANG === 'en') ? '/calendar-en/' : (global.LANG === 'in') ? '/calendar-in/' : '/calendar/';
-    }
-    var tmGoD = document.getElementById('tmGoDecide');
-    if (tmGoD) {
-      tmGoD.href = (global.LANG === 'en') ? '/decide-en/' : (global.LANG === 'in') ? '/decide-in/' : '/decide/';
     }
     // APIキーの案内ページ（周知サイト）。AI利用ポップアップとAPIキー入力の2か所を、
     // 同じ言語の版へ送る。HTMLに直書きの href は ja 用の既定値。

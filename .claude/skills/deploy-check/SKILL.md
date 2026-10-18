@@ -16,13 +16,14 @@ node tools/sync-check.js
 
 | # | 内容 |
 |---|---|
-| 1 | 3言語フォルダの共有JSがバイト同一か（`calendar*` `schedule*` `decide*` の**全JS**） |
+| 1 | 3言語フォルダの共有JSがバイト同一か（`calendar*` `schedule*` の**全JS**） |
 | 2 | `index.html` の `</head>` 以降が `window.LANG` 以外は同一か |
 | 3 | JSの構文（`node --check`） |
 | 4 | i18n の ja / en / in にキーの過不足が無いか |
 | 5 | `attend/` が原本（`hakusan-attendance`）とバイト同一か |
 | 6 | `LICENSE` が3リポジトリでバイト同一か |
 | 7 | `BASE_SCOPES` が審査済みの3つのままか |
+| 8 | 「何ができる？」ポップアップが `schedule` と `entry` で同じ中身か |
 
 ### ★ head の中は揃えない
 
@@ -77,11 +78,11 @@ head の中の `title` / `description` / `canonical` / `og:*` / `twitter:*` / JS
    |---|---|---|---|
    | イベント | `/calendar/` | `/calendar-en/` | `/calendar-in/` |
    | 予定表 | `/schedule/` | `/schedule-en/` | `/schedule-in/` |
-   | 決めごと | `/decide/` | `/decide-en/` | `/decide-in/` |
 
    いずれも `https://app.dropper-tools.com` の下。
-   **同期チェックの項目1は3ツールとも見ている。確認URLも直したツールに合わせること**
-   （以前ここはイベントの3つしか書いていなかった）
+   **同期チェックの項目1は2ツールとも見ている。確認URLも直したツールに合わせること**
+   （以前ここはイベントの3つしか書いていなかった）。
+   決めごとドロッパー（`/decide*/`）は 2026-10-18 に廃止した。旧URLは404になるのが正しい
 3. **確認ポイント**（何が変わったか、どこを見れば動作確認できるか）
 
 3言語分は1つのZIPにまとめて渡す。

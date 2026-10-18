@@ -3373,8 +3373,6 @@ function focusHandoff_() {
     return a;
   }
   links.appendChild(toolLink('/schedule' + sfx + '/', 'tmGoSchedule'));
-  links.appendChild(document.createTextNode('　／　'));
-  links.appendChild(toolLink('/decide' + sfx + '/', 'tmGoDecide'));
 
   // 「別の要項を読み取る」もここへ。隠した画面を元に戻す。
   var btn = document.createElement('button');

@@ -417,15 +417,6 @@
     .fig .chk div { display:flex; align-items:center; gap:4px; }
     .fig .chk em { flex:none; width:7px; height:7px; border-radius:2px; background:var(--teal); }
     .fig .chk .bar { flex:1; }
-    .chat { width:80px; background:#fff; border:2px solid var(--teal); border-radius:8px;
-      padding:7px 5px; display:flex; flex-direction:column; gap:4px; }
-    .chat u { display:block; height:9px; border-radius:5px; background:var(--line); width:74%; }
-    .chat u.r { margin-left:auto; background:#c8f0a8; width:62%; }
-    .bins { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
-    .bin { background:#fff; border:2px solid var(--line); border-radius:8px;
-      padding:5px 6px; font-size:10px; font-weight:700; color:var(--teal-d); white-space:nowrap; }
-    .bin.a { border-color:var(--lime-d); }
-    .bin.b { border-color:var(--yellow); }
 
     .tm-tags { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 0; }
     /* 出欠の説明（イベントの中に置く）。**周知サイトの .ta-* を、こちらの色で移したもの。**
@@ -737,8 +728,7 @@
       <span class="tool-tabs-label" data-i18n="typePrompt">ドロッパーの選択</span>
       <span class="tool-tab on" data-i18n="toolEvent">🎪 イベント</span>
       <a class="tool-tab" id="tabSchedule" href="/schedule/" data-i18n="toolSchedule">📅 予定表</a>
-      <a class="tool-tab" id="tabDecide" href="/decide/" data-i18n="toolDecide">✅ 決めごと</a>
-      <!-- 申込書ドロッパー（4本目）。日本語のみなので、en/in では i18n.js が隠す -->
+      <!-- 申込書ドロッパー（3本目）。日本語のみなので、en/in では i18n.js が隠す -->
       <a class="tool-tab" id="tabEntry" href="/entry/" data-i18n="toolEntry">📝 申込書</a>
       <button type="button" id="whatBtn" class="what-btn" data-i18n="tmBtn">🔍 何ができる？</button>
     </nav>
@@ -913,7 +903,7 @@
     </div>
   </div>
 
-  <!-- 「何ができる？」ポップアップ。3本それぞれの入力と出力を図で見せる。
+  <!-- 「何ができる？」ポップアップ。それぞれのドロッパーの入力と出力を図で見せる。
        いま開いているのはイベントなので、イベントのパネルだけ .tm-here（リンクにしない）。
        移動先の href は i18n.js の applyDom が window.LANG を見て張り替える（直書きは ja 用の既定値）。 -->
   <div id="tools-modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle" data-home="event">
@@ -924,7 +914,6 @@
       <div class="tm-tabs" role="tablist">
         <button class="tm-tab" type="button" role="tab" aria-selected="true"  data-tab="event" data-i18n="toolEvent">🎪 イベント</button>
         <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="schedule" data-i18n="toolSchedule">📅 予定表</button>
-        <button class="tm-tab" type="button" role="tab" aria-selected="false" data-tab="decide" data-i18n="toolDecide">✅ 決めごと</button>
         <button class="tm-tab" type="button" role="tab" aria-selected="false" id="tmTabEntry" data-tab="entry" data-i18n="toolEntry">📝 申込書</button>
       </div>
 
@@ -1016,51 +1005,6 @@
         </div>
         <div class="tm-btns">
           <a class="tm-go" id="tmGoSchedule" href="/schedule/" data-i18n="tmGoSchedule">📅 予定表ドロッパーを使ってみる</a>
-          <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
-        </div>
-      </div>
-
-      <!-- 決めごと：会話・メモ → 4つに仕分け。カレンダーではなく仕分け箱が主役なのが要点。 -->
-      <div class="tm-panel" data-panel="decide" role="tabpanel">
-        <p class="tm-name" data-i18n="tmNameDecide">✅ 決めごとドロッパー</p>
-        <p class="tm-one" data-i18n="tmOneDecide">会話やメモから、決まったこと・未決・やること・記録に仕分け。</p>
-        <div class="fig">
-          <div class="fig-col">
-            <div class="chat" aria-hidden="true">
-              <u></u><u class="r"></u><u></u><u class="r"></u>
-            </div>
-            <span class="fig-cap" data-i18n="tmFigChat">会話・手書きメモ</span>
-          </div>
-          <span class="fig-arrow" aria-hidden="true">→</span>
-          <div class="fig-col">
-            <div class="bins">
-              <span class="bin a" data-i18n="tmBinDecided">✅ 決まった</span>
-              <span class="bin b" data-i18n="tmBinOpen">❓ 未決</span>
-              <span class="bin a" data-i18n="tmBinTodo">📌 やること</span>
-              <span class="bin" data-i18n="tmBinRecord">🗒 記録</span>
-            </div>
-            <span class="fig-cap" data-i18n="tmFigSort">4つに仕分け</span>
-          </div>
-          <span class="fig-arrow" aria-hidden="true">→</span>
-          <div class="fig-col">
-            <div class="cal" aria-hidden="true">
-              <div class="cal-top"></div>
-              <div class="cal-grid">
-                <s></s><s></s><s></s><s class="f1"></s><s></s><s></s><s></s>
-                <s></s><s class="f1"></s><s></s><s></s><s></s><s></s><s></s>
-                <s></s><s></s><s></s><s></s><s></s><s class="f1"></s><s></s>
-              </div>
-            </div>
-            <span class="fig-cap" data-i18n="tmFigDeadline">期限だけ登録</span>
-          </div>
-        </div>
-        <div class="tm-tags">
-          <span class="tm-tag" data-i18n="tmTagDecide1">ログイン不要で試せる</span>
-          <span class="tm-tag" data-i18n="tmTagDecide2">会話のスクショから</span>
-          <span class="tm-tag" data-i18n="tmTagDecide3">手書き・議事録もOK</span>
-        </div>
-        <div class="tm-btns">
-          <a class="tm-go" id="tmGoDecide" href="/decide/" data-i18n="tmGoDecide">✅ 決めごとドロッパーを使ってみる</a>
           <button type="button" class="tm-close" data-tm-close data-i18n="tmClose">閉じる</button>
         </div>
       </div>
@@ -1269,10 +1213,10 @@
   <!-- ?v= はキャッシュ対策の通し番号。日付ではない。
        **中身を変えたファイルの値だけ上げる。使った値は二度と使わない**
        （スマホのブラウザ／LINEアプリ内ブラウザは古いJSを長く抱え込むことがあるため）。 -->
-  <script src="i18n.js?v=20260876"></script>
+  <script src="i18n.js?v=20260878"></script>
   <script src="parser.js?v=20260816"></script>
   <!-- 出欠システム連携。app.js より前に置く（app.js が AttendanceHook を参照するため） -->
   <script src="attendance-hook.js?v=20260831"></script>
-  <script src="app.js?v=20260877"></script>
+  <script src="app.js?v=20260878"></script>
 </body>
 </html>
