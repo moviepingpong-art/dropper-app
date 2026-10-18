@@ -49,7 +49,7 @@
       <p class="note">マネージャーの「テンプレート」で<b>6分割（大）</b>を選び、下の順にアクション＝リンクを設定します。</p>
       <table id="links"></table>
       <p class="note">
-        <b>3本の道具・APIキー・使い方のリンクには <code>?openExternalBrowser=1</code> が付いています。</b>
+        <b>3本の道具・出欠・使い方のリンクには <code>?openExternalBrowser=1</code> が付いています。</b>
         これが無いとLINE内のブラウザで開き、<b>Googleログインが弾かれて使えません</b>。消さないでください。<br>
         <b>申込書ドロッパーはGoogleログインを使いませんが、それでも付けます。</b>
         Excelのファイルを開いて保存する道具なので、LINE内のブラウザでは危ういためです。<br>
@@ -64,9 +64,9 @@
     // ★ 道具は3本（イベント・予定表・申込書）。上段の3マスに並べ、色を塗る。
     //   2026-10-18 に決めごとドロッパーを廃止したので、上段右にいた決めごとを外し、
     //   下段左にいた申込書を上段右へ上げた。
-    // ★ 空いた下段左には 🔑APIキー（周知サイトの取得ガイド）を戻した。2026-09-24 に申込書を
-    //   入れるために外したマス。キーが要る2本は道具の中のキー入力欄からも取得ガイドへ行けるので、
-    //   ここは近道（唯一の道ではない）。取得には Google のログインが要るので外部ブラウザで開く。
+    // ★ 空いた下段左には 🙋出欠（イベントドロッパーの出欠の入口 ?go=attend）を置いた（本人の判断）。
+    //   🔑APIキーは戻さない。イベント・予定表もキーなし（当方の中継）にする予定で、いずれ要らなくなるため。
+    //   ?go=attend はイベントドロッパーの画面を通るので、ほかの道具と同じく外部ブラウザで開く。
     //   下段（サポート）は淡色。
     // スマホでは 1080px 程度に縮んで表示されるので、文字は大きめに取っている。
     var W = 2500, H = 1686;
@@ -88,8 +88,8 @@
         url:'https://app.dropper-tools.com/schedule/?openExternalBrowser=1' },
       { emoji:'📝', name:'申込書',     sub:'名簿から記入',    bg:'#ffd23f', fg:'#0f3d3a',
         url:'https://app.dropper-tools.com/entry/?openExternalBrowser=1' },
-      { emoji:'🔑', name:'APIキー',    sub:'無料で取る方法',  bg:'#f7fffd', fg:'#0f3d3a',
-        url:'https://dropper-tools.com/apikey.html?openExternalBrowser=1' },
+      { emoji:'🙋', name:'出欠',       sub:'集めて数える',    bg:'#f7fffd', fg:'#0f3d3a',
+        url:'https://app.dropper-tools.com/calendar/?go=attend&openExternalBrowser=1' },
       // ★ 使い方は、周知サイトのホームの「シリーズを見る」と同じ所（#tools。道具のカード）へ
       //   （2026-09-24、本人の指摘）。前は guide.html＝イベントドロッパーだけの使い方だった。
       //   ★ ?openExternalBrowser=1 は # より前に置く（後ろに置くと LINE が読まない）。
